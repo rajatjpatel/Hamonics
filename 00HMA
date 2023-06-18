@@ -1,0 +1,49 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+//@version=5
+
+indicator(title='(Hull Moving Averge)', shorttitle = "00HMA", overlay=true, timeframe="", timeframe_gaps=true)
+
+variant(type, src, len) =>
+    sig = 0.0
+    if type == "SMA"
+        sig := ta.sma(src, len) 
+    else if type == "EMA"
+        sig := ta.ema(src, len) 
+    else if type == "LWMA"
+        sig := ta.wma(src, len) 
+    else if type == "SMMA"
+        outer =ta.sma(src, len)
+        sig := na(sig[1]) ?  outer : (sig[1] * (len - 1) + src) / len
+    sig
+
+func_hma(src, len, mode) =>
+    out = ta.wma(2 * variant(mode, src, len / 2) - variant(mode, src, len), math.round(math.sqrt(len)))
+    out
+
+src = input.source(close, "Source")
+per = input(50, title='Period')
+mode = input.string("LWMA", 'Averge Mode', options = ["EMA", "SMA", "SMMA", "LWMA"])
+shift = input.int(0, "Shift")
+
+hma = func_hma(src, per, mode)
+
+plot(hma, color=close > hma ? color.lime : color.red, linewidth=2, title='HMA', offset = shift)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
