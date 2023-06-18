@@ -1,0 +1,191 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonayatrade
+
+//@version=5
+indicator(title="MA", shorttitle="ALLIN", overlay=true, timeframe="", timeframe_gaps=true)
+len = input.int(200, minval=1, title="Length")
+src = input(high, title="Source")
+offset = input.int(title="Offset", defval=0, minval=-500, maxval=500)
+out = ta.sma(src, len)
+plot(out, color=color.red, title="MA", offset=offset, linewidth=2)
+
+len1 = input.int(200, minval=1, title="Length")
+src1 = input(low, title="Source")
+offset1 = input.int(title="Offset", defval=0, minval=-500, maxval=500)
+out1 = ta.sma(src1, len1)
+plot(out1, color=color.green, title="MA", offset=offset, linewidth=2)
+
+len2 = input.int(200, minval=1, title="Length")
+src2 = input(close, title="Source")
+offset2 = input.int(title="Offset", defval=0, minval=-500, maxval=500)
+out2 = ta.sma(src2, len2)
+plot(out2, color=color.blue, title="MA", offset=offset, linewidth=2)
+//
+price       = input(close, 'Source')
+length      = input.int(10, 'Length', minval=1)
+smooth      = input.int(3, 'Extra Smooth [1 = None]', minval=1)
+
+mult        = input.float(0.3, minval=0.05, maxval=3, step=0.05,    title='Width',  inline = 'SD Channel', group='Volatility Filter (SD Channel)')
+sd_len      = input.int(5, minval=1,                                title='Length', inline = 'SD Channel', group='Volatility Filter (SD Channel)')
+
+baseline    = ta.wma(price, sd_len)
+dev         = mult * ta.stdev(price, sd_len)
+upper       = baseline + dev
+lower       = baseline - dev
+
+cprice      = price > upper ? upper : price < lower ? lower : price
+
+REMA        = ta.wma(cprice, length)//, smooth)
+
+c_up        = color.new(#33ff00, 0)
+c_dn        = color.new(#ff1111, 0)
+
+REMA_up     = REMA > REMA[1]
+
+plot(REMA, title='VCopyWave', color=REMA_up ? c_up : c_dn, linewidth=2)
+
+// ======================================================================================================
+// add optional MA's - to enable us to track what many other traders are working with
+// These MA's will be hidden by default until user exposes them as needed in the Settings
+// the below code is based on the built-in MA Ribbon in the TV library - with some modifications
+
+// ======================================================================    
+f_ma(source, length, type) =>
+    type    == 'SMA' ? ta.sma(source, length) : 
+      type  == 'EMA' ? ta.ema(source, length) : 
+      ta.wma(source, length)
+// ======================================================================    
+gr_ma       = 'Optional MA\'s'
+t_ma1       = 'MA #1'
+t_ma2       = 'MA #2'
+
+show_ma1    = input.bool(false, t_ma1, inline=t_ma1, group=gr_ma)
+ma1_type    = input.string('SMA', '', options=['SMA', 'EMA', 'WMA'], inline=t_ma1, group=gr_ma)
+ma1_source  = input.source(close, '', inline=t_ma1, group=gr_ma)
+ma1_length  = input.int(50, '', minval=1, inline=t_ma1, group=gr_ma)
+ma1_color   = #9c27b0
+ma1         = f_ma(ma1_source, ma1_length, ma1_type)
+plot(show_ma1 ? ma1 : na, color=color.new(ma1_color, 0), title=t_ma1, linewidth=1)
+
+show_ma2    = input.bool(false, t_ma2, inline=t_ma2, group=gr_ma)
+ma2_type    = input.string('SMA', '', options=['SMA', 'EMA', 'WMA'], inline=t_ma2, group=gr_ma)
+ma2_source  = input.source(close, '', inline=t_ma2, group=gr_ma)
+ma2_length  = input.int(100, '', minval=1, inline=t_ma2, group=gr_ma)
+ma2_color   = #1163f6
+ma2         = f_ma(ma2_source, ma2_length, ma2_type)
+plot(show_ma2 ? ma2 : na, color=color.new(ma2_color, 0), title=t_ma2, linewidth=1)
+
+//Volume Weighted Average Price
+hideonDWM = input(false, title="Hide VWAP on 1D or Above", group="VWAP Settings")
+var anchor = input.string(defval = "Session", title="Anchor Period",
+ options=["Session", "Week", "Month", "Quarter", "Year", "Decade", "Century", "Earnings", "Dividends", "Splits"], group="VWAP Settings")
+src3 = input(title = "Source", defval = hlc3, group="VWAP Settings")
+offset3 = input(0, title="Offset", group="VWAP Settings")
+
+showBand_1 = input(true, title="", group="Standard Deviation Bands Settings", inline="band_1")
+stdevMult_1 = input(0.6, title="Bands Multiplier #1", group="Standard Deviation Bands Settings", inline="band_1")
+showBand_2 = input(true, title="", group="Standard Deviation Bands Settings", inline="band_2")
+stdevMult_2 = input(0.8, title="Bands Multiplier #2", group="Standard Deviation Bands Settings", inline="band_2")
+showBand_3 = input(true, title="", group="Standard Deviation Bands Settings", inline="band_3")
+stdevMult_3 = input(1.9, title="Bands Multiplier #3", group="Standard Deviation Bands Settings", inline="band_3")
+showBand_4 = input(true, title="", group="Standard Deviation Bands Settings", inline="band_4")
+stdevMult_4 = input(2.4, title="Bands Multiplier #4", group="Standard Deviation Bands Settings", inline="band_4")
+
+
+if barstate.islast and ta.cum(volume) == 0
+    runtime.error("No volume is provided by the data vendor.")
+
+new_earnings = request.earnings(syminfo.tickerid, earnings.actual, barmerge.gaps_on, barmerge.lookahead_on, ignore_invalid_symbol=true)
+new_dividends = request.dividends(syminfo.tickerid, dividends.gross, barmerge.gaps_on, barmerge.lookahead_on, ignore_invalid_symbol=true)
+new_split = request.splits(syminfo.tickerid, splits.denominator, barmerge.gaps_on, barmerge.lookahead_on, ignore_invalid_symbol=true)
+
+isNewPeriod = switch anchor
+//	"Earnings"  => not na(new_earnings)
+//	"Dividends" => not na(new_dividends)
+//	"Splits"    => not na(new_split)
+	"Session"   => timeframe.change("D")
+	"Week"      => timeframe.change("W")
+	"Month"     => timeframe.change("M")
+	"Quarter"   => timeframe.change("3M")
+	"Year"      => timeframe.change("12M")
+	"Decade"    => timeframe.change("12M") and year % 10 == 0
+	"Century"   => timeframe.change("12M") and year % 100 == 0
+	=> false
+
+isEsdAnchor = anchor == "Earnings" or anchor == "Dividends" or anchor == "Splits"
+if na(src[1]) and not isEsdAnchor
+	isNewPeriod := true
+
+float vwapValue = na
+float upperBandValue1 = na
+float lowerBandValue1 = na
+float upperBandValue2 = na
+float lowerBandValue2 = na
+float upperBandValue3 = na
+float lowerBandValue3 = na
+float upperBandValue4 = na
+float lowerBandValue4 = na
+
+if not (hideonDWM and timeframe.isdwm)
+    [_vwap, _stdevUpper, _] = ta.vwap(src, isNewPeriod, 1)
+	vwapValue := _vwap
+    stdevAbs = _stdevUpper - _vwap
+	upperBandValue1 := _vwap + stdevAbs * stdevMult_1
+	lowerBandValue1 := _vwap - stdevAbs * stdevMult_1
+	upperBandValue2 := _vwap + stdevAbs * stdevMult_2
+	lowerBandValue2 := _vwap - stdevAbs * stdevMult_2
+	upperBandValue3 := _vwap + stdevAbs * stdevMult_3
+	lowerBandValue3 := _vwap - stdevAbs * stdevMult_3
+	upperBandValue4 := _vwap + stdevAbs * stdevMult_4
+	lowerBandValue4 := _vwap - stdevAbs * stdevMult_4
+
+plot(vwapValue, title="VWAP", color=color.orange, offset=offset)
+
+upperBand_1 = plot(upperBandValue1, title="Upper Band #1", color=color.yellow, offset=offset, display = showBand_1 ? display.all : display.none)
+lowerBand_1 = plot(lowerBandValue1, title="Lower Band #1", color=color.yellow, offset=offset, display = showBand_1 ? display.all : display.none)
+upperBand_2 = plot(upperBandValue2, title="Upper Band #2", color=color.yellow, offset=offset, display = showBand_2 ? display.all : display.none)
+lowerBand_2 = plot(lowerBandValue2, title="Lower Band #2", color=color.yellow, offset=offset, display = showBand_2 ? display.all : display.none)
+upperBand_3 = plot(upperBandValue3, title="Upper Band #3", color=color.green, offset=offset, display = showBand_3 ? display.all : display.none)
+lowerBand_3 = plot(lowerBandValue3, title="Lower Band #3", color=color.red, offset=offset, display = showBand_3 ? display.all : display.none)
+upperBand_4 = plot(upperBandValue4, title="Upper Band #4", color=color.aqua, offset=offset, display = showBand_4 ? display.all : display.none)
+lowerBand_4 = plot(lowerBandValue4, title="Lower Band #4", color=color.aqua, offset=offset, display = showBand_4 ? display.all : display.none)
+fill(upperBand_1, upperBand_2, title="Bands Fill Upper #1", color=color.new(color.yellow,67), display = showBand_1 ? display.all : display.none)
+fill(lowerBand_1, lowerBand_2, title="Bands Fill Lower #1", color=color.new(color.yellow,67), display = showBand_2 ? display.all : display.none)
+fill(upperBand_2, upperBand_3 , title="Bands Fill Upper #2", color=color.new(color.green,79), display = showBand_3 ? display.all : display.none)
+fill(lowerBand_2, lowerBand_3, title="Bands Fill Lower #2", color=color.new(color.red,79), display = showBand_4 ? display.all : display.none)
+fill(upperBand_3, upperBand_4 , title="Bands Fill Upper #3", color=color.new(color.aqua,67), display = showBand_3 ? display.all : display.none)
+fill(lowerBand_3, lowerBand_4, title="Bands Fill Lower #4", color=color.new(color.aqua,67), display = showBand_4 ? display.all : display.none)
+
+//LiveTrend Support & Resistance
+var float upper1 = high
+var float lower1 = low
+
+if low[2]>low[1] and  low>low[1]
+    lower1 := low[1]
+
+if high[2]<high[1] and  high<high[1]
+    upper1 := high[1]
+
+plot(upper1,style=plot.style_cross,color=color.red,offset = -3)
+plot(lower1,style=plot.style_cross,color=color.blue,offset = -3)
+
+// SnR Levels
+bars                    = input.int(15, title = "Pivot")
+tipe                    = input.string("Body", title = "Type", options = ["Wick", "Body"])
+pivot_tertinggi         = fixnan(ta.pivothigh(tipe == "Wick" ? high : close, bars, bars)[1])
+pivot_terendah          = fixnan(ta.pivotlow(tipe == "Wick" ? low : close, bars, bars)[1])
+resistance_pertama      = plot(pivot_tertinggi, color=ta.change(pivot_tertinggi) ? na : #ff0040,  linewidth=2, offset = -bars - 1, title="Resistance")
+support_pertama         = plot(pivot_terendah, color=ta.change(pivot_terendah) ? na : #10b442,  linewidth=2, offset = -bars - 1, title="Support")
+
+// Adaptive Moving Average
+plot_ama                = input.bool(false, title = "Adaptive Moving Average")
+ama_length              = input.int(15, title = "Line Length")
+ama_src                 = close
+float ama               = 0
+hh                      = math.max(math.sign(ta.change(ta.highest(ama_length))),0)
+ll                      = math.max(math.sign(ta.change(ta.lowest(ama_length))*-1),0)
+tc                      = math.pow(ta.sma(hh or ll ? 1 : 0,ama_length),2)
+
+ama := nz(ama[1]+tc*(ama_src-ama[1]),ama_src)
+
+garis_ama               = plot(plot_ama ? ama : na,"Adaptive Moving Average",#ffffff,2)
