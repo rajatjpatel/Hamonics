@@ -1,0 +1,80 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+
+
+
+//@version=4
+study(title="20BRSI", shorttitle="20BRSI", format=format.price, precision=2)
+strat = input(title="Select a Speed", defval="Fast", options=["Fast", "Slow"], group="RSI Speed Control")
+strat_val = strat == "Fast" ? 0 : strat == "Slow" ? 1 : na
+
+rsifast  = strat_val < 1
+rsislow  = strat_val > 0 
+
+fast = input(5,  minval=1, title="Length")
+slow = input(14, minval=1, title="Length")
+src  = input(close, "Source", type = input.source)
+
+len =  rsifast ? fast : 
+       rsislow ? slow : na
+
+rsi = rsi(src,len)
+
+rsi5   = input(#4CAF50, title="RSI 0-5",   type = input.color)
+rsi10  = input(#4CAF50, title="RSI 5-10",  type = input.color)
+rsi15  = input(#4CAF50, title="RSI 10-15", type = input.color)
+rsi20  = input(#4CAF50, title="RSI 15-20", type = input.color)
+rsi25  = input(#4CAF50, title="RSI 20-25", type = input.color)
+rsi30  = input(#4CAF50, title="RSI 25-30", type = input.color)
+rsi35  = input(#ef5350, title="RSI 30-35", type = input.color)
+rsi40  = input(#ef5350, title="RSI 35-40", type = input.color)  
+rsi45  = input(#ef5350, title="RSI 40-45", type = input.color)
+rsi50  = input(#ef5350, title="RSI 45-50", type = input.color)
+rsi55  = input(#64b5f6, title="RSI 50-55", type = input.color)
+rsi60  = input(#64b5f6, title="RSI 55-60", type = input.color)
+rsi65  = input(#64b5f6, title="RSI 60-65", type = input.color)
+rsi70  = input(#64b5f6, title="RSI 65-70", type = input.color)
+rsi75  = input(#ffeb3b, title="RSI 70-75", type = input.color)
+rsi80  = input(#ffeb3b, title="RSI 75-80", type = input.color)
+rsi85  = input(#ff9800, title="RSI 80-85", type = input.color)
+rsi90  = input(#ff9800, title="RSI 85-90", type = input.color)
+rsi95  = input(#ffffff, title="RSI 90-95", type = input.color)
+rsi100 = input(#ffffff, title="RSI 95-100",type = input.color)
+
+bjCol =  rsi > 0  and rsi < 5  ? rsi5  :
+         rsi > 5  and rsi < 10 ? rsi10 :
+         rsi > 10 and rsi < 15 ? rsi15 :
+         rsi > 15 and rsi < 20 ? rsi20 :
+         rsi > 20 and rsi < 25 ? rsi25 :
+         rsi > 25 and rsi < 30 ? rsi30 :
+         rsi > 30 and rsi < 35 ? rsi35 :
+         rsi > 35 and rsi < 40 ? rsi40 :
+         rsi > 40 and rsi < 45 ? rsi45 :
+         rsi > 45 and rsi < 50 ? rsi50 :
+         rsi > 50 and rsi < 55 ? rsi55 :
+         rsi > 55 and rsi < 60 ? rsi60 :
+         rsi > 60 and rsi < 65 ? rsi65 :
+         rsi > 65 and rsi < 70 ? rsi70 :
+         rsi > 70 and rsi < 75 ? rsi75 :
+         rsi > 75 and rsi < 80 ? rsi80 :
+         rsi > 80 and rsi < 85 ? rsi85 :
+         rsi > 85 and rsi < 90 ? rsi90 :
+         rsi > 90 and rsi < 95 ? rsi95 :
+         rsi > 95 and rsi < 100? rsi100: na
+     
+plotrsi = plot(rsi, "RSI", color=bjCol)
+lineC = true ? #64b5f6 : na 
+f0 = plot(series=50, color=lineC, transp=65, title="50 Level")
+fill(f0, plotrsi, #ffffff, transp=90)
+
+rsicross = cross(rsi, 50)
+alertcondition(rsicross, title='RSI Signal', message='RSI crossed 50 on {{interval}} chart. Price is {{close}}')
+
+showcol = input(title="Toggle For Bar Color", type=input.bool, defval=false, group="Optional Bar Color")
+
+barcolor(color= false ? na : showcol ? bjCol : na)
+
+
+
+
