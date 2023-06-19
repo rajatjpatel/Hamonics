@@ -1,0 +1,816 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+
+
+//@version=4
+study(title="7MA",  shorttitle="7MA", overlay=true, precision = 4, linktoseries = true, max_bars_back = 500, max_lines_count = 500)
+// Function to select the type of source
+get_src(Type) =>
+    if Type == "VWAP"
+        vwap
+    else if Type == "Close"
+        close
+    else if Type == "Open"
+        open
+    else if Type == "HL2"
+        hl2
+    else if Type == "HLC3"
+        hlc3
+    else if Type == "OHLC4"
+        ohlc4
+    else if Type == "Volume"
+        volume
+    else if Type == "High"
+        high
+    else if Type == "Low"
+        low
+    else if Type == "vwap(Close)"
+        vwap(close)
+    else if Type == "vwap(Open)"
+        vwap(open)
+    else if Type == "vwap(High)"
+        vwap(high)
+    else if Type == "vwap(Low)"
+        vwap(low)
+    else if Type == "AVG(vwap(H,L))"
+        avg(vwap(high), vwap(low))
+    else if Type == "AVG(vwap(O,C))"
+        avg(vwap(open), vwap(close))
+    else if Type == "OBV" // On Balance Volume
+        obv
+    else if Type == "AccDist" // Accumulation Distribution
+        accdist
+    else if Type == "PVT" // Price Volume Trend
+        pvt
+//_________________________________________________________________________________________
+// Based on "Fancy Triple Moving Averages [BigBitsIO]" - Author: @BigBitsIO
+// https://www.tradingview.com/script/7emR6ckb-Fancy-Triple-Moving-Averages-BigBitsIO/
+// https://www.tradingview.com/script/UQAv1U0c-MA-Study-Different-Types-and-More-NeoButane/
+//_________________________________________________________________________________________
+MA_1Visible  = input(true,   title="⮩ MA1", type=input.bool, inline ="MA1") 
+MA_1Period   = input(21,     title="Period", minval=1, step=1, inline ="MA1")
+MA_1Type     = input("WMA",  title="Type", options=["SMA", "EMA", "WMA", "DWMA", "VWMA", "DVWMA", "HMA", "ALMA", "LSMA", "Wild", "JMA", "Zero Lag", "Tillson T3", "VIDYA", "KAMA", "CTI", "RMA", "DEMA", "TEMA", "SWMA"], inline ="MA1")
+
+MA_2Visible = input(true,  title="⮩ MA2", type=input.bool, inline ="MA2") 
+MA_2Period  = input(55,    title="Period", minval=1, step=1, inline ="MA2")
+MA_2Type    = input("EMA", title="Type", options=["SMA", "EMA", "WMA", "DWMA", "VWMA", "DVWMA", "HMA", "ALMA", "LSMA", "Wild", "JMA", "Zero Lag", "Tillson T3", "VIDYA", "KAMA", "CTI", "RMA", "DEMA", "TEMA", "SWMA"], inline ="MA2")
+
+MA_3Visible = input(true,  title="⮩ MA3", type=input.bool, inline ="MA3") 
+MA_3Period  = input(200,   title="Period", minval=1, step=1, inline ="MA3")
+MA_3Type    = input("SMA", title="Type", options=["SMA", "EMA", "WMA", "DWMA", "VWMA", "DVWMA", "HMA", "ALMA", "LSMA", "Wild", "JMA", "Zero Lag", "Tillson T3", "VIDYA", "KAMA", "CTI", "RMA", "DEMA", "TEMA", "SWMA"], inline ="MA3")
+
+MA_4Visible    = input(false,   title="⮩ MA4", type=input.bool, inline ="MA4")
+MA_4Period     = input(20,      title="Period", minval=1, step=1, inline ="MA4")
+MA_4Type       = input("EMA",   title="Type", options=["SMA", "EMA", "WMA", "DWMA", "VWMA", "DVWMA", "HMA", "ALMA", "LSMA", "Wild", "JMA", "Zero Lag", "Tillson T3", "VIDYA", "KAMA", "CTI", "RMA", "DEMA", "TEMA", "SWMA"], inline ="MA4")
+
+MA_5Visible    = input(false,   title="⮩ MA5", type=input.bool, inline ="MA5")
+MA_5Period     = input(50,      title="Period", minval=1, step=1, inline ="MA5")
+MA_5Type       = input("SMA",   title="Type", options=["SMA", "EMA", "WMA", "DWMA", "VWMA", "DVWMA", "HMA", "ALMA", "LSMA", "Wild", "JMA", "Zero Lag", "Tillson T3", "VIDYA", "KAMA", "CTI", "RMA", "DEMA", "TEMA", "SWMA"], inline ="MA5")
+
+MA_6Visible    = input(false,   title="⮩ MA6", type=input.bool, inline ="MA6")
+MA_6Period     = input(30,      title="Period", minval=1, step=1, inline ="MA6")
+MA_6Type       = input("WMA",   title="Type", options=["SMA", "EMA", "WMA", "DWMA", "VWMA", "DVWMA", "HMA", "ALMA", "LSMA", "Wild", "JMA", "Zero Lag", "Tillson T3", "VIDYA", "KAMA", "CTI", "RMA", "DEMA", "TEMA", "SWMA"], inline ="MA6")
+
+Source1 = input("Close", title = "MA1 SRC", options=["VWAP", "Close", "Open", "HL2", "HLC3", "OHLC4", "High", "Low", "vwap(Close)", "vwap(Open)", "vwap(High)", "vwap(Low)", "AVG(vwap(H,L))", "AVG(vwap(O,C))", "OBV", "AccDist", "PVT", "Volume"], inline = "g1")
+Source2 = input("Close", title = "MA2 SRC", options=["VWAP", "Close", "Open", "HL2", "HLC3", "OHLC4", "High", "Low", "vwap(Close)", "vwap(Open)", "vwap(High)", "vwap(Low)", "AVG(vwap(H,L))", "AVG(vwap(O,C))", "OBV", "AccDist", "PVT", "Volume"], inline = "g1")
+Source3 = input("Close", title = "MA3 SRC", options=["VWAP", "Close", "Open", "HL2", "HLC3", "OHLC4", "High", "Low", "vwap(Close)", "vwap(Open)", "vwap(High)", "vwap(Low)", "AVG(vwap(H,L))", "AVG(vwap(O,C))", "OBV", "AccDist", "PVT", "Volume"], inline = "g1")
+Source4 = input("Close", title = "MA4 SRC", options=["VWAP", "Close", "Open", "HL2", "HLC3", "OHLC4", "High", "Low", "vwap(Close)", "vwap(Open)", "vwap(High)", "vwap(Low)", "AVG(vwap(H,L))", "AVG(vwap(O,C))", "OBV", "AccDist", "PVT", "Volume"], inline = "g2")
+Source5 = input("Close", title = "MA5 SRC", options=["VWAP", "Close", "Open", "HL2", "HLC3", "OHLC4", "High", "Low", "vwap(Close)", "vwap(Open)", "vwap(High)", "vwap(Low)", "AVG(vwap(H,L))", "AVG(vwap(O,C))", "OBV", "AccDist", "PVT", "Volume"], inline = "g2")
+Source6 = input("Close", title = "MA6 SRC", options=["VWAP", "Close", "Open", "HL2", "HLC3", "OHLC4", "High", "Low", "vwap(Close)", "vwap(Open)", "vwap(High)", "vwap(Low)", "AVG(vwap(H,L))", "AVG(vwap(O,C))", "OBV", "AccDist", "PVT", "Volume"], inline = "g2")
+MA_1Source = get_src(Source1)
+MA_2Source = get_src(Source2)
+MA_3Source = get_src(Source3)
+MA_4Source = get_src(Source4)
+MA_5Source = get_src(Source5)
+MA_6Source = get_src(Source6)
+MA_4Resolution = input("11 1D", title="MA4 Res", options=["00 Current", "01 1m", "02 3m", "03 5m", "04 15m", "05 30m", "06 45m", "07 1h", "08 2h", "09 3h", "10 4h", "11 1D", "12 1W", "13 1M"], inline = "g2r")
+MA_5Resolution = input("11 1D", title="MA5 Res", options=["00 Current", "01 1m", "02 3m", "03 5m", "04 15m", "05 30m", "06 45m", "07 1h", "08 2h", "09 3h", "10 4h", "11 1D", "12 1W", "13 1M"], inline = "g2r")
+MA_6Resolution = input("12 1W", title="MA6 Res", options=["00 Current", "01 1m", "02 3m", "03 5m", "04 15m", "05 30m", "06 45m", "07 1h", "08 2h", "09 3h", "10 4h", "11 1D", "12 1W", "13 1M"], inline = "g2r")
+MA_4off = input(0, title="4 Offset", minval=-200, maxval=200, type=input.integer, inline = "g2off")
+MA_5off = input(0, title="5 Offset", minval=-200, maxval=200, type=input.integer, inline = "g2off")
+MA_6off = input(0, title="6 Offset", minval=-200, maxval=200, type=input.integer, inline = "g2off")
+
+MA_1Strategy = input("3-MA", title="▷ MA1 ⮩ Strategy Color", options=["None", "3-MA", "SuperTrend", "IchimokuTrend"], inline ="strag")
+MA_abc_Type  = input("EMA",  title="Type", options=["SMA", "EMA", "WMA", "DWMA", "VWMA", "DVWMA", "HMA", "ALMA", "LSMA", "Wild", "JMA", "Zero Lag", "Tillson T3", "VIDYA", "KAMA", "CTI", "RMA", "DEMA", "TEMA", "SWMA"], inline ="strag")
+MA_a_Period  = input(4,  title="Fast",   minval=1, step=1, inline ="MA")
+MA_b_Period  = input(9,  title="Middle", minval=1, step=1, inline ="MA")
+MA_c_Period  = input(18, title="Slow",   minval=1, step=1, inline ="MA")
+
+MA_2Strategy = input("SuperTrend", title="▷ MA2 ⮩ Strategy Color", options=["None", "3-MA", "SuperTrend", "IchimokuTrend"], inline ="strag2")
+MA_abc2_Type = input("EMA",  title="Type", options=["SMA", "EMA", "WMA", "DWMA", "VWMA", "DVWMA", "HMA", "ALMA", "LSMA", "Wild", "JMA", "Zero Lag", "Tillson T3", "VIDYA", "KAMA", "CTI", "RMA", "DEMA", "TEMA", "SWMA"], inline ="strag2")
+MA_a2_Period = input(5,  title="Fast",   minval=1, step=1, inline ="M2")
+MA_b2_Period = input(5,  title="Middle", minval=1, step=1, inline ="M2")
+MA_c2_Period = input(20, title="Slow",   minval=1, step=1, inline ="M2")
+
+MA_3Strategy = input("None", title="▷ MA3 ⮩ Strategy Color", options=["None", "3-MA", "SuperTrend", "IchimokuTrend"], inline ="strag3")
+MA_abc3_Type = input("Wild",  title="Type", options=["SMA", "EMA", "WMA", "DWMA", "VWMA", "DVWMA", "HMA", "ALMA", "LSMA", "Wild", "JMA", "Zero Lag", "Tillson T3", "VIDYA", "KAMA", "CTI", "RMA", "DEMA", "TEMA", "SWMA"], inline ="strag3")
+MA_a3_Period = input(21, title="Fast",   minval=1, step=1, inline ="M3")
+MA_b3_Period = input(21, title="Middle", minval=1, step=1, inline ="M3")
+MA_c3_Period = input(55, title="Slow",   minval=1, step=1, inline ="M3")
+
+// Input - Bollinger Bands
+BB_Visible = input(title="⮩ Visible", type=input.bool, defval=false, group ="Bollinger Bands")
+length_BB  = input(20, title="Length", minval=1, inline ="bb", group ="Bollinger Bands")
+BB_Type    = input("SMA", title="Type", options=["SMA", "EMA", "WMA", "DWMA", "VWMA", "DVWMA", "HMA", "ALMA", "LSMA", "Wild", "JMA", "Zero Lag", "Tillson T3", "VIDYA", "KAMA", "CTI", "RMA", "DEMA", "TEMA", "SWMA"], inline ="bb", group ="Bollinger Bands")
+Source_BB  = input("Close", title = "Source", options=["VWAP", "Close", "Open", "HL2", "HLC3", "OHLC4", "High", "Low", "vwap(Close)", "vwap(Open)", "vwap(High)", "vwap(Low)", "AVG(vwap(H,L))", "AVG(vwap(O,C))", "OBV", "AccDist", "PVT", "Volume"], inline ="bb", group ="Bollinger Bands")
+src_BB     = get_src(Source_BB)
+mult_BB    = input(2.0, title="Multiplier", minval=0.001, maxval=50, inline ="mx", group ="Bollinger Bands")
+show_bands = input(false, title="▷ Show Extra Bands", inline ="mx", group ="Bollinger Bands")
+show_disp  = input(false, title="Show dispersion", inline="disp", group ="Bollinger Bands")
+dispersion = input(0.1, title="Disp:", type=input.float, minval=0.01, maxval=1, step=0.01, inline="disp", group ="Bollinger Bands")
+
+// Input - Parabolic SAR
+PSAR_Visible = input(title="⮩ Visible", type=input.bool, defval=false, group ="Parabolic SAR")
+start        = input(title="Start",        type=input.float,   step=0.001, defval=0.02, inline ="sar", group ="Parabolic SAR")
+increment    = input(title="Increment",    type=input.float,   step=0.001, defval=0.02, inline ="sar", group ="Parabolic SAR")
+maximum      = input(title="Maximum",      type=input.float,   step=0.01,  defval=0.2,  inline ="sar", group ="Parabolic SAR")
+showsignals  = input(title="Show Signals", type=input.bool,    defval=true, inline ="Opc SAR", group ="Parabolic SAR")
+highlighting = input(title="Highlighter",  type=input.bool,    defval=true, inline ="Opc SAR", group ="Parabolic SAR")
+
+// Volume Weighted Colored Bars
+VBCB_Visible  = input(title="⮩ Visible", type=input.bool, defval=false, group ="Volume Weighted Colored Bars")
+vbcbLength    = input(21,    "Volume MA Length", minval=1, inline ="v1", group ="Volume Weighted Colored Bars")
+v_show_last   = input(233,   "Plotting Length", inline ="v1", group ="Volume Weighted Colored Bars")
+vwcbUpper     = input(1.5,   "Upper Theshold", minval = 0.1, step = .1, inline ="v2", group ="Volume Weighted Colored Bars")
+vwcbLower     = input(.5,    "Lower Theshold", minval = 0.1, step = .1, inline ="v2", group ="Volume Weighted Colored Bars")
+
+// Input - Linear Regression (Logarithmic)
+LR_Visible  = input(title="⮩ Visible", type=input.bool, defval=false, group ="Linear Regression (log)")
+lenLR       = input(100,   title="Count", minval=10, maxval=300, inline ="lr", group ="Linear Regression (log)")
+sourceLR    = input(close, title="Source", inline ="lr", group ="Linear Regression (log)")
+upperMult   = input(2.0,   title="Upper Deviation", inline ="devi", group ="Linear Regression (log)")
+lowerMult   = input(-2.0,  title="Lower Deviation", inline ="devi", group ="Linear Regression (log)")
+useUpperDev = input(true,  title="Use Upper Deviation", group ="Linear Regression (log)")
+useLowerDev = input(true,  title="Use Lower Deviation", group ="Linear Regression (log)")
+showPearson = input(false, title="Show Pearson`s R", group ="Linear Regression (log)")
+extendLines = input(false, title="Extend Lines", group ="Linear Regression (log)")
+
+// Input - Laguerre Average
+LMA_Visible   = input(title="⮩ Visible", type=input.bool, defval=false, group ="Laguerre Average")
+src_LMA       = input("HL2", title = "Source", options=["VWAP", "Close", "Open", "HL2", "HLC3", "OHLC4", "Volume", "High", "Low", "vwap(Close)", "vwap(Open)", "vwap(High)", "vwap(Low)", "AVG(vwap(H,L))", "AVG(vwap(O,C))"], inline ="L1", group ="Laguerre Average")
+src_L         = get_src(src_LMA)
+Gamma         = input(0.77, inline ="L1", group ="Laguerre Average")
+useCurrentRes = input(true, title="▷ Use Current Chart Resolution?", inline ="L2", group ="Laguerre Average")
+resCustom     = input("D", title="Timeframe", type=input.resolution, inline ="L2", group ="Laguerre Average")
+res_LMA       = useCurrentRes ? timeframe.period : resCustom
+sd            = input(true, title="Show dots?", inline ="L3", group ="Laguerre Average")
+ccol          = input(true, title="Change Color?", inline ="L3", group ="Laguerre Average")
+//______________________________________________________________________________
+//______________________________________________________________________________
+// Kaufman's Adaptive Moving Average
+fast = 0.666 // KAMA Fast End
+slow = 0.645 // KAMA Slow End
+kama(x, t)=>
+    dist   = abs(x[0] - x[1])
+    signal = abs(x - x[t])
+    noise  = sum(dist, t)
+    effr   = noise!=0 ? signal/noise : 1
+    sc     = pow(effr*(fast - slow) + slow,2)
+    KAma   = x
+    KAma  := nz(KAma[1]) + sc*(x - nz(KAma[1]))
+    KAma
+
+// Jurik Moving Average of @everget
+jma(src, length, power, phase) => 
+    phaseRatio = phase < -100 ? 0.5 : phase > 100 ? 2.5 : phase / 100 + 1.5
+    beta = 0.45 * (length - 1) / (0.45 * (length - 1) + 2)
+    alpha = pow(beta, power)
+    Jma = 0.0
+    e0 = 0.0
+    e0 := (1 - alpha) * src + alpha * nz(e0[1])
+    e1 = 0.0
+    e1 := (src - e0) * (1 - beta) + beta * nz(e1[1])
+    e2 = 0.0
+    e2 := (e0 + phaseRatio * e1 - nz(Jma[1])) * pow(1 - alpha, 2) + pow(alpha, 2) * nz(e2[1])
+    Jma := e2 + nz(Jma[1])
+    Jma
+
+cti(sm, src, cd) =>
+    di = (sm - 1.0) / 2.0 + 1.0
+    c1 = 2 / (di + 1.0)
+    c2 = 1 - c1
+    c3 = 3.0 * (cd * cd + cd * cd * cd)
+    c4 = -3.0 * (2.0 * cd * cd + cd + cd * cd * cd)
+    c5 = 3.0 * cd + 1.0 + cd * cd * cd + 3.0 * cd * cd
+    i1 = 0.0
+    i2 = 0.0
+    i3 = 0.0
+    i4 = 0.0
+    i5 = 0.0
+    i6 = 0.0
+    i1 := c1*src + c2*nz(i1[1])
+    i2 := c1*i1 + c2*nz(i2[1])
+    i3 := c1*i2 + c2*nz(i3[1])
+    i4 := c1*i3 + c2*nz(i4[1])
+    i5 := c1*i4 + c2*nz(i5[1])
+    i6 := c1*i5 + c2*nz(i6[1])
+    bfr = -cd*cd*cd*i6 + c3*(i5) + c4*(i4) + c5*(i3)
+    bfr
+
+a = 0.618
+T3ma(src,Len) =>
+    e1 = ema(src, Len)
+    e2 = ema(e1, Len)
+    e3 = ema(e2, Len)
+    e4 = ema(e3, Len)
+    e5 = ema(e4, Len)
+    e6 = ema(e5, Len)
+    C1 = -a*a*a
+    C2 = 3*a*a+3*a*a*a
+    C3 = -6*a*a-3*a-3*a*a*a
+    C4 = 1+3*a+a*a*a+3*a*a
+    C1*e6+C2*e5+C3*e4+C4*e3
+
+VIDYA(src,Len) =>
+    mom = change(src)
+    upSum = sum(max(mom, 0), Len)
+    downSum = sum(-min(mom, 0), Len)
+    out = (upSum - downSum) / (upSum + downSum)
+    cmo = abs(out)
+    alpha = 2 / (Len + 1)
+    vidya = 0.0
+    vidya := src * alpha * cmo + nz(vidya[1]) * (1 - alpha * cmo)
+    vidya
+
+// ZLEMA: Zero Lag
+zema(_src, _len) =>
+    _alpha = (_len - 1) / 2
+    _zlema0 = (_src + (_src - _src[_alpha]))
+    _zlemaF = ema(_zlema0, _len)
+
+ma(MAType, MASource, MAPeriod) =>
+    if MAPeriod > 0
+        if MAType == "SMA"
+            sma(MASource, MAPeriod)
+        else if MAType == "EMA"
+            ema(MASource, MAPeriod)
+        else if MAType == "WMA"
+            wma(MASource, MAPeriod)
+        else if MAType == "RMA"
+            rma(MASource, MAPeriod)
+        else if MAType == "HMA"
+            hma(MASource, MAPeriod)
+        else if MAType == "DEMA"
+            e = ema(MASource, MAPeriod)
+            2 * e - ema(e, MAPeriod)
+        else if MAType == "TEMA"
+            e = ema(MASource, MAPeriod)
+            3 * (e - ema(e, MAPeriod)) + ema(ema(e, MAPeriod), MAPeriod)
+        else if MAType == "VWMA"
+            vwma(MASource, MAPeriod)
+        else if MAType == "ALMA"
+            alma(MASource, MAPeriod, .85, 6)
+        else if MAType == "CTI"
+            cti(MAPeriod, MASource, 0)
+        else if MAType == "KAMA"
+            kama(MASource, MAPeriod)
+        else if MAType == "SWMA" 
+            swma(MASource)
+        else if MAType == "JMA"
+            jma(MASource, MAPeriod, 2, 50)
+        else if MAType == "LSMA"
+            linreg(MASource, MAPeriod, 0) // Least Squares
+        else if MAType == "Wild"
+            wild = MASource
+            wild := nz(wild[1]) + (MASource - nz(wild[1])) / MAPeriod
+        else if MAType == "Tillson T3"
+            T3ma(MASource, MAPeriod)
+        else if MAType == "VIDYA"
+            VIDYA(MASource, MAPeriod)
+        else if MAType == "DWMA" // Double Weighted Moving Average
+            wma(wma(MASource, MAPeriod), MAPeriod)
+        else if MAType == "DVWMA" // Double Volume-Weighted Moving Average
+            vwma(vwma(MASource, MAPeriod), MAPeriod)
+        else if MAType == "Zero Lag"
+            zema(MASource, MAPeriod)
+
+res(MAResolution) =>
+    if MAResolution == "00 Current"
+        timeframe.period
+    else if MAResolution == "01 1m"
+        "1"
+    else if MAResolution == "02 3m"
+        "3"
+    else if MAResolution == "03 5m"
+        "5"
+    else if MAResolution == "04 15m"
+        "15"
+    else if MAResolution == "05 30m"
+        "30"
+    else if MAResolution == "06 45m"
+        "45"
+    else if MAResolution == "07 1h"
+        "60"
+    else if MAResolution == "08 2h"
+        "120"
+    else if MAResolution == "09 3h"
+        "180"
+    else if MAResolution == "10 4h"
+        "240"
+    else if MAResolution == "11 1D"
+        "1D"
+    else if MAResolution == "12 1W"
+        "1W"
+    else if MAResolution == "13 1M"
+        "1M"
+
+color_lavender     = #8080FF 
+color_coral        = #FF8080 
+color_black        = color.new(color.black, 10)
+color_fuchsia      = #FF00FF // Color MA 4
+color_hanpurple    = #6600FF // Color MA 5
+color_chartreuse   = #80FF00 // Color MA 6
+color_redorange    = #FF4000 
+
+// Strategy 3-MA
+// When the color is green, this is a bullish zone. 
+// When the color is red, this is a bearish zone. 
+// When the color is red, this is a bearish zone. 
+f_color_3ma(Type, Period1, Period2, Period3) =>
+    ma_v = ma(Type, close, Period1) 
+    ma_a = ma(Type, close, Period2) 
+    ma_r = ma(Type, close, Period3)
+    bulls = ma_v >= ma_a and ma_a > ma_r 
+    bears = ma_v < ma_a and ma_a < ma_r
+    color_3 = bulls ? color.lime : bears ? color.red : color.yellow   
+ 
+color_3ma_m1 = f_color_3ma(MA_abc_Type, MA_a_Period, MA_b_Period, MA_c_Period)     
+color_3ma_m2 = f_color_3ma(MA_abc2_Type, MA_a2_Period, MA_b2_Period, MA_c2_Period)
+color_3ma_m3 = f_color_3ma(MA_abc3_Type, MA_a3_Period, MA_b3_Period, MA_c3_Period)
+
+//______________________________________________________________________________
+// Based on "Pivot Point Supertrend" - Author: @LonesomeTheBlue
+// https://www.tradingview.com/script/L0AIiLvH-Pivot-Point-Supertrend/
+//______________________________________________________________________________
+prd    = 2   // Pivot Point Period
+Factor = 3   // ATR Factor
+Pd     = 10  // ATR Period
+// Get Pivot High/Low
+float ph = pivothigh(prd, prd)
+float pl = pivotlow(prd, prd)
+// Calculate the Center line using pivot points
+var float center = na
+float lastpp = ph ? ph : pl ? pl : na
+if lastpp
+    if na(center)
+        center := lastpp
+    else
+        center := (center * 2 + lastpp) / 3 // Weighted calculation
+// Upper/Lower bands calculation
+Up = center - (Factor * atr(Pd))
+Dn = center + (Factor * atr(Pd))
+// Get the trend
+float TUp   = na
+float TDown = na
+Trend = 0
+TUp   := close[1] > TUp[1]   ? max(Up, TUp[1])   : Up
+TDown := close[1] < TDown[1] ? min(Dn, TDown[1]) : Dn
+Trend := close > TDown[1]    ? 1 : close < TUp[1] ? -1 : nz(Trend[1], 1)
+Trailingsl = Trend == 1 ? TUp : TDown
+color_SuperTrend = Trend == 1 and nz(Trend[1]) == 1 ? #00C0FF : Trend == -1 and nz(Trend[1]) == -1 ? #FF4000 : #808080
+
+// Ichimoku Trend and MFI
+conversionLine = avg(lowest(9), highest(9))
+baseLine       = avg(lowest(26), highest(26))
+ssa            = avg(conversionLine, baseLine)
+ssb            = avg(lowest(52), highest(52))
+valor_mfi  = mfi(hlc3, 14)
+bull_Ichi  = close > ssa[26] and close > ssb[26] and valor_mfi >= 50
+bear_Ichi  = close < ssa[26] and close < ssb[26] and valor_mfi < 50
+color_Ichi = bull_Ichi ? color.lime : bear_Ichi ? color.red : color.yellow
+
+// Color MA 1
+color_MA1 = color_redorange 
+if MA_1Strategy == "None"
+    na
+else if MA_1Strategy == "3-MA"
+    color_MA1 := color_3ma_m1
+else if MA_1Strategy == "SuperTrend"
+    color_MA1 := color_SuperTrend
+else if MA_1Strategy == "IchimokuTrend"
+    color_MA1 := color_Ichi
+
+// Color MA 2
+color_MA2 = color_coral 
+if MA_2Strategy == "None"
+    na
+else if MA_2Strategy == "3-MA"
+    color_MA2 := color_3ma_m2
+else if MA_2Strategy == "SuperTrend"
+    color_MA2 := color_SuperTrend
+else if MA_2Strategy == "IchimokuTrend"
+    color_MA2 := color_Ichi
+    
+// Color MA 3
+color_MA3 = color_lavender
+if MA_3Strategy == "None"
+    na
+else if MA_3Strategy == "3-MA"
+    color_MA3 := color_3ma_m3
+else if MA_3Strategy == "SuperTrend"
+    color_MA3 := color_SuperTrend
+else if MA_3Strategy == "IchimokuTrend"
+    color_MA3 := color_Ichi
+
+// PLOT - MA
+MA_1 = ma(MA_1Type, MA_1Source, MA_1Period)
+plot(MA_1Visible ? MA_1 : na, color=color_MA1, linewidth=2, title="MA1")
+plot(MA_1Visible ? MA_1[MA_1Period-1] : na, color=color_black, linewidth=2, title="MA1 Trail", offset=((MA_1Period-1)*-1))
+
+MA_2 = ma(MA_2Type, MA_2Source, MA_2Period)
+plot(MA_2Visible ? MA_2 : na, color=color_MA2, linewidth=1, title="MA2")
+plot(MA_2Visible ? MA_2[MA_2Period-1] : na, color=color_black, linewidth=2, title="MA2 Trail", offset=((MA_2Period-1)*-1))
+
+MA_3 = ma(MA_3Type, MA_3Source, MA_3Period)
+plot(MA_3Visible ? MA_3 : na, color=color_MA3, linewidth=1, title="MA3")
+plot(MA_3Visible ? MA_3[MA_3Period-1] : na, color=color_black, linewidth=2, title="MA3 Trail", offset=((MA_3Period-1)*-1))
+
+// https://www.tradingview.com/pine-script-reference/#fun_security
+MA_4 = security(syminfo.tickerid, res(MA_4Resolution), ma(MA_4Type, MA_4Source, MA_4Period))
+plot(MA_4Visible ? MA_4 : na, color=color_fuchsia, linewidth=2, title="MA4", offset=MA_4off)
+
+MA_5 = security(syminfo.tickerid, res(MA_5Resolution), ma(MA_5Type, MA_5Source, MA_5Period))
+plot(MA_5Visible ? MA_5 : na, color=color_hanpurple, linewidth=2, title="MA5", offset=MA_5off)
+
+MA_6 = security(syminfo.tickerid, res(MA_6Resolution), ma(MA_6Type, MA_6Source, MA_6Period))
+plot(MA_6Visible ? MA_6 : na, color=color_chartreuse, linewidth=2, title="MA6", offset=MA_6off)
+
+// Forecasting - forcasted prices are calculated using our MAType and MASource for the MAPeriod - the last X candles.
+//              it essentially replaces the oldest X candles, with the selected source * X candles
+MAForecast1 = MA_1Period > 1 ? (security(syminfo.tickerid, timeframe.period, ma(MA_1Type, MA_1Source, MA_1Period - 1)) * (MA_1Period - 1) + ((MA_1Source * 1) )) / MA_1Period : na
+MAForecast2 = MA_1Period > 2 ? (security(syminfo.tickerid, timeframe.period, ma(MA_1Type, MA_1Source, MA_1Period - 2)) * (MA_1Period - 2) + ((MA_1Source * 2) )) / MA_1Period : na
+MAForecast3 = MA_1Period > 3 ? (security(syminfo.tickerid, timeframe.period, ma(MA_1Type, MA_1Source, MA_1Period - 3)) * (MA_1Period - 3) + ((MA_1Source * 3) )) / MA_1Period : na
+MAForecast4 = MA_1Period > 4 ? (security(syminfo.tickerid, timeframe.period, ma(MA_1Type, MA_1Source, MA_1Period - 4)) * (MA_1Period - 4) + ((MA_1Source * 4) )) / MA_1Period : na
+MAForecast5 = MA_1Period > 5 ? (security(syminfo.tickerid, timeframe.period, ma(MA_1Type, MA_1Source, MA_1Period - 5)) * (MA_1Period - 5) + ((MA_1Source * 5) )) / MA_1Period : na
+
+plot( MA_1Visible ? MAForecast1 : na, color=color_MA1, linewidth=1, style=plot.style_circles, title="MA1 F1", offset=1, show_last=1)
+plot( MA_1Visible ? MAForecast2 : na, color=color_MA1, linewidth=1, style=plot.style_circles, title="MA1 F2", offset=2, show_last=1)
+plot( MA_1Visible ? MAForecast3 : na, color=color_MA1, linewidth=1, style=plot.style_circles, title="MA1 F3", offset=3, show_last=1)
+plot( MA_1Visible ? MAForecast4 : na, color=color_MA1, linewidth=1, style=plot.style_circles, title="MA1 F4", offset=4, show_last=1)
+plot( MA_1Visible ? MAForecast5 : na, color=color_MA1, linewidth=1, style=plot.style_circles, title="MA1 F5", offset=5, show_last=1)
+
+MA2Forecast1 = MA_2Period > 1 ? (security(syminfo.tickerid, timeframe.period, ma(MA_2Type, MA_2Source, MA_2Period - 1)) * (MA_2Period - 1) + ((MA_2Source * 1) )) / MA_2Period : na
+MA2Forecast2 = MA_2Period > 2 ? (security(syminfo.tickerid, timeframe.period, ma(MA_2Type, MA_2Source, MA_2Period - 2)) * (MA_2Period - 2) + ((MA_2Source * 2) )) / MA_2Period : na
+MA2Forecast3 = MA_2Period > 3 ? (security(syminfo.tickerid, timeframe.period, ma(MA_2Type, MA_2Source, MA_2Period - 3)) * (MA_2Period - 3) + ((MA_2Source * 3) )) / MA_2Period : na
+MA2Forecast4 = MA_2Period > 4 ? (security(syminfo.tickerid, timeframe.period, ma(MA_2Type, MA_2Source, MA_2Period - 4)) * (MA_2Period - 4) + ((MA_2Source * 4) )) / MA_2Period : na
+MA2Forecast5 = MA_2Period > 5 ? (security(syminfo.tickerid, timeframe.period, ma(MA_2Type, MA_2Source, MA_2Period - 5)) * (MA_2Period - 5) + ((MA_2Source * 5) )) / MA_2Period : na
+
+plot( MA_2Visible ? MA2Forecast1 : na, color=color.gray, linewidth=1, style=plot.style_circles, title="MA2 F1", offset=1, show_last=1)
+plot( MA_2Visible ? MA2Forecast2 : na, color=color.gray, linewidth=1, style=plot.style_circles, title="MA2 F2", offset=2, show_last=1)
+plot( MA_2Visible ? MA2Forecast3 : na, color=color.gray, linewidth=1, style=plot.style_circles, title="MA2 F3", offset=3, show_last=1)
+plot( MA_2Visible ? MA2Forecast4 : na, color=color.gray, linewidth=1, style=plot.style_circles, title="MA2 F4", offset=4, show_last=1)
+plot( MA_2Visible ? MA2Forecast5 : na, color=color.gray, linewidth=1, style=plot.style_circles, title="MA2 F5", offset=5, show_last=1)
+
+MA3Forecast1 = MA_3Period > 1 ? (security(syminfo.tickerid, timeframe.period, ma(MA_3Type, MA_3Source, MA_3Period - 1)) * (MA_3Period - 1) + ((MA_3Source * 1) )) / MA_3Period : na
+MA3Forecast2 = MA_3Period > 2 ? (security(syminfo.tickerid, timeframe.period, ma(MA_3Type, MA_3Source, MA_3Period - 2)) * (MA_3Period - 2) + ((MA_3Source * 2) )) / MA_3Period : na
+MA3Forecast3 = MA_3Period > 3 ? (security(syminfo.tickerid, timeframe.period, ma(MA_3Type, MA_3Source, MA_3Period - 3)) * (MA_3Period - 3) + ((MA_3Source * 3) )) / MA_3Period : na
+MA3Forecast4 = MA_3Period > 4 ? (security(syminfo.tickerid, timeframe.period, ma(MA_3Type, MA_3Source, MA_3Period - 4)) * (MA_3Period - 4) + ((MA_3Source * 4) )) / MA_3Period : na
+MA3Forecast5 = MA_3Period > 5 ? (security(syminfo.tickerid, timeframe.period, ma(MA_3Type, MA_3Source, MA_3Period - 5)) * (MA_3Period - 5) + ((MA_3Source * 5) )) / MA_3Period : na
+
+plot( MA_3Visible ? MA3Forecast1 : na, color=color.gray, linewidth=1, style=plot.style_circles, title="MA3 F1", offset=1, show_last=1)
+plot( MA_3Visible ? MA3Forecast2 : na, color=color.gray, linewidth=1, style=plot.style_circles, title="MA3 F2", offset=2, show_last=1)
+plot( MA_3Visible ? MA3Forecast3 : na, color=color.gray, linewidth=1, style=plot.style_circles, title="MA3 F3", offset=3, show_last=1)
+plot( MA_3Visible ? MA3Forecast4 : na, color=color.gray, linewidth=1, style=plot.style_circles, title="MA3 F4", offset=4, show_last=1)
+plot( MA_3Visible ? MA3Forecast5 : na, color=color.gray, linewidth=1, style=plot.style_circles, title="MA3 F5", offset=5, show_last=1)
+
+//_____________________________________________________________________________________________
+//                                      Parabolic SAR 
+//_____________________________________________________________________________________________
+// Create non-repainting security function
+rp_security(_symbol, _res, _src) => security(_symbol, _res, _src[barstate.isrealtime ? 1 : 0])
+htclose = rp_security(syminfo.tickerid, timeframe.period, close)
+
+psar      = sar(start, increment, maximum)
+Trend_SAR = psar < htclose ? 1 : -1
+
+//Plot line and fill
+upPlot = plot(PSAR_Visible and Trend_SAR == 1  ? psar : na, title='Uptrend',   style=plot.style_circles, color=#12DA00, linewidth=1)
+dnPlot = plot(PSAR_Visible and Trend_SAR == -1 ? psar : na, title='Downtrend', style=plot.style_circles, color=#CC0000, linewidth=1)
+mPlot  = plot(PSAR_Visible ? ohlc4 : na, title="", style=plot.style_circles, linewidth=0, editable = false)
+fillColor = PSAR_Visible and highlighting ? (Trend_SAR == 1  ? #12DA00 : #CC0000) : na
+fill(mPlot, upPlot, title="UpTrend Highligter",   color=fillColor)
+fill(mPlot, dnPlot, title="DownTrend Highligter", color=fillColor)
+
+//Plot Long Signal
+buySignal = Trend_SAR == 1 and Trend_SAR[1] == -1
+plotshape(PSAR_Visible and buySignal and showsignals ? psar : na, title="PSAR Buy", text="B", location=location.absolute, style=shape.labelup, size=size.tiny, color=#0EAE00, textcolor=color.white)
+
+//Plot Short Signal
+sellSignal = Trend_SAR == -1 and Trend_SAR[1] == 1
+plotshape(PSAR_Visible and sellSignal and showsignals ? psar : na, title="PSAR Sell", text="S", location=location.absolute, style=shape.labeldown, size=size.tiny, color=#CC0000, textcolor=color.white)
+ 
+//_____________________________________________________________________________________________
+//                                       Bollinger Bands
+//_____________________________________________________________________________________________
+basis    = ma(BB_Type, src_BB, length_BB) 
+stdDevBB = stdev(src_BB, length_BB)
+devBase  = mult_BB * stdDevBB
+upperBB  = basis + devBase
+lowerBB  = basis - devBase
+
+disp_up   = basis + ((upperBB - lowerBB) * dispersion) 
+disp_down = basis - ((upperBB - lowerBB) * dispersion)
+
+devInc1 = (mult_BB + 0.5) * stdDevBB
+devInc2 = (mult_BB + (0.5 * 2)) * stdDevBB
+
+verde  = color.new(#00FFBB, 10)
+rojo   = color.new(#FF5500, 0)
+rojo85 = color.new(#FF5500, 85)
+rojo80 = color.new(#FF5500, 80)
+azul   = color.new(#004EF7, 0)
+azul85 = color.new(#004EF7, 85)
+azul80 = color.new(#004EF7, 80)
+
+plot(BB_Visible ? basis : na, color=verde, linewidth=2, title="Basis")
+plot(BB_Visible ? basis[length_BB-1] : na, color=color_black, linewidth=2, title="Basis Trail", offset=((length_BB-1)*-1))
+p1 = plot(BB_Visible ? upperBB : na, "Upper", color=rojo, linewidth=2)
+p2 = plot(BB_Visible ? lowerBB : na, "Lower", color=azul, linewidth=2)
+fill(p1, p2, title = "BB Background", color = color.new(#FEDF88, 95))
+plot(BB_Visible ? upperBB[length_BB-1] : na, color=color_black, linewidth=2, title="Upper Trail", offset=((length_BB-1)*-1))
+plot(BB_Visible ? lowerBB[length_BB-1] : na, color=color_black, linewidth=2, title="Lower Trail", offset=((length_BB-1)*-1))
+
+plot(show_bands ? (basis + devInc1) : na, title="Upper - Middle Band", color = rojo85, linewidth=2)
+plot(show_bands ? (basis + devInc2) : na, title="Upper - Top Band",    color = rojo80, linewidth=2)
+plot(show_bands ? (basis - devInc1) : na, title="Lower - Middle Band", color = azul85, linewidth=2)
+plot(show_bands ? (basis - devInc2) : na, title="Lower - Low Band",    color = azul80, linewidth=2)
+
+p3 = plot(show_disp ? disp_up   : na, color=color_black)
+p4 = plot(show_disp ? disp_down : na, color=color_black)
+fill(p3, p4, title = "Dispersion Background", color = color.new(#FEDF88, 95))
+
+BBForecast1 = length_BB > 1 ? (security(syminfo.tickerid, timeframe.period, ma(BB_Type, src_BB, length_BB - 1)) * (length_BB - 1) + ((src_BB * 1) )) / length_BB : na
+BBForecast2 = length_BB > 2 ? (security(syminfo.tickerid, timeframe.period, ma(BB_Type, src_BB, length_BB - 2)) * (length_BB - 2) + ((src_BB * 2) )) / length_BB : na
+BBForecast3 = length_BB > 3 ? (security(syminfo.tickerid, timeframe.period, ma(BB_Type, src_BB, length_BB - 3)) * (length_BB - 3) + ((src_BB * 3) )) / length_BB : na
+BBForecast4 = length_BB > 4 ? (security(syminfo.tickerid, timeframe.period, ma(BB_Type, src_BB, length_BB - 4)) * (length_BB - 4) + ((src_BB * 4) )) / length_BB : na
+BBForecast5 = length_BB > 5 ? (security(syminfo.tickerid, timeframe.period, ma(BB_Type, src_BB, length_BB - 5)) * (length_BB - 5) + ((src_BB * 5) )) / length_BB : na
+
+plot( BB_Visible ? BBForecast1 : na, color=verde, linewidth=1, style=plot.style_circles, title="BB F1", offset=1, show_last=1)
+plot( BB_Visible ? BBForecast2 : na, color=verde, linewidth=1, style=plot.style_circles, title="BB F2", offset=2, show_last=1)
+plot( BB_Visible ? BBForecast3 : na, color=verde, linewidth=1, style=plot.style_circles, title="BB F3", offset=3, show_last=1)
+plot( BB_Visible ? BBForecast4 : na, color=verde, linewidth=1, style=plot.style_circles, title="BB F4", offset=4, show_last=1)
+plot( BB_Visible ? BBForecast5 : na, color=verde, linewidth=1, style=plot.style_circles, title="BB F5", offset=5, show_last=1) 
+
+//______________________________________________________________________________
+// Volume Weighted Colored Bars by KIVANÇ ÖZBİLGİÇ
+// https://www.tradingview.com/script/8RPiMMmn-Volume-Based-Coloured-Bars/
+//______________________________________________________________________________
+volMA = sma(volume, vbcbLength)
+
+vwcbColor = if close < open
+    if      volume > volMA * vwcbUpper
+        #FF0000 // Red
+    else if volume < volMA * vwcbLower
+        #820000 // Dark Red
+else
+    if      volume > volMA * vwcbUpper
+        #3FFF5E // Screamin' Green
+    else if volume < volMA * vwcbLower
+        #208230 // Forest Green
+
+barcolor(VBCB_Visible and nz(volume) ? vwcbColor : na, title = "Volume Weighted Colored Bars", show_last = v_show_last)
+
+//______________________________________________________________________________________
+// LMA (Laguerre) v2 - multi timeframe by TheLark
+// https://www.tradingview.com/script/u3irwHjc-TheLark-LMA-Laguerre-v2-multi-timeframe/
+//______________________________________________________________________________________
+lag(g) =>
+    L0 = 0.0
+    L1 = 0.0
+    L2 = 0.0
+    L3 = 0.0
+    L0 := (1 - g) * src_L + g * nz(L0[1])
+    L1 := -g * L0 + nz(L0[1]) + g * nz(L1[1])
+    L2 := -g * L1 + nz(L1[1]) + g * nz(L2[1])
+    L3 := -g * L2 + nz(L2[1]) + g * nz(L3[1])
+    f = (L0 + 2 * L1 + 2 * L2 + L3) / 6
+    f
+
+lma = security(syminfo.tickerid, res_LMA, lag(Gamma))
+col = 0.0
+col := ccol ? lma == lma[1] and col[1] == 1 ? 1 : 
+   lma == lma[1] and col[1] == 2 ? 2 : lma > lma[1] ? 1 : 2 : 2
+
+color_lag  = col < 2 ? #00CC96 : #FF3571
+color_dots = col < 2 ? color.new(#00CC96, 60) : color.new(#FF3571, 60)
+up = col < col[1] ? 1 : 0
+down = col > col[1] ? 1 : 0
+
+plot(LMA_Visible ? lma : na, title = "MT Laguerre", color = color_lag, linewidth = 2)
+plot(LMA_Visible and sd and cross(up, down) ? lma : na, style=plot.style_circles, linewidth = 7, color = color_dots)
+
+//_____________________________________________________________________________________________
+// Based on "Linear Regression (Log Scale)" - Author: @Forza
+// https://www.tradingview.com/script/cxcEYTkE-Linear-Regression-Log-Scale/
+//_____________________________________________________________________________________________
+srcLR  = security(syminfo.tickerid, timeframe.period, log(sourceLR))
+extend = extendLines ? extend.right : extend.none
+
+calcSlope(src, len) =>
+	if not barstate.islast or len <= 1
+		[float(na), float(na), float(na)]
+	else
+		sumX = 0.0
+		sumY = 0.0
+		sumXSqr = 0.0
+		sumXY = 0.0
+		for i = 0 to len - 1
+			val = src[i]
+			per = i + 1.0
+			sumX := sumX + per
+			sumY := sumY + val
+			sumXSqr := sumXSqr + per * per
+			sumXY := sumXY + val * per
+		slope = (len * sumXY - sumX * sumY) / (len * sumXSqr - sumX * sumX)
+		average = sumY / len
+		intercept = average - slope * sumX / len + slope
+		[slope, average, intercept]
+
+[s, aa, i] = calcSlope(srcLR, lenLR)
+startPrice = i + s * (lenLR - 1)
+endPrice = i
+var line baseLineR = na
+if LR_Visible and na(baseLineR) and not na(startPrice)
+	baseLineR := line.new(bar_index - lenLR + 1, exp(startPrice), bar_index, exp(endPrice), width=2, extend=extend, color = rojo)
+else
+	line.set_xy1(baseLineR, bar_index - lenLR + 1, startPrice)
+	line.set_xy2(baseLineR, bar_index, endPrice)
+	na
+
+calcDev(src, len, slope, average, intercept) =>
+	upDev = 0.0
+	dnDev = 0.0
+	stdDevAcc = 0.0
+	dsxx = 0.0
+	dsyy = 0.0
+	dsxy = 0.0
+	periods = len - 1
+	daY = intercept + (slope * periods) / 2
+	val = intercept
+	for i = 0 to periods
+		price = high[i] - val
+		if (price > upDev)
+			upDev := price
+		price := val - low[i]
+		if (price > dnDev)
+			dnDev := price
+		price := src[i]
+		dxt = price - average
+		dyt = val - daY
+		price := price - val
+		stdDevAcc := stdDevAcc + price * price
+		dsxx := dsxx + dxt * dxt
+		dsyy := dsyy + dyt * dyt
+		dsxy := dsxy + dxt * dyt
+		val := val + slope
+	stdDev = sqrt(stdDevAcc / (periods == 0 ? 1 : periods))
+	pearsonR = dsxx == 0 or dsyy == 0 ? 0 : dsxy / sqrt(dsxx * dsyy)
+	[stdDev, pearsonR, upDev, dnDev]
+
+[stdDev, pearsonR, upDev, dnDev] = calcDev(srcLR, lenLR, s, aa, i)
+upperStartPrice = startPrice + (useUpperDev ? upperMult * stdDev : upDev)
+upperEndPrice = endPrice + (useUpperDev ? upperMult * stdDev : upDev)
+var line upper = na
+lowerStartPrice = startPrice + (useLowerDev ? lowerMult * stdDev : -dnDev)
+lowerEndPrice = endPrice + (useLowerDev ? lowerMult * stdDev : -dnDev)
+var line lower = na
+if LR_Visible and na(upper) and not na(upperStartPrice)
+	upper := line.new(bar_index - lenLR + 1, exp(upperStartPrice), bar_index, exp(upperEndPrice), width=1, extend=extend, color = azul)
+else
+	line.set_xy1(upper, bar_index - lenLR + 1, upperStartPrice)
+	line.set_xy2(upper, bar_index, upperEndPrice)
+	na
+if LR_Visible and na(lower) and not na(lowerStartPrice)
+	lower := line.new(bar_index - lenLR + 1, exp(lowerStartPrice), bar_index, exp(lowerEndPrice), width=1, extend=extend, color = azul)
+else
+	line.set_xy1(lower, bar_index - lenLR + 1, lowerStartPrice)
+	line.set_xy2(lower, bar_index, lowerEndPrice)
+	na
+// Pearson`s R
+var label r = na
+transparent = color.new(color.white, 100)
+label.delete(r[1])
+if LR_Visible and showPearson and not na(pearsonR)
+	r := label.new(bar_index - lenLR + 1, exp(lowerStartPrice), tostring(pearsonR, "#.#####"), color=transparent, textcolor = azul, size=size.normal, style=label.style_labelup)
+
+//______________________________________________________________________________
+// Based on "Volume Profile" - Author: @kv4coins
+// https://www.tradingview.com/script/r3VrWAO4-Volume-Profile/ 
+//______________________________________________________________________________
+//// INPUTS 
+VP_Visible    = input(title="⮩ Visible", type=input.bool, defval=false, group ="Volume Profile")
+vp_lookback   = input(defval = 250, 
+                     title   = "Volume Lookback Depth [10-500]", 
+                     type    = input.integer, 
+                     minval  = 10, 
+                     maxval  = 500, group="Volume Profile")
+
+vp_max_bars   = input(defval = 500, 
+                     title   = "Number of Bars [10-500]",
+                     type    = input.integer, 
+                     minval  = 10, 
+                     maxval  = 500, group="Volume Profile")
+
+vp_bar_mult   = input(defval = 50, 
+                     title   = "Bar Length Multiplier [10-100]",
+                     type    = input.integer, 
+                     minval  = 10, 
+                     maxval  = 100, group="Volume Profile")
+
+vp_bar_offset = input(defval = 40, 
+                     title   = "Bar Horizontal Offset [0-100]", 
+                     type    = input.integer, 
+                     minval  = 0, 
+                     maxval  = 100, group="Volume Profile")
+
+vp_bar_width  = input(defval = 1, 
+                     title   = "Bar Width [1-20]", 
+                     type    = input.integer, 
+                     minval  = 1, 
+                     maxval  = 20, group="Volume Profile")
+
+vp_delta_type = input(defval = "Both",
+                     title   = "Delta Type",
+                     type    = input.string,
+                     options = ['Both', 'Bullish', 'Bearish'], group="Volume Profile")
+
+vp_poc_show   = input(defval = true, 
+                     title   = "Show POC Line", 
+                     type    = input.bool, group="Volume Profile")
+
+vp_bar_color  = input(defval = color.new(color.blue, 70) , 
+                     title   = "Area Color", 
+                     type    = input.color, inline ="colVP", group="Volume Profile")
+
+vp_poc_color  = input(defval = color.new(#FF0000, 20), 
+                     title   = "POC Color", 
+                     type    = input.color, inline ="colVP", group="Volume Profile")
+
+//// VARIABLES
+float vp_Vmax = 0.0
+int vp_VmaxId = 0
+int vp_N_BARS = vp_max_bars
+
+var int vp_first = time
+
+vp_a_P = array.new_float((vp_N_BARS + 1), 0.0)
+vp_a_V = array.new_float(vp_N_BARS, 0.0)
+vp_a_D = array.new_float(vp_N_BARS, 0.0)
+vp_a_W = array.new_int(vp_N_BARS, 0)
+
+
+//// CALCULATIONS
+float vp_HH = highest(high, vp_lookback)
+float vp_LL = lowest(low, vp_lookback)
+
+if barstate.islast and VP_Visible
+	float vp_HL = (vp_HH - vp_LL) / vp_N_BARS
+    for j = 1 to (vp_N_BARS + 1)
+        array.set(vp_a_P, (j-1), (vp_LL + vp_HL * j))
+	for i = 0 to (vp_lookback - 1)
+		int Dc = 0
+		array.fill(vp_a_D, 0.0)
+		for j = 0 to (vp_N_BARS - 1)
+			float Pj = array.get(vp_a_P, j)
+			if low[i] < Pj and high[i] > Pj and (vp_delta_type == "Bullish" ? 
+			 close[i] >= open[i] : (vp_delta_type == "Bearish" ? close[i] <= open[i] : true))
+				float Dj = array.get(vp_a_D, j)
+				float dDj = Dj + nz(volume[i])
+				array.set(vp_a_D, j, dDj)
+				Dc := Dc + 1
+		for j = 0 to (vp_N_BARS - 1)
+			float Vj = array.get(vp_a_V, j)
+			float Dj = array.get(vp_a_D, j)
+			float dVj = Vj + ((Dc > 0) ? (Dj / Dc) : 0.0)
+			array.set(vp_a_V, j, dVj)
+	vp_Vmax := array.max(vp_a_V)
+    vp_VmaxId := array.indexof(vp_a_V, vp_Vmax)
+    for j = 0 to (vp_N_BARS - 1)
+        float Vj = array.get(vp_a_V, j)
+        int Aj = round(vp_bar_mult * Vj / vp_Vmax)
+        array.set(vp_a_W, j, Aj)
+
+//// PLOTING
+if barstate.isfirst and VP_Visible
+    vp_first := time
+vp_change = change(time)
+vp_x_loc = timenow + round(vp_change * vp_bar_offset)
+
+f_setup_bar(n) =>
+    x1 = ((vp_VmaxId == n) and vp_poc_show) ? max(time[vp_lookback], vp_first) : 
+		 (timenow + round(vp_change * (vp_bar_offset - array.get(vp_a_W, n))))
+	ys = array.get(vp_a_P, n)
+    line.new(x1     = x1, 
+             y1     = ys, 
+             x2     = vp_x_loc, 
+             y2     = ys, 
+             xloc   = xloc.bar_time, 
+             extend = extend.none, 
+             color  = (vp_VmaxId == n ? vp_poc_color : vp_bar_color), 
+             style  = line.style_solid, 
+             width  = vp_bar_width)
+
+if barstate.islast and VP_Visible
+    for i = 0 to (vp_N_BARS - 1) by 1
+        f_setup_bar(i)
