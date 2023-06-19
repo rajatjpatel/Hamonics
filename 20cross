@@ -1,0 +1,350 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+//@version=5
+indicator('Moving Average Multitool Crossover', shorttitle = '20MAM', overlay = true)
+
+//==============================================================================
+// Function: Calculate a given type of moving average
+//==============================================================================
+get_ma_out(type, src, len, alma_offset, alma_sigma, kama_fastLength, kama_slowLength, vama_vol_len, vama_do_smth, vama_smth, mf_beta, mf_feedback, mf_z) =>
+    float baseline = 0.0
+    
+    if type == 'SMA  | Simple MA'
+        baseline := ta.sma(src, len)
+
+    else if type == 'EMA  | Exponential MA'
+        baseline := ta.ema(src, len)
+
+    else if type == 'DEMA | Double Exponential MA'
+        e = ta.ema(src, len)
+        baseline := 2 * e - ta.ema(e, len)
+
+    else if type == 'TEMA | Triple Exponential MA'
+        e = ta.ema(src, len)
+        baseline := 3 * (e - ta.ema(e, len)) + ta.ema(ta.ema(e, len), len)
+
+	else if type == 'TMA  | Triangular MA' // by everget
+        baseline := ta.sma(ta.sma(src, math.ceil(len / 2)), math.floor(len / 2) + 1)
+
+    else if type == 'WMA  | Weighted MA'  // Weighted
+        baseline := ta.wma(src, len)
+
+    else if type == 'VWMA | Volume-Weighted MA'
+        baseline := ta.vwma(src, len)
+
+    else if type == 'SMMA | Smoothed MA'  // Smoothed
+        w = ta.wma(src, len)
+        baseline := na(w[1]) ? ta.sma(src, len) : (w[1] * (len - 1) + src) / len
+
+    else if type == 'RMA  | Rolling MA'
+        baseline := ta.rma(src, len)
+
+    else if type == 'HMA  | Hull MA'
+        baseline := ta.wma(2 * ta.wma(src, len / 2) - ta.wma(src, len), math.round(math.sqrt(len)))
+
+    else if type == 'LSMA | Least Squares MA'
+        baseline := ta.linreg(src, len, 0)
+
+    else if type == 'Kijun'  //Kijun-sen
+        kijun = math.avg(ta.lowest(len), ta.highest(len))
+        baseline := kijun
+
+    else if type == 'MD   | McGinley Dynamic'
+        mg = 0.0
+        mg := na(mg[1]) ? ta.ema(src, len) : mg[1] + (src - mg[1]) / (len * math.pow(src / mg[1], 4))
+        baseline := mg
+
+	else if type == 'JMA  | Jurik MA' // by everget
+		DEMAe1 = ta.ema(src, len)
+		DEMAe2 = ta.ema(DEMAe1, len)
+		baseline := 2 * DEMAe1 - DEMAe2
+		
+    else if type == 'ALMA | Arnaud Legoux MA'
+        baseline := ta.alma(src, len, alma_offset, alma_sigma)
+
+    else if type == 'VAR  | Vector Autoregression MA'
+        valpha = 2 / (len+1)
+        vud1   = (src > src[1]) ? (src - src[1]) : 0
+        vdd1   = (src < src[1]) ? (src[1] - src) : 0
+        vUD    = math.sum(vud1, 9)
+        vDD    = math.sum(vdd1, 9)
+        vCMO   = nz( (vUD - vDD) / (vUD + vDD) )
+        baseline := nz(valpha * math.abs(vCMO) * src) + (1 - valpha * math.abs(vCMO)) * nz(baseline[1])
+        
+    else if type == 'WWMA | Welles Wilder MA'
+        baseline := nz(baseline[1]) + (src - nz(baseline[1])) / len
+        
+    else if type == 'ZLEMA | Zero-Lag Exponential MA' // by HPotter
+        xLag     = (len) / 2
+        xEMAData = (src + (src - src[xLag]))
+        baseline := ta.ema(xEMAData, len)
+        
+    else if type == 'AHMA | Ahrens Moving Average' // by everget
+        baseline := nz(baseline[1]) + (src - (nz(baseline[1]) + nz(baseline[len])) / 2) / len 
+        
+    else if type == 'EVWMA | Elastic Volume Weighted MA'
+        volumeSum = math.sum(volume, len)
+        baseline := ( (volumeSum - volume) * nz(baseline[1]) + volume * src ) / volumeSum
+    
+    else if type == 'SWMA | Sine Weighted MA' // by everget
+        sum = 0.0
+        weightSum = 0.0
+        for i = 0 to len - 1
+            weight = math.sin(i * math.pi / (len + 1))
+            sum := sum + nz(src[i]) * weight
+            weightSum := weightSum + weight
+        baseline := sum / weightSum
+        
+    else if type == 'LMA  | Leo MA'
+        baseline := 2 * ta.wma(src, len) - ta.sma(src, len)
+        
+    else if type == 'VIDYA | Variable Index Dynamic Average' // by KivancOzbilgic
+        mom = ta.change(src)
+        upSum = math.sum(math.max(mom, 0), len)
+        downSum = math.sum(-math.min(mom, 0), len)
+        out = (upSum - downSum) / (upSum + downSum)
+
+        cmo = math.abs(out)
+        
+        alpha = 2 / (len + 1)
+        
+        baseline := src * alpha * cmo + nz(baseline[1]) * (1 - alpha * cmo)
+    
+    else if type == 'FRAMA | Fractal Adaptive MA'
+        length2 = math.floor(len / 2)
+        hh2 = ta.highest(length2)
+        ll2 = ta.lowest(length2)
+        
+        N1 = (hh2 - ll2) / length2
+        
+        N2 = (hh2[length2] - ll2[length2]) / length2
+        
+        N3 = (ta.highest(len) - ta.lowest(len)) / len
+        
+        D = (math.log(N1 + N2) - math.log(N3)) / math.log(2)
+        
+        factor = math.exp(-4.6 * (D - 1))
+        
+        baseline := factor * src + (1 - factor) * nz(baseline[1])
+    
+    else if type == 'VMA  | Variable MA' // by LazyBear
+        k = 1.0/len
+        pdm = math.max((src - src[1]), 0)
+        mdm = math.max((src[1] - src), 0)
+        
+        pdmS  = float(0.0)
+        mdmS  = float(0.0)
+        pdmS := ((1 - k)*nz(pdmS[1]) + k*pdm)
+        mdmS := ((1 - k)*nz(mdmS[1]) + k*mdm)
+        
+        s = pdmS + mdmS
+        pdi = pdmS/s
+        mdi = mdmS/s
+        
+        pdiS  = float(0.0)
+        mdiS  = float(0.0)
+        pdiS := ((1 - k)*nz(pdiS[1]) + k*pdi)
+        mdiS := ((1 - k)*nz(mdiS[1]) + k*mdi)
+        
+        d = math.abs(pdiS - mdiS)
+        s1 = pdiS + mdiS
+        
+        iS  = float(0.0)
+        iS := ((1 - k)*nz(iS[1]) + k*d/s1)
+        
+        hhv = ta.highest(iS, len) 
+        llv = ta.lowest(iS, len) 
+        d1 = hhv - llv
+        vI = (iS - llv)/d1
+        baseline := (1 - k*vI)*nz(baseline[1]) + k*vI*src
+    
+    else if type == 'GMMA | Geometric Mean MA'
+        lmean = math.log(src)
+        smean = math.sum(lmean, len)
+        baseline := math.exp(smean / len)
+        
+    else if type == 'CMA  | Corrective MA' // by everget
+        sma = ta.sma(src, len)
+        baseline := sma
+        v1 = ta.variance(src, len)
+        v2 = math.pow(nz(baseline[1], baseline) - baseline, 2)
+        v3 = v1 == 0 or v2 == 0 ? 1 : v2 / (v1 + v2)
+        
+        var tolerance = math.pow(10, -5)
+        float err = 1
+        
+        // Gain Factor
+        float kPrev = 1
+        float k = 1
+        
+        for i = 0 to 5000 by 1
+            if err > tolerance
+                k := v3 * kPrev * (2 - kPrev)
+                err := kPrev - k
+                kPrev := k
+                kPrev
+                
+        baseline := nz(baseline[1], src) + k * (sma - nz(baseline[1], src))
+        
+    else if type == 'MM   | Moving Median' // by everget
+        baseline := ta.percentile_nearest_rank(src, len, 50)
+        
+    else if type == 'QMA  | Quick MA' // by everget
+        peak = len / 3
+        num = 0.0
+        denom = 0.0
+         
+        for i = 1 to len + 1
+            mult = 0.0
+            if i <= peak
+                mult := i / peak
+            else
+                mult := (len + 1 - i) / (len + 1 - peak)
+            num := num + src[i - 1] * mult
+            denom := denom + mult
+         
+        baseline := (denom != 0.0) ? (num / denom) : src
+        
+    else if type == 'KAMA | Kaufman Adaptive MA' // by everget
+        mom = math.abs(ta.change(src, len))
+        volatility = math.sum(math.abs(ta.change(src)), len)
+        
+        // Efficiency Ratio
+        er = volatility != 0 ? mom / volatility : 0
+        
+        fastAlpha = 2 / (kama_fastLength + 1)
+        slowAlpha = 2 / (kama_slowLength + 1)
+        
+        alpha = math.pow(er * (fastAlpha - slowAlpha) + slowAlpha, 2)
+        
+        baseline := alpha * src + (1 - alpha) * nz(baseline[1], src)
+    
+    else if type == 'VAMA | Volatility Adjusted MA' // by Joris Duyck (JD)
+        mid = ta.ema(src, len)
+        dev = src - mid
+        
+        vol_up   = ta.highest(dev, vama_vol_len)
+        vol_down = ta.lowest(dev, vama_vol_len)
+        
+        vama = mid + math.avg(vol_up, vol_down)
+        baseline := vama_do_smth ? ta.wma(vama, vama_smth) : vama
+    
+    else if type == 'Modular Filter' // by alexgrover
+        //----
+        b = 0.0, c = 0.0, os = 0.0, ts = 0.0
+        //----
+        alpha = 2/(len+1)
+        a = mf_feedback ? mf_z*src + (1-mf_z)*nz(baseline[1],src) : src
+        //----
+        b := a > alpha*a+(1-alpha)*nz(b[1],a) ? a : alpha*a+(1-alpha)*nz(b[1],a)
+        c := a < alpha*a+(1-alpha)*nz(c[1],a) ? a : alpha*a+(1-alpha)*nz(c[1],a)
+        os := a == b ? 1 : a == c ? 0 : os[1]
+        //----
+        upper = mf_beta*b+(1-mf_beta)*c
+        lower = mf_beta*c+(1-mf_beta)*b 
+        baseline := os*upper+(1-os)*lower
+        
+    baseline
+//==============================================================================
+
+
+//==============================================================================
+// Inputs for first moving average
+//==============================================================================
+// General indicator settings for 1st and 2nd moving averages
+ma_type_1 = input.string('EMA  | Exponential MA', '1st MA Type', options=['EMA  | Exponential MA',                  'SMA  | Simple MA', 
+                                                                          'WMA  | Weighted MA',                     'DEMA | Double Exponential MA', 
+                                                                          'TEMA | Triple Exponential MA',           'TMA  | Triangular MA', 
+                                                                          'VWMA | Volume-Weighted MA',              'SMMA | Smoothed MA', 
+                                                                          'HMA  | Hull MA',                         'LSMA | Least Squares MA', 
+                                                                          'Kijun',                                  'MD   | McGinley Dynamic', 
+                                                                          'RMA  | Rolling MA',                      'JMA  | Jurik MA', 
+                                                                          'ALMA | Arnaud Legoux MA',                'VAR  | Vector Autoregression MA', 
+                                                                          'WWMA | Welles Wilder MA',                'ZLEMA | Zero-Lag Exponential MA',
+                                                                          'AHMA | Ahrens Moving Average',           'EVWMA | Elastic Volume Weighted MA',
+                                                                          'SWMA | Sine Weighted MA',                'LMA  | Leo MA',
+                                                                          'VIDYA | Variable Index Dynamic Average', 'FRAMA | Fractal Adaptive MA',
+                                                                          'VMA  | Variable MA',                     'GMMA | Geometric Mean MA',
+                                                                          'CMA  | Corrective MA',                   'MM   | Moving Median',
+                                                                          'QMA  | Quick MA',                        'KAMA | Kaufman Adaptive MA',
+                                                                          'VAMA | Volatility Adjusted MA',          'Modular Filter'
+                                                                         ], inline = 'ma_type', group = 'General MA Settings')
+ma_len_1  = input.int(13, minval=1, title='1st MA Length', inline = 'ma_len', group = 'General MA Settings')
+ma_src_1  = input(close, title='1st MA Source', inline = 'ma_src', group = 'General MA Settings')
+
+ma_type_2 = input.string('EMA  | Exponential MA', '2nd MA Type', options=['EMA  | Exponential MA',                  'SMA  | Simple MA', 
+                                                                          'WMA  | Weighted MA',                     'DEMA | Double Exponential MA', 
+                                                                          'TEMA | Triple Exponential MA',           'TMA  | Triangular MA', 
+                                                                          'VWMA | Volume-Weighted MA',              'SMMA | Smoothed MA', 
+                                                                          'HMA  | Hull MA',                         'LSMA | Least Squares MA', 
+                                                                          'Kijun',                                  'MD   | McGinley Dynamic', 
+                                                                          'RMA  | Rolling MA',                      'JMA  | Jurik MA', 
+                                                                          'ALMA | Arnaud Legoux MA',                'VAR  | Vector Autoregression MA', 
+                                                                          'WWMA | Welles Wilder MA',                'ZLEMA | Zero-Lag Exponential MA',
+                                                                          'AHMA | Ahrens Moving Average',           'EVWMA | Elastic Volume Weighted MA',
+                                                                          'SWMA | Sine Weighted MA',                'LMA  | Leo MA',
+                                                                          'VIDYA | Variable Index Dynamic Average', 'FRAMA | Fractal Adaptive MA',
+                                                                          'VMA  | Variable MA',                     'GMMA | Geometric Mean MA',
+                                                                          'CMA  | Corrective MA',                   'MM   | Moving Median',
+                                                                          'QMA  | Quick MA',                        'KAMA | Kaufman Adaptive MA',
+                                                                          'VAMA | Volatility Adjusted MA',          'Modular Filter'
+                                                                         ], inline = 'ma_type', group = 'General MA Settings')
+ma_len_2  = input.int(21, minval=1, title='2nd MA Length', inline = 'ma_len', group = 'General MA Settings')
+ma_src_2  = input(close, title='2nd MA Source', inline = 'ma_src', group = 'General MA Settings')
+ma_do_signals = input(true, title = 'Show MA Crossover Signals?', group = 'General MA Settings')
+
+
+// Specific indicator settings for 1st and 2nd moving averages
+alma_offset_1 = input.float(title = "Offset",        defval = 0.85, step = 0.05, group = 'ALMA Settings')
+alma_sigma_1  = input.int(title   = '1st MA: Sigma', defval = 6,                 group = 'ALMA Settings')
+alma_offset_2 = input.float(title = "Offset",        defval = 0.85, step = 0.05, group = 'ALMA Settings')
+alma_sigma_2  = input.int(title   = '2nd MA: Sigma', defval = 6,                 group = 'ALMA Settings')
+
+kama_fastLength_1 = input(title = '1st MA: Fast EMA Length', defval=2,  group = 'KAMA Settings')
+kama_slowLength_1 = input(title = '1st MA: Slow EMA Length', defval=30, group = 'KAMA Settings')
+kama_fastLength_2 = input(title = '2nd MA: Fast EMA Length', defval=2,  group = 'KAMA Settings')
+kama_slowLength_2 = input(title = '2nd MA: Slow EMA Length', defval=30, group = 'KAMA Settings')
+
+vama_vol_len_1 = input.int(title  = '1st MA: Volatality Length', defval = 51,            group = 'VAMA Settings')
+vama_do_smth_1 = input.bool(title = '1st MA: Do Smoothing?',     defval = false,         group = 'VAMA Settings')
+vama_smth_1    = input.int(title  = '1st MA: Smoothing length',  defval = 5, minval = 1, group = 'VAMA Settings')
+vama_vol_len_2 = input.int(title  = '2nd MA: Volatality Length', defval = 51,            group = 'VAMA Settings')
+vama_do_smth_2 = input.bool(title = '2nd MA: Do Smoothing?',     defval = false,         group = 'VAMA Settings')
+vama_smth_2    = input.int(title  = '2nd MA: Smoothing length',  defval = 5, minval = 1, group = 'VAMA Settings')
+
+mf_beta_1     = input.float(title = '1st MA: Beta',               defval = 0.8, step = 0.1, minval = 0, maxval=1,   group = 'Modular Filter Settings')
+mf_feedback_1 = input.bool(title  = '1st MA: Feedback?',          defval = false,                                   group = 'Modular Filter Settings')
+mf_z_1        = input.float(title = '1st MA: Feedback Weighting', defval = 0.5, step = 0.1, minval = 0, maxval = 1, group = 'Modular Filter Settings')
+mf_beta_2     = input.float(title = '2nd MA: Beta',               defval = 0.8, step = 0.1, minval = 0, maxval=1,   group = 'Modular Filter Settings')
+mf_feedback_2 = input.bool(title  = '2nd MA: Feedback?',          defval = false,                                   group = 'Modular Filter Settings')
+mf_z_2        = input.float(title = '2nd MA: Feedback Weighting', defval = 0.5, step = 0.1, minval = 0, maxval = 1, group = 'Modular Filter Settings')
+//==============================================================================
+
+
+//==============================================================================
+// Calculate and plot both moving averages
+//==============================================================================
+// Initalize MAs
+ma1  = float(0.0)
+ma2  = float(0.0)
+
+// Calculate and add each MA value to the ma1 and ma2 lines 
+ma1 := get_ma_out(ma_type_1, ma_src_1, ma_len_1, alma_offset_1, alma_sigma_1, kama_fastLength_1, kama_slowLength_1, vama_vol_len_1, vama_do_smth_1, vama_smth_1, mf_beta_1, mf_feedback_1, mf_z_1)
+ma2 := get_ma_out(ma_type_2, ma_src_2, ma_len_2, alma_offset_2, alma_sigma_2, kama_fastLength_2, kama_slowLength_2, vama_vol_len_2, vama_do_smth_2, vama_smth_2, mf_beta_2, mf_feedback_2, mf_z_2)
+
+// Plot the ma1 and ma2 lines
+plot(ma1, title = '1st MA', color = color.blue, linewidth = 1)
+plot(ma2, title = '2nd MA', color = #000000,    linewidth = 1)
+//==============================================================================
+
+
+//==============================================================================
+// Plot ma1 and ma2 crossover signals
+//==============================================================================
+buySignal = ta.crossover(ma1, ma2)
+plotshape(buySignal and ma_do_signals ? ma2 - ta.atr(14) : na, title='B', text='B', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(color.green, 0), textcolor=color.new(color.white, 0))
+
+sellSignal = ta.crossunder(ma1, ma2)
+plotshape(sellSignal and ma_do_signals ? ma2 + ta.atr(14) : na, title='S', text='S', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.red, 0), textcolor=color.new(color.white, 0))
+//==============================================================================
