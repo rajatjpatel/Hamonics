@@ -1,0 +1,398 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+//@version=5
+indicator           ('20Bj', '20Bj', overlay=true, max_boxes_count=500)
+
+// ================================== //
+// ------------> Tips <-------------- //
+// ================================== //
+
+leftTip         =   "Look left for swing high/low in x number of bars to form pivot. The higher the number, the higher the script looks to the left for the highest/lowest point before drawing pivot"        
+rightTip        =   "Look right for swing high/low in x number of bars to form pivot. The higher the number, the higher the script looks to the right for the highest/lowest point before drawing pivot"       
+nPivTip         =   "This sets the array size, or the number of pivots to track at a time (x highs, and x number of lows)" 
+atrLenTip       =   "Number of bars to average. ATR is used to standardize zone width between assets and timeframes"     
+multTip         =   "ATR multiplier to set zone width. Default is half of one ATR from box bottom to box top"     
+perTip          =   "Max zone size as a percent of price. Some assets can be too volatile at low prices creating an unreasonably sized zone"
+srcTip          =   "Source input for pivots. Default tracks the highest and lowest bodies of HA candles to average price action, which can result in a level that sits in the overlap of support and resistance"     
+alignZonesTip   =   "Aligns recurring zones who's edges overlap an existing zone creating a zone that ages in time and intensifies visually"     
+  
+dhighsTip       =   "Disabling will prevent highs from being tracked"          
+dlowsTip        =   "Disabling will prevent lows from being tracked"         
+detectBOTip     =   "Show points that price action breaks above all pivots. An arrow from below is displayed"        
+detectBDTip     =   "Show points that price action breaks below all pivots. An arrow from above is displayed"         
+breakUpTip      =   "Show points that price action breaks above resistance. An arrow from below is displayed"         
+breakDnTip      =   "Show points that price action breaks below support. An arrow from above is displayed"          
+falseBullTip    =   "Show points that price action initially breaks below support before reversing. False moves can lead to fast moves in the opposite direction (bear trap). A large arrow from below is displayed"          
+falseBearTip    =   "Show points that price action initially breaks above resistance before reversing. False moves can lead to fast moves in the opposite direction (bull trap). A large arrow from above is displayed"           
+supPushTip      =   "Show up candles that are detected within a support zone. Can show points support is being respected. A triangle from below is displayed"          
+resPushTip      =   "Show down candles that are detected within a resistance zone. Can show points resistance is being respected. A triangle from above is displayed"           
+  
+lookbackTip     =   "Number of candles that can be included in a false break signal"        
+swingTip        =   "Swing detection is used to filter signals on breakout type signals. A higher number will mean more significant points, but less of them"        
+pivotColorTip   =   "Color of key levels --> (bull color, bear color, transparency of box background, transparency of box borders)"            
+breakoutTip     =   "Color of breakout arrows --> (bull, bear, transp., transp.)"           
+SnRTip          =   "Color of triangles for broken support or resistance --> (bull, bear, transp., transp.)"   
+falseBreakTip   =   "Color of arrows for false breaks --> (bull, bear, transp., transp., arrow max height in pixels)"            
+moveTip         =   "Color of triangles for candles that are detected within zones --> (bull, bear, transp., transp.)"    
+
+// ================================== //
+// ---------> User Input <----------- //
+// ================================== //
+
+left            =   input.int       (20     ,   "Look Left"                     ,   group= "Zones"                , tooltip= leftTip)    
+right           =   input.int       (15     ,   "Look Right"                    ,   group= "Zones"                , tooltip= rightTip)    
+nPiv            =   input.int       (4      ,   "Number of Pivots"              ,   group= "Zones"                , tooltip= nPivTip)
+atrLen          =   input.int       (30     ,   "ATR Length"                    ,   group= "Zones"                , tooltip= atrLenTip)
+mult            =   input.float     (0.5    ,   "Zone Width (ATR)"              ,   group= "Zones"                , tooltip= multTip,                step   = 0.1)
+per             =   input.float     (5,         "Max Zone Percent"              ,   group= "Zones"                , tooltip= perTip)
+src             =   input.string    ("HA"   ,   "Source For Pivots"             ,   group= "Zones"                , tooltip= srcTip,                 options= ["HA", "High/Low Body", "High/Low"])
+alignZones      =   input.bool      (true   ,   "Align Zones"                   ,   group= "Zones"                , tooltip= alignZonesTip)
+
+dhighs          =   input.bool      (true   ,   "Detect Pivot Highs"            ,   group= "Detection"            , tooltip= dhighsTip)
+dlows           =   input.bool      (true   ,   "Detect Pivot Lows"             ,   group= "Detection"            , tooltip= dlowsTip)
+detectBO        =   input.bool      (false  ,   "Detect Breakout"               ,   group= "Detection"            , tooltip= detectBOTip)
+detectBD        =   input.bool      (false  ,   "Detect Breakdown"              ,   group= "Detection"            , tooltip= detectBDTip)
+breakUp         =   input.bool      (false  ,   "Detect Resistance Break"       ,   group= "Detection"            , tooltip= breakUpTip)
+breakDn         =   input.bool      (false  ,   "Detect Support Break"          ,   group= "Detection"            , tooltip= breakDnTip) 
+falseBull       =   input.bool      (false  ,   "Detect False Breakdown"        ,   group= "Detection"            , tooltip= falseBullTip)
+falseBear       =   input.bool      (false  ,   "Detect False Breakup"          ,   group= "Detection"            , tooltip= falseBearTip) 
+supPush         =   input.bool      (false  ,   "Detect Moves Off Support"      ,   group= "Detection"            , tooltip= supPushTip)
+resPush         =   input.bool      (false  ,   "Detect Moves Off Resistance"   ,   group= "Detection"            , tooltip= resPushTip) 
+
+lookback        =   input.int       (2      ,   "Lookback For Breaks"           ,   group= "Lookback"             , tooltip= lookbackTip)
+swing           =   input.int       (5      ,   "swing High/Low"                ,   group= "Lookback"             , tooltip= swingTip)
+
+bullCol         =   input.color     (#64b5f6,   ""   ,  inline="1"              ,   group= "Pivot Color")
+bearCol         =   input.color     (#ffeb3b,   ""   ,  inline="1"              ,   group= "Pivot Color")
+bgTransp        =   input.int       (95     ,   ""   ,  inline="1"              ,   group= "Pivot Color")   
+bordTransp      =   input.int       (60     ,   ""   ,  inline="1"              ,   group= "Pivot Color"          , tooltip= pivotColorTip)
+
+bullBreak       =   input.color     (#0000ff,   ""   ,  inline="2"              ,   group= "Breakout Color")
+bearBreak       =   input.color     (#ff00ff,   ""   ,  inline="2"              ,   group= "Breakout Color")
+bullTransp      =   input.int       (40     ,   ""   ,  inline="2"              ,   group= "Breakout Color")   
+bearTransp      =   input.int       (40     ,   ""   ,  inline="2"              ,   group= "Breakout Color"       , tooltip= breakoutTip) 
+
+resBreakCol     =   input.color     (#17ff00,   ""   ,  inline="3"              ,   group= "S&R Break Color")
+supBreakCol     =   input.color     (#ff0000,   ""   ,  inline="3"              ,   group= "S&R Break Color")
+resBreakTransp  =   input.int       (40     ,   ""   ,  inline="3"              ,   group= "S&R Break Color")   
+supBreakTransp  =   input.int       (40     ,   ""   ,  inline="3"              ,   group= "S&R Break Color"      , tooltip= SnRTip) 
+
+falseBullCol    =   input.color     (#17ff00,   ""   ,  inline="4"              ,   group= "False Break Color")
+falseBearCol    =   input.color     (#ff0000,   ""   ,  inline="4"              ,   group= "False Break Color")
+falseBullTransp =   input.int       (40     ,   ""   ,  inline="4"              ,   group= "False Break Color")   
+falseBearTransp =   input.int       (40     ,   ""   ,  inline="4"              ,   group= "False Break Color") 
+arrowMax        =   input.int       (75     ,   ""   ,  inline="4"              ,   group= "False Break Color"    , tooltip= falseBreakTip) 
+
+moveBull        =   input.color     (#64b5f6,   ""   ,  inline="5"              ,   group= "Moves From S&R Color")
+moveBear        =   input.color     (#ffeb3b,   ""   ,  inline="5"              ,   group= "Moves From S&R Color")
+moveBullTransp  =   input.int       (40     ,   ""   ,  inline="5"              ,   group= "Moves From S&R Color")   
+moveBearTransp  =   input.int       (40     ,   ""   ,  inline="5"              ,   group= "Moves From S&R Color" , tooltip= moveTip) 
+
+alertMode       =   input.string    (alert.freq_once_per_bar_close              ,   "Alerts Mode" ,                 group  = "Alert Frequency",     options= [alert.freq_once_per_bar, alert.freq_once_per_bar_close]) 
+
+// ================================== //
+// -----> Immutable Constants <------ //
+// ================================== //    
+ 
+sync            =   bar_index
+confirmed       =   barstate.isconfirmed
+var pivotHigh   =   array.new_box   (nPiv)
+var pivotLows   =   array.new_box   (nPiv)  
+var highBull    =   array.new_bool  (nPiv)
+var lowsBull    =   array.new_bool  (nPiv)
+var bullBorder  =   color.new       (bullCol,       bordTransp)
+var bullBgCol   =   color.new       (bullCol,       bgTransp)
+var bearBorder  =   color.new       (bearCol,       bordTransp)
+var bearBgCol   =   color.new       (bearCol,       bgTransp)
+var upCol       =   color.new       (bullBreak,     bullTransp)
+var dnCol       =   color.new       (bearBreak,     bearTransp)
+var supCol      =   color.new       (resBreakCol,   resBreakTransp)
+var resCol      =   color.new       (supBreakCol,   supBreakTransp)
+var fBull       =   color.new       (falseBullCol,  falseBullTransp)
+var fBear       =   color.new       (falseBearCol,  falseBearTransp)
+var moveBullCol =   color.new       (moveBull,      moveBullTransp)
+var moveBearCol =   color.new       (moveBear,      moveBearTransp)
+
+haSrc           =   src ==          "HA"    
+hiLoSrc         =   src ==          "High/Low"
+
+// ================================== //
+// ---> Functional Declarations <---- //
+// ================================== //
+
+_haBody()       =>
+    haClose     =   (open + high  +  low  + close)    / 4
+    haOpen      =   float(na)
+    haOpen      :=  na(haOpen[1]) ? (open + close)    / 2 : 
+                   (nz(haOpen[1]) + nz(haClose[1]))   / 2
+    
+    [haOpen, haClose]
+
+_arrayLoad(_x, _max, _val) =>  
+    array.unshift                               (_x,   _val)   
+    if  array.size                              (_x) > _max
+        array.pop                               (_x)
+
+_getBox(_x,_i)   =>
+    _box         =             array.get        (_x,_i)
+    _t           =             box.get_top      (_box)
+    _b           =             box.get_bottom   (_box)
+    [_t, _b]
+    
+_align(_x,_y)    =>
+    for i = 0 to               array.size       (_x) -1
+        [_T, _B] =             _getBox          (_y, 0)
+        [_t, _b] =             _getBox          (_x, i)
+        if _T > _b and         _T < _t or 
+           _B < _t and         _B > _b or 
+           _T > _t and         _B < _b or 
+           _B > _b and         _T < _t
+            box.set_top        (array.get       (_y, 0), _t)
+            box.set_bottom     (array.get       (_y, 0), _b)
+
+_extend(_x) =>
+    for i = 0 to               array.size       (_x)-1
+        box.set_right          (array.get       (_x, i), sync)
+ 
+_color(_x, _y)     =>
+    var int _track = nPiv
+    for i = 0 to               array.size       (_x) -1
+        [t_, b_] =             _getBox          (_x, i)
+        _isBull  =             array.get        (_y, i)
+        if close > t_ and not  _isBull
+            array.set(_x, i, 
+                      box.new( sync, t_, sync,  b_, 
+                               xloc           = xloc.bar_index,
+                               border_color   = bullBorder,   
+                               bgcolor        = bullBgCol))      
+            array.set(_y, i,   true)
+            _track += 1
+        if close < b_ and _isBull
+            array.set(_x, i, 
+                      box.new( sync, t_, sync,  b_, 
+                               xloc           = xloc.bar_index,
+                               border_color   = bearBorder,   
+                               bgcolor        = bearBgCol))  
+            array.set(_y, i,   false)
+            _track -= 1
+    _track
+
+_detect(_x,_y)      =>
+    int  _i         = 0
+    bool _found     = false
+    bool _isBull    = na
+    while (not _found and _i <  array.size      (_x)  )
+        [t_, b_] =              _getBox         (_x,_i)
+        if low < t_ and high >  b_
+            _isBull :=          array.get       (_y,_i)
+            _found  :=          true
+        _i          +=          1
+    [_found, _isBull]
+
+_falseBreak(_l)      =>       
+    bool _d         = false
+    bool _u         = false
+    for i = 1 to lookback
+        if _l[i] < _l and _l[i+1] >= _l and _l[1] < _l 
+            _d      := true
+        if _l[i] > _l and _l[i+1] <= _l and _l[1] > _l 
+            _u      := true
+    [_d, _u]
+
+_numLevel(_x,_y)    =>
+    int _above      = 0
+    int _fill       = 0
+    for i = 0 to                array.size      (_x)-1
+        _isBull     =           array.get       (_x,i)
+        if  _isBull
+            _above += 1
+        if  not na(_isBull)
+            _fill  += 1
+    for i = 0 to                array.size      (_y)-1
+        _isBull     =           array.get       (_y,i)
+        if  _isBull
+            _above += 1
+        if  not na(_isBull)
+            _fill  += 1
+    [_above, _fill]  
+
+_check(_src,_l) =>
+    bool _check = false
+    for i = 0 to _l
+        if _src[i]
+            _check := true
+    _check
+
+// ================================== //
+// ----> Variable Calculations <----- //
+// ================================== //
+
+highest         =   close ==            ta.highest      (close,     right)
+lowest          =   close ==            ta.lowest       (close,     right)
+
+closeLows       =   ta.lowest           (close,          swing)
+closeHigh       =   ta.highest          (close,          swing)
+
+[open_, close_] =   _haBody             ()
+
+hiHaBod         =   math.max            (close_,        open_)
+loHaBod         =   math.min            (close_,        open_)
+
+hiBod           =   math.max            (close,         open)
+loBod           =   math.min            (close,         open)
+
+srcHigh         =   haSrc ?             hiHaBod :       hiLoSrc ?   high :      hiBod
+srcLow          =   haSrc ?             loHaBod :       hiLoSrc ?   low  :      loBod
+
+pivot_high      =   ta.pivothigh        (srcHigh,       left,       right)
+pivot_low       =   ta.pivotlow         (srcLow,        left,       right)
+
+perc            =   close*              (per/100)
+atr             =   ta.atr              (atrLen)*       mult
+
+band            =   math.min            (atr,           perc)       [right]     /2
+
+HH              =   pivot_high+         band
+HL              =   pivot_high-         band
+
+LH              =   pivot_low+          band
+LL              =   pivot_low-          band
+
+coDiff          =   close -             open
+
+// ================================== //
+// --------> Logical Order <--------- //
+// ================================== //
+
+if pivot_high and   dhighs and  confirmed
+    _arrayLoad      (highBull,  nPiv,   false)      
+    _arrayLoad      (pivotHigh, nPiv,   box.new( sync[right],       HH, sync, HL, 
+                                                 xloc           =   xloc.bar_index,
+                                                 border_color   =   bearBorder,   
+                                                 bgcolor        =   bearBgCol))
+
+if pivot_low and    dlows and   confirmed
+    _arrayLoad      (lowsBull,  nPiv,   true)      
+    _arrayLoad      (pivotLows, nPiv,   box.new( sync[right],       LH, sync, LL,    
+                                                 xloc           =   xloc.bar_index,
+                                                 border_color   =   bullBorder, 
+                                                 bgcolor        =   bullBgCol))
+
+if alignZones
+    _align          (pivotHigh,         pivotHigh)
+    _align          (pivotHigh,         pivotLows)    
+    _align          (pivotLows,         pivotLows)
+    _align          (pivotLows,         pivotHigh)
+
+_extend             (pivotHigh)
+_extend             (pivotLows)
+
+trackHigh       =   _color              (pivotHigh,     highBull)
+trackLows       =   _color              (pivotLows,     lowsBull)
+
+// ================================== //
+// ----> Conditional Parameters <---- //
+// ================================== //
+
+isLows          =   closeLows      ==   close
+isHigh          =   closeHigh      ==   close
+
+wasLows         =   _check              (isLows,        lookback)
+wasHigh         =   _check              (isHigh,        lookback)
+
+[above, total]  =   _numLevel           (highBull,      lowsBull)
+
+moveAbove       =   trackHigh       >   trackHigh[1]
+moveBelow       =   trackLows       <   trackLows[1]
+
+resBreak        =   (trackLows      >   trackLows[1]    or  moveAbove) 
+supBreak        =   (trackHigh      <   trackHigh[1]    or  moveBelow) 
+
+breakOut        =   moveAbove     and   highest and     above == total             
+breakDwn        =   moveBelow     and   lowest  and     above == 0         
+
+[dh, uh]        =   _falseBreak         (trackHigh) 
+[dl, ul]        =   _falseBreak         (trackLows) 
+
+falseBreakBull  =   wasLows       and   (dh or dl)
+falseBreakBear  =   wasHigh       and   (uh or ul)
+
+[fh,hb]         =   _detect             (pivotHigh,     highBull)
+[fl,lb]         =   _detect             (pivotLows,     lowsBull)
+
+bullCheck       =   not resBreak  and   not resBreak[1] and (fh or fl) and  close > open and     (hb or lb)
+bearCheck       =   not supBreak  and   not supBreak[1] and (fh or fl) and  close < open and not (hb or lb)
+
+// ================================== //
+// ------> Graphical Display <------- //
+// ================================== //
+
+plotFalseDn     =   falseBull     and   falseBreakBull
+plotFalseUp     =   falseBear     and   falseBreakBear
+
+falseUpCol      =   plotFalseUp     ?   upCol       :   na
+falseDnCol      =   plotFalseDn     ?   dnCol       :   na
+
+plotBreakOut    =   breakOut      and   detectBO    and not         plotFalseDn
+plotBreakDn     =   breakDwn      and   detectBD    and not         plotFalseUp
+
+plotResBreak    =   resBreak      and   breakUp     and not         (plotBreakOut or plotFalseDn)
+plotSupBreak    =   supBreak      and   breakDn     and not         (plotBreakDn  or plotFalseUp)
+
+plotBullCheck   =   bullCheck     and   supPush
+plotBearCheck   =   bearCheck     and   resPush
+
+plotarrow           (plotFalseUp    ?   coDiff      :   na      ,   colorup  = fBull,               colordown=      fBear,          maxheight=      arrowMax)
+plotarrow           (plotFalseDn    ?   coDiff      :   na      ,   colorup  = fBull,               colordown=      fBear,          maxheight=      arrowMax)
+
+plotshape           (plotBreakOut   ,   style=shape.arrowup     ,   location=location.belowbar,     color=          upCol)
+plotshape           (plotBreakDn    ,   style=shape.arrowdown   ,   location=location.abovebar,     color=          dnCol)
+
+plotshape           (plotResBreak   ,   style=shape.arrowup     ,   location=location.belowbar,     color=          supCol)
+plotshape           (plotSupBreak   ,   style=shape.arrowdown   ,   location=location.abovebar,     color=          resCol)
+
+plotshape           (plotBullCheck  ,   style=shape.triangleup  ,   location=location.belowbar,     color=          moveBullCol)
+plotshape           (plotBearCheck  ,   style=shape.triangledown,   location=location.abovebar,     color=          moveBearCol)
+
+// ================================== //
+// -----> Alert Functionality <------ //
+// ================================== //
+
+alertcondition      (resBreak       ,   'Resistance break'      ,   'Resistance broke on {{interval}} chart. Price is {{close}}')
+alertcondition      (supBreak       ,   'Support break'         ,   'Support broke on {{interval}} chart. Price is {{close}}')
+
+alertcondition      (bullCheck      ,   'Found Support'         ,   'Pushing Off Key Level Support on {{interval}} chart. Price is {{close}}')
+alertcondition      (bearCheck      ,   'Found Resistance'      ,   'Pushing Off Key Level Resistance on {{interval}} chart. Price is {{close}}')
+
+alertcondition      (falseBreakBull ,   'False Break Down'      ,   'False Break Down on {{interval}} chart. Price is {{close}}')
+alertcondition      (falseBreakBear ,   'False Break Up'        ,   'False Break Up on {{interval}} chart. Price is {{close}}')
+
+alertcondition      (breakOut       ,   'Breakout'              ,   'Breakout on {{interval}} chart. Price is {{close}}')
+alertcondition      (breakDwn       ,   'Breakdown'             ,   'Breakdown on {{interval}} chart. Price is {{close}}')
+
+if plotResBreak
+    alert           ('Resistance broke on '                     +   timeframe.period + ' chart. Price is ' + str.tostring(close), alertMode)
+
+if plotSupBreak
+    alert           ('Resistance broke on '                     +   timeframe.period + ' chart. Price is ' + str.tostring(close), alertMode)
+
+if plotBullCheck
+    alert           ('Pushing Off Key Level Support on '        +   timeframe.period + ' chart. Price is ' + str.tostring(close), alertMode)
+
+if plotBearCheck
+    alert           ('Pushing Off Key Level Resistance on '     +   timeframe.period + ' chart. Price is ' + str.tostring(close), alertMode)
+
+if plotFalseDn
+    alert           ('False Break Down on '                     +   timeframe.period + ' chart. Price is ' + str.tostring(close), alertMode)
+
+if plotFalseUp 
+    alert           ('False Break Up on '                       +   timeframe.period + ' chart. Price is ' + str.tostring(close), alertMode)
+
+if plotBreakOut
+    alert           ('Breakout on '                             +   timeframe.period + ' chart. Price is ' + str.tostring(close), alertMode)
+
+if plotBreakDn
+    alert           ('Breakdown on '                            +   timeframe.period + ' chart. Price is ' + str.tostring(close), alertMode)
+
+// END
