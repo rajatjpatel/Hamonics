@@ -1,0 +1,34 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+//@version=4
+study("20TDI", shorttitle="20TDI")
+
+rsiPeriod = input(11, minval = 1, title = "RSI Period")
+bandLength = input(31, minval = 1, title = "Band Length")
+lengthrsipl = input(1, minval = 0, title = "Fast MA on RSI")
+lengthtradesl = input(9, minval = 1, title = "Slow MA on RSI")
+
+src = close                                                             // Source of Calculations (Close of Bar)
+r = rsi(src, rsiPeriod)                                                 // RSI of Close
+ma = sma(r, bandLength)                                                 // Moving Average of RSI [current]
+offs = (1.6185 * stdev(r, bandLength))                                  // Offset
+up = ma + offs                                                          // Upper Bands
+dn = ma - offs                                                          // Lower Bands
+mid = (up + dn) / 2                                                     // Average of Upper and Lower Bands
+fastMA = sma(r, lengthrsipl)                                            // Moving Average of RSI 2 bars back
+slowMA = sma(r, lengthtradesl)                                          // Moving Average of RSI 7 bars back
+
+hline(30)                                                               // Oversold
+hline(50)                                                               // Midline
+hline(70)                                                               // Overbought
+
+upl = plot(up, "Upper Band", color = color.blue)                              // Upper Band
+dnl = plot(dn, "Lower Band", color = color.blue)                              // Lower Band
+midl = plot(mid, "Middle of Bands", color = color.orange, linewidth = 2)      // Middle of Bands
+
+plot(slowMA, "Slow MA", color = color.green, linewidth=2)                       // Plot Slow MA
+plot(fastMA, "Fast MA", color = color.red, linewidth=2)                         // Plot Fast MA
+
+fill(upl, midl, color = color.new(color.green, transp = 90))                                         // Fill Upper Half Red
+fill(midl, dnl, color = color.new(color.red, transp = 90))                                       // Fill Lower Half Green
