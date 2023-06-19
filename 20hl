@@ -1,0 +1,67 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+//@version=3
+study(title="HI-LO", shorttitle="20HL", overlay=true)
+
+DAILY = "Daily"
+WEEKLY = "Weekly"
+MONTHLY = "Monthly"
+YEARLY = "Yearly"
+
+
+//
+// Inputs
+//
+
+hiLoPeriod = input(title="Hi/Lo Reset Period", type=string, defval=DAILY, options=[DAILY, WEEKLY, MONTHLY, YEARLY])
+
+
+//
+// Logic
+//
+
+getResetPeriodSeries(periodTypeDesc) => 
+    if periodTypeDesc == DAILY
+        dayofweek
+    else
+        if periodTypeDesc == WEEKLY
+            weekofyear
+        else
+            if periodTypeDesc == MONTHLY
+                month
+            else // YEARLY
+                year
+
+resetPeriodSeries = getResetPeriodSeries(hiLoPeriod)
+highsInPeriod = high
+lowsInPeriod = low
+
+requiresReset = resetPeriodSeries != nz(resetPeriodSeries[1])
+
+highsInPeriod := if requiresReset
+    // reset to new period's high
+    high
+else
+    // compare subsequent period highs
+    high > nz(highsInPeriod[1]) ? high : highsInPeriod[1]
+
+lowsInPeriod := if requiresReset
+    // reset to new period's low
+    low
+else
+    // compare subsequent period lows
+    low < nz(lowsInPeriod[1]) ? low : lowsInPeriod[1]
+    
+
+//
+// Plot Visuals
+//
+
+style = circles
+hiColor = #FF0000//#aaaaff
+loColor = #4CAF50//#ffaaaa
+lineWidth = 2
+
+plot(highsInPeriod, title='hi lines', color=hiColor, linewidth=lineWidth, style=style)
+plot(lowsInPeriod, title='lo lines', color=loColor, linewidth=lineWidth, style=style)
+
