@@ -1,0 +1,149 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+// Based on the TMA Overlay by Arty
+//
+// This is a trimmed down version of the OG TMA Overlay with a focus on highlighting a couple specific candlestick patterns.
+// This script is organized in a way that allows each pattern to be commented-out (disabled) or uncommented (enabled) pretty easily.
+//
+// The original request was for 3-Line-Strike only, so that is what will be enabled/uncommented by default,
+// but the engulfing code will be left in as well so that it can be turned on easily if desired.
+//
+// TODO: Add in a trend filter based on the trend identification method Arty discusses in his video on this candle pattern. 
+//
+// NOTE: As-written, the symbols and 'alert()' functions are subject to repainting (firing without a confirmed signal at bar close).
+//       This was done deliberately as a way to give people early-warning on live charts to help give them time to prepare for an entry,
+//       which can be especially significant when scalping on low timeframe (1-5m) charts.
+//       
+//
+//@version=5
+indicator(title='3 Line Strike ', shorttitle='3LS', overlay=true)
+
+// Inputs
+//
+// ### 3 Line Strike
+bearS = input.bool(title='Show Bearish 3 Line Strike', defval=true, group='3 Line Strike', tooltip="The Bearish 3 Line Strike (Bear) is a candlestick pattern comprised of 3 bullish (green) candles, " +
+         "followed by a bearish engulfing candle (see 'Big A$$ Candles' below).\n\n" +
+         "This pattern tends to be best used as a signal of the end of a retracement period as part of a trend continuation strategy.\n\n" +
+         "Default: Checked")
+bullS = input.bool(title='Show Bullish 3 Line Strike', defval=true, group='3 Line Strike', tooltip="The Bullish 3 Line Strike (Bull) is a candlestick pattern comprised of 3 bearish (red) candles, " +
+         "followed by a bullish engulfing candle (see 'Big A$$ Candles' below).\n\n" +
+         "This pattern tends to be best used as a signal of the end of a retracement period as part of a trend continuation strategy.\n\n" +
+         "Default: Checked")
+showMemeChars = input.bool(title="Plot 3 Line Strike meme symbols", defval=false, group="3 Line Strike", tooltip="If disabled (default), standard shapes will be plotted instead, which can then be further customized on the 'Styles' tab of the indicator settings.\n\n" +
+         "If enabled, meme icons hand-selected by Arty himself (🍆 and 🍑) will be plotted for 3LS signals instead of the more typical shapes.\n\n" +
+         "Default: Unchecked")
+//
+//### Engulfing Candles
+//
+bearE = input.bool(title='Show Bearish Big A$$ Candles', defval=false, group='Big A$$ Candles', tooltip="Bearish 'Big A$$ Candles' are the same as Bearish Engulfing candles.")
+bullE = input.bool(title='Show Bullish Big A$$ Candles', defval=false, group='Big A$$ Candles', tooltip="Bullish 'Big A$$ Candles' are the same as Bullish Engulfing candles.")
+//
+//### Alerts
+//
+// This won't actually DO anything, just popping it to note the behavior of the "Any alert() function call" alert type
+void = input.bool(title="The new 'Any alert() function call' (dynamic) alerts will be based on what signals are enabled in the indicator settings.", defval=true, tooltip="This does nothing - it's only here to clarify alert functionality.")
+//
+// End Inputs ###
+
+// ### 3 Line Strike
+
+bearSig = close[3] > open[3] and close[2] > open[2] and close[1] > open[1] and close < open[1]
+bullSig = close[3] < open[3] and close[2] < open[2] and close[1] < open[1] and close > open[1]
+
+// Meme plots for the 3LS signal
+plotchar(bullS and showMemeChars ? bullSig : na, char="🍆", color=color.rgb(0, 255, 0, 0), location=location.belowbar, size=size.small, text='Bull', title='3 Line Strike Up (Meme Icon)', editable=false)
+plotchar(bearS and showMemeChars ? bearSig : na, char="🍑", color=color.rgb(255, 0, 0, 0), location=location.abovebar, size=size.small, text='Bear', title='3 Line Strike Down (Meme Icon)', editable=false)
+//
+// Standard plots for the 3LS signal
+plotshape(bullS and not showMemeChars ? bullSig : na, style=shape.triangleup, color=color.rgb(0, 255, 0, 0), location=location.belowbar, size=size.small, text='Bull', title='3 Line Strike Up')
+plotshape(bearS and not showMemeChars ? bearSig : na, style=shape.triangledown, color=color.rgb(255, 0, 0, 0), location=location.abovebar, size=size.small, text='Bear', title='3 Line Strike Down')
+//
+// # Alerts
+//
+// Old-style Alert Conditions
+alertcondition(bullS, title='Bullish 3 Line Strike', message='{{exchange}}:{{ticker}} {{interval}} - Bullish 3 Line Strike')
+alertcondition(bearS, title='Bearish 3 Line Strike', message='{{exchange}}:{{ticker}} {{interval}} - Bearish 3 Line Strike')
+//
+// New-style alerts
+if (bullS and bullSig)
+    m = '{{exchange}}:{{ticker}} {{interval}} - Bullish 3 Line Strike'
+    alert(message=m, freq=alert.freq_once_per_bar)
+if (bearS and bearSig)
+    m = '{{exchange}}:{{ticker}} {{interval}} - Bearish 3 Line Strike'
+    alert(message=m, freq=alert.freq_once_per_bar)   
+
+// End ###
+
+//### Engulfing Candles
+
+openBarPrevious = open[1]
+closeBarPrevious = close[1]
+openBarCurrent = open
+closeBarCurrent = close
+
+//If current bar open is less than equal to the previous bar close AND current bar open is less than previous bar open AND current bar close is greater than previous bar open THEN True
+bullishEngulfing = openBarCurrent <= closeBarPrevious and openBarCurrent < openBarPrevious and closeBarCurrent > openBarPrevious
+//If current bar open is greater than equal to previous bar close AND current bar open is greater than previous bar open AND current bar close is less than previous bar open THEN True
+bearishEngulfing = openBarCurrent >= closeBarPrevious and openBarCurrent > openBarPrevious and closeBarCurrent < openBarPrevious
+
+//bullishEngulfing/bearishEngulfing return a value of 1 or 0; if 1 then plot on chart, if 0 then don't plot
+plotshape(bullE ? bullishEngulfing : na, style=shape.triangleup, location=location.belowbar, color=color.rgb(0, 255, 0, 0), size=size.tiny, title='Big A$$ Candle Up')
+plotshape(bearE ? bearishEngulfing : na, style=shape.triangledown, location=location.abovebar, color=color.rgb(255, 0, 0, 0), size=size.tiny, title='Big A$$ Candle Down')
+
+// Alerts
+//
+// Old-style alert conditions...
+alertcondition(bullishEngulfing, title='Bullish Engulfing', message='{{exchange}}:{{ticker}} {{interval}} - Bullish candle engulfing previous candle')
+alertcondition(bearishEngulfing, title='Bearish Engulfing', message='{{exchange}}:{{ticker}} {{interval}} - Bearish candle engulfing previous candle')
+//
+// New-style alert() functions
+// New-style alerts
+if (bullE and bullishEngulfing)
+    m = '{{exchange}}:{{ticker}} {{interval}} - Bullish candle engulfing previous candle'
+    alert(message=m, freq=alert.freq_once_per_bar)
+if (bearE and bearishEngulfing)
+    m = '{{exchange}}:{{ticker}} {{interval}} - Bearish candle engulfing previous candle'
+    alert(message=m, freq=alert.freq_once_per_bar)  
+
+// End ###
+////@version = 5
+////indicator(title="Support and Resistance Levels ", shorttitle = "S&R", overlay = true)
+
+// SnR Levels
+bars                    = input.int(15, title = "Pivot")
+tipe                    = input.string("Body", title = "Type", options = ["Wick", "Body"])
+pivot_tertinggi         = fixnan(ta.pivothigh(tipe == "Wick" ? high : close, bars, bars)[1])
+pivot_terendah          = fixnan(ta.pivotlow(tipe == "Wick" ? low : close, bars, bars)[1])
+resistance_pertama      = plot(pivot_tertinggi, color=ta.change(pivot_tertinggi) ? na : #ff0040,  linewidth=2, offset = -bars - 1, title="Resistance")
+support_pertama         = plot(pivot_terendah, color=ta.change(pivot_terendah) ? na : #10b442,  linewidth=2, offset = -bars - 1, title="Support")
+
+// Adaptive Moving Average
+plot_ama                = input.bool(false, title = "Adaptive Moving Average")
+ama_length              = input.int(15, title = "Line Length")
+ama_src                 = close
+float ama               = 0
+hh                      = math.max(math.sign(ta.change(ta.highest(ama_length))),0)
+ll                      = math.max(math.sign(ta.change(ta.lowest(ama_length))*-1),0)
+tc                      = math.pow(ta.sma(hh or ll ? 1 : 0,ama_length),2)
+
+ama := nz(ama[1]+tc*(ama_src-ama[1]),ama_src)
+
+garis_ama               = plot(plot_ama ? ama : na,"Adaptive Moving Average",#ffffff,2)
+/////
+//var float priceL = close
+//var float priceS = close
+
+//if long_entry
+//    if close < priceL    
+//        priceL := close
+
+//if short_entry
+//    if close > priceS    
+//        priceS := close
+ 
+//buy_cond  = long_entry  and close < priceL[1] 
+//sell_cond = short_entry and close > priceS[1] 
+
+//plotshape(buy_cond,title = "Buy Cond",style=shape.labelup,location=location.belowbar,color=color.green,textcolor = color.white,text="long0")
+//plotshape(sell_cond,title = "Sell Cond",style=shape.labeldown,location=location.abovebar,color=color.red,textcolor = color.white,text="short0")
