@@ -1,0 +1,201 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+//@version=4
+
+study(title="20Boom", shorttitle="20Boom", overlay=false)
+theme = input("Classic", "Theme:", options=["Original", "Large", "Classic", "Tartan"], group = "Main Settings", inline = "main")
+osc = input("LSMA Wave Trend", "Oscillator:", options=["Stochastic RSI", "Stochastic RVI", "LSMA Wave Trend"], group = "Main Settings", inline = "main")
+showentry = input(defval = true, title = "Show Entry Points", group = "Main Settings")
+showsignals = input(defval = false, title = "Show Alerts?", group = "Main Settings")
+mafilter = input(defval = true, title = "Use Ma to filter dumps?", group = "Main Settings")
+//Inputs
+
+//Quotient
+LPPeriod = input(20, title = "Quotient | LPPeriod" , inline = "quotient", group = "EOT Settings")
+K1 = input(0.8, title = "K1", inline = "quotient", group = "EOT Settings")
+K2 = input(0.4, title = "K2", inline = "quotient", group = "EOT Settings")
+esize = input(90, title = "EOT Size", inline = "quotient2", group = "EOT Settings")
+ey = input(50, title = "EOT Y axis", inline = "quotient2", group = "EOT Settings")
+
+//Stoch RSI
+smoothK = input(3, "SRSI K", minval=1, inline = "srsi", group = "Stochastic RSI Settings")
+smoothD = input(3, "SRSI D", minval=1, inline = "srsi", group = "Stochastic RSI Settings")
+lengthRSI = input(14, "SRSI Length", minval=1, inline = "srsi2", group = "Stochastic RSI Settings")
+lengthStoch = input(14, "SRSI Length", minval=1, inline = "srsi2", group = "Stochastic RSI Settings")
+src9 = input(close, title="RSI Source", inline = "srsi", group = "Stochastic RSI Settings")
+rsi1 = rsi(src9, lengthRSI)
+k = sma(stoch(rsi1, rsi1, rsi1, lengthStoch), smoothK)
+d = sma(k, smoothD)
+
+//STOCHASTIC RVI
+lengthStoch2 = input(14, "SRVI Length", minval=1, group = "Stochastic RVI Settings", inline = "srvi")
+length = input(10, minval=1, group = "Stochastic RVI Settings", inline = "srvi")
+src = input(close, title="RVI Source", group = "Stochastic RVI Settings", inline = "srvi")
+len = 14
+stddev = stdev(src, length)
+upper = ema(change(src) <= 0 ? 0 : stddev, len)
+lower = ema(change(src) > 0 ? 0 : stddev, len)
+rvi = upper / (upper + lower) * 100
+kr = sma(stoch(rvi, rvi, rvi, lengthStoch2), smoothK)
+dr = sma(kr, smoothD)
+
+// LSMAWT
+n1 = input(9, "WT | master", inline = "lsma", group = "LSMA Wave Trend Settings")
+n2 = input(6, "time 1", inline = "lsma", group = "LSMA Wave Trend Settings")
+n3 = input(3, "2", inline = "lsma", group = "LSMA Wave Trend Settings")
+n4 = input(21, "LSMA | 1", inline = "LSMA", group = "LSMA Wave Trend Settings")
+n5 = input(0, "2", inline = "LSMA", group = "LSMA Wave Trend Settings")
+smalen = input(2, "Trigger Length", group = "LSMA Wave Trend Settings")
+
+if theme == "Large" or theme == "Tartan" or theme == "Classic"
+    esize := 60
+
+//EOT
+//Vars
+alpha1 = 0.00 
+HP = 0.00 
+a1 = 0.00 
+b1 = 0.00 
+c1 = 0.00 
+c2 = 0.00 
+c3 = 0.00 
+Filt = 0.00 
+Peak = 0.00
+X = 0.00 
+Quotient1 = 0.00 
+Quotient2 = 0.00
+pi = 2 * asin(1)
+
+//Highpass filter cyclic components
+//whose periods are shorter than 100 bars
+alpha1 := ( cos( .707 * 2 * pi / 100 ) + sin( .707 * 2 * pi / 100 ) - 1 ) / cos( .707 * 2 * pi / 100 ) 
+HP := ( 1 - alpha1 / 2 )*( 1 - alpha1 / 2 )*( close - 2 * nz(close[1]) + nz(close[2]) ) + 2 * ( 1 - alpha1 ) * nz(HP[1])  - ( 1 - alpha1 ) * ( 1 - alpha1 ) * nz(HP[2]) 
+
+//SuperSmoother Filter
+a1 := exp( -1.414 * pi / LPPeriod ) 
+b1 := 2 * a1 * cos( 1.414*pi / LPPeriod ) 
+c2 := b1 
+c3 := -a1 * a1 
+c1 := 1 - c2 - c3 
+Filt := c1 * ( HP + nz(HP[1]) ) / 2 + c2 * nz(Filt[1]) + c3 * nz(Filt[2]) 
+
+//Fast Attack - Slow Decay Algorithm
+Peak := .991 * nz(Peak[1]) 
+if abs( Filt ) > Peak  
+	Peak := abs( Filt ) 
+
+//Normalized Roofing Filter
+if Peak != 0  
+	X := Filt / Peak 
+
+Quotient1 := ( X + K1 ) / ( K1 * X + 1 ) 
+Quotient2 := ( X + K2 ) / ( K2 * X + 1 ) 
+
+long = false
+short = false
+
+long := crossover(Quotient1, -0.25)
+short := crossunder(Quotient2, 0.25)
+line1 = -0.9
+
+// LSMAWT
+// Sources:
+src0 = (open), src1 = (high), src2 = (low),  src3 = (close)
+src4 = (hl2),  src5 = (hlc3), src6 = (ohlc4), src7 = (tr)
+vol  = (volume)
+
+tci(src) => ema((src-ema(src, n1)) / (0.025 * ema(abs(src - ema(src, n1)), n1)), n2)+50
+
+mf(src) => rsi(sum(volume * (change(src) <= 0 ? 0 : src), n3), sum(volume * (change(src) >= 0 ? 0 : src), n3))
+
+willy(src) => 60 * (src - highest(src, n2)) / (highest(src, n2) - lowest(src, n2)) +80
+
+csi(src) => avg(rsi(src,n3), tsi(src0,n1,n2)*50+50)
+
+phoenix(src) => avg(tci(src),csi(src),mf(src), willy(src))
+
+tradition(src) => avg(tci(src), mf(src), rsi(src, n3))
+
+// Indi FUnctions {
+wt1 = tradition(src5)
+wt2 = sma(wt1,6)
+//wt5 = sma(j,6)
+
+// LSMA
+wt3 = linreg(wt1,n4,n5)
+wt4 = ema ((wt1-wt2)*2+50, n3)
+trig = sma(wt3,smalen)
+// wt33 = wt3 / 30 * 40 - 165 // GOOD 
+ext1 = wt2<20 ? trig+9 : wt2>80 ? trig-9 : na
+
+
+//Plot SRSI
+plot(osc == "Stochastic RSI" ? k : na, "K", color=theme == "Classic" ? #2196f3 : color.blue, linewidth = 2)
+plot(osc == "Stochastic RSI" ? d : na, "D", color=theme == "Classic" ? #ff6a00 : color.yellow, linewidth = 2)
+
+//Plot SRVI
+plot(osc == "Stochastic RVI" ? kr : na, "K", color=theme == "Classic" ? #2196f3 : color.blue, linewidth = 2)
+plot(osc == "Stochastic RVI" ? dr : na, "D", color=theme == "Classic" ? #ff6a00 : color.yellow, linewidth = 2)
+
+//Plot lines
+hline(theme == "Tartan" ? na : 80, linestyle=hline.style_solid, color=color.new(color.white, 70))
+hline(theme == "Tartan" ? na : 20, linestyle=hline.style_solid, color=color.new(color.white, 70))
+h = hline(theme == "Tartan" ? 80 : na, linestyle=hline.style_solid, color=color.new(color.white, 100))
+l = hline(theme == "Tartan" ? 20 : na, linestyle=hline.style_solid, color=color.new(color.white, 100))
+hline(50, linestyle=hline.style_dashed, color=color.new(color.white, 70))
+hline(theme == "Tartan" ? 50 : na, linestyle=hline.style_dashed, title = "Zero Line", color=color.new(color.white, 50))
+b = hline(theme == "Tartan" ? -3 : na, linestyle=hline.style_solid, title = "Zero Line", color=color.new(color.white, 100))
+hline(theme == "Tartan" ? 40 : na, linestyle=hline.style_solid, title = "Zero Line", color=color.new(color.red, 50))
+hline(theme == "Tartan" ? 60 : na, linestyle=hline.style_solid, title = "Zero Line", color=color.new(color.green, 50))
+t = hline(theme == "Tartan" ? 103 : na, linestyle=hline.style_solid, title = "Zero Line", color=color.new(color.white, 100))
+fill(h,t,color.green)
+fill(b,l,color.red)
+bgcolor(k > 60 and theme == "Tartan" ? color.green : na )
+bgcolor(k < 40 and theme == "Tartan"  ? color.red : na )
+
+
+
+//Plot EOT
+q1 = Quotient1 * esize + ey
+q2 = Quotient2 * esize + ey
+Plot3 =  plot(q1, color= theme == "Tartan" ? color.white : color.blue, linewidth =2, transp=theme == "Large" ? 70 : theme == "Tartan" ? 95 : theme == "Classic" ? 80 : 10,title = "Quotient 1")
+Plot4 =  plot(q2, color= theme == "Tartan" ? color.white : color.blue, linewidth =2, transp=theme == "Large" ? 70 : theme == "Tartan" ? 95 : theme == "Classic" ? 80 : 10,title = "Quotient 2")
+fill(Plot3, Plot4, color=theme == "Tartan" ? color.white : color.blue, transp=theme == "Large" ? 90 : theme == "Tartan" ? 90 : theme == "Classic" ? 90 : 70, title = "Quotient Fill")
+
+//PLOT LSMAWT
+plot(osc == "LSMA Wave Trend" ? wt3 : na, "LSMA", color = theme == "Tartan" ? color.white : theme == "Classic" ? #2196f3 : color.blue, linewidth = 2, transp = 0)
+plot(osc == "LSMA Wave Trend" ? ext1 : na,  "Pressure",    color = theme == "Tartan" ? color.white : theme == "Classic" ? color.silver : color.yellow,  style = plot.style_circles, linewidth = 2)
+plot(osc == "LSMA Wave Trend" ? sma(wt3,smalen) : na, color= theme == "Tartan" ? color.blue : theme == "Classic" ? #ff6a00 : color.yellow, linewidth = 2)
+
+//MA
+ema1 = ema(close,30)
+sma10 = sma(close, 10)
+sma30 = sma(close, 30)
+sma200 = sma(close,200)
+ema200 = ema(close,200)
+
+//Conditions
+smacross = crossover(sma10, sma30) and close > sma200 
+dump = k < 25 and crossunder(k,d) and close > ema1
+dump2 =  k < 25 and crossunder(k,d)
+dump3 = mafilter ? dump : dump2
+entry = crossunder(Quotient2, line1)
+color2 = Quotient1 <= -1 and Quotient2 <= -1
+exit = cross(Quotient1, Quotient2) and close > sma200 and Quotient1 > 0.5
+
+//Signals
+plotshape(showsignals ? dump3 : na, title="Dump Warning", location=location.bottom, style=shape.triangledown, size=size.tiny, color=color.red, transp=20, text = "Dump")
+plotshape(showsignals ? smacross : na, title="Dip Warning", location=location.bottom, style=shape.triangledown, size=size.tiny, color=color.red, transp=20, text ="dip")
+plotshape(showentry ? entry : na, title="Entry Point Warning", location=location.top, style=shape.circle, size=size.tiny, color=color.lime, transp=20)
+plotshape(showentry ? exit : na, title="Exit Warning", location=location.top, style=shape.circle, size=size.tiny, color=color.red, transp=20)
+
+//Alerts
+alertcondition(entry, title='Buy Point', message='Buy Point')
+alertcondition(exit, title='Sell Point', message='Sell Point')
+
+
+
+
+
+
