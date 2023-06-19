@@ -1,0 +1,50 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+
+study(title="20CAE", shorttitle="20CAE")
+
+src = close, len = input(14, minval=1, title="Length")
+up = rma(max(change(src), 0), len)
+down = rma(-min(change(src), 0), len)
+rsi = down == 0 ? 100 : up == 0 ? 0 : 100 - (100 / (1 + up / down))
+
+plot(rsi, color=black)
+
+change1 = rsi > 60 ? blue :na
+change2= rsi < 40 ? purple: na
+
+p1 = plot(rsi, style=linebr, linewidth=3, color=change1)
+p2 = plot(rsi, style=linebr, linewidth=3, color=change2)
+
+
+band1 = hline(70)
+band2 = hline(30)
+band3 = hline (60)
+band4 = hline (40)
+midline= hline (50)
+band5=hline(55)
+band6=hline(45)
+fill(band1, band3, color=green, transp=90)
+fill(band3, band4, color=yellow, transp=90)
+fill(band4, band2, color=red, transp=90)
+fill (band5,band6, color=black, transp=50)
+
+cond1 = rsi > 60 and close[1] < rsi and close > 0 ? 1 : 0
+barcolor(cond1 ? blue : na) 
+
+cond2 = rsi < 40 and close[1] < rsi and close > 0 ? 1 : 0
+barcolor(cond2 ? purple : na)
+
+cond3 = rsi > 55 and close[1] < rsi and close < 60 ? 1 : 0
+barcolor(cond3 ? yellow : na)
+
+cond4 = rsi > 45 and close[1] < rsi and close [1] < 55 ? 1 : 0
+barcolor(cond4 ? black : na)
+
+cond5 = rsi > 40 and close[1] < rsi and close [1] < 55 ? 1 : 0
+barcolor(cond5 ? yellow : na)
+
+//Boom
+
+
