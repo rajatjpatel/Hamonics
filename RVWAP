@@ -1,0 +1,98 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+//@version=5
+indicator("Rolling VWAP", "RVWAP", true)
+
+import PineCoders/ConditionalAverages/1 as pc
+
+
+
+// ———————————————————— Constants and Inputs {
+
+int MS_IN_MIN   = 60 * 1000
+int MS_IN_HOUR  = MS_IN_MIN  * 60
+int MS_IN_DAY   = MS_IN_HOUR * 24
+
+var string TT_WINDOW = "By default, the time period used to calculate the RVWAP automatically adjusts with the chart's timeframe.
+  Check this to use a fixed-size time period instead, which you define with the following three values."
+var string TT_MINBARS = "The minimum number of last values to keep in the moving window, even if these values are outside the time period.
+  This avoids situations where a large time gap between two bars would cause the time window to be empty."
+
+float srcInput        = input.source(hlc3, "Source", tooltip = "The source used to calculate the VWAP. The default is the average of the high, low and close prices.")
+
+var string GRP2       = '═══════════   Time Period   ═══════════'
+bool fixedTfInput     = input.bool(false, "Use a fixed time period", group = GRP2, tooltip = TT_WINDOW)
+int  daysInput        = input.int(1, "Days", 0, 90, group = GRP2) * MS_IN_DAY
+int  hoursInput       = input.int(0, "Hours", 0, 23, group = GRP2) * MS_IN_HOUR
+int  minsInput        = input.int(0, "Minutes", 0, 59, group = GRP2) * MS_IN_MIN
+bool tableInput       = input.bool(true, "Show time period", group = GRP2, tooltip = "Displays the time period of the rolling window.")
+string textSizeInput  = input.string("large", "Text size", group = GRP2, options = ["tiny", "small", "normal", "large", "huge", "auto"])
+string tableYposInput = input.string("bottom", "Position     ", inline = "21", group = GRP2, options = ["top", "middle", "bottom"])
+string tableXposInput = input.string("right", "", inline = "21", group = GRP2, options = ["left", "center", "right"])
+
+var string GRP3       = '════════ Minimum Window Size ════════'
+int  minBarsInput     = input.int(10, "Bars", group = GRP3, tooltip = TT_MINBARS)
+
+// }
+
+
+
+// ———————————————————— Functions {
+
+timeStep() =>
+    // @function    Determines a time period from the chart's timeframe.
+    // @returns     (int) A value of time in milliseconds that is appropriate for the current chart timeframe. To be used in the RVWAP calculation.
+    int tfInMs = timeframe.in_seconds() * 1000
+    float step =
+      switch
+        tfInMs <= MS_IN_MIN        => MS_IN_HOUR
+        tfInMs <= MS_IN_MIN * 5    => MS_IN_HOUR * 4
+        tfInMs <= MS_IN_HOUR       => MS_IN_DAY * 1
+        tfInMs <= MS_IN_HOUR * 4   => MS_IN_DAY * 3
+        tfInMs <= MS_IN_HOUR * 12  => MS_IN_DAY * 7
+        tfInMs <= MS_IN_DAY        => MS_IN_DAY * 30.4375
+        tfInMs <= MS_IN_DAY * 7    => MS_IN_DAY * 90
+        => MS_IN_DAY * 365
+    int result = int(step)
+
+
+tfString(int timeInMs) =>
+    // @function    Produces a string corresponding to the input time in days, hours, and minutes.
+    // @param       (series int) A time value in milliseconds to be converted to a string variable. 
+    // @returns     (string) A string variable reflecting the amount of time from the input time.
+    int s  = timeInMs / 1000
+    int m  = s / 60
+    int h  = m / 60
+    int tm = math.floor(m % 60)
+    int th = math.floor(h % 24)
+    int d  = math.floor(h / 24)
+    string result = 
+      switch
+        d == 30 and th == 10 and tm == 30 => "1M"
+        d == 7  and th == 0  and tm == 0  => "1W"
+        =>
+            string dStr = d  ? str.tostring(d)  + "D "  : ""
+            string hStr = th ? str.tostring(th) + "H "  : ""
+            string mStr = tm ? str.tostring(tm) + "min" : ""
+            dStr + hStr + mStr
+// }
+
+
+
+// ———————————————————— Calculations and Plots {
+
+// Stop the indicator on charts with no volume.
+if barstate.islast and ta.cum(nz(volume)) == 0
+    runtime.error("No volume is provided by the data vendor.")
+
+// RVWAP
+var int timeInMs  = fixedTfInput ? minsInput + hoursInput + daysInput : timeStep()
+float rollingVWAP = pc.totalForTimeWhen(srcInput * volume, timeInMs, true, minBarsInput) / pc.totalForTimeWhen(volume, timeInMs, true, minBarsInput)
+plot(rollingVWAP, "Rolling VWAP", color.orange)
+
+// Display of time period.
+var table tfDisplay = table.new(tableYposInput + "_" + tableXposInput, 1, 1)
+if tableInput
+    table.cell(tfDisplay, 0, 0, tfString(timeInMs), bgcolor = na, text_color = color.gray, text_size = textSizeInput)
+// }
