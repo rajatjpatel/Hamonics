@@ -1,0 +1,276 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+
+//@version=5
+indicator("Anchored VWAP", 'Price', overlay = true, max_lines_count = 500)
+
+evnHi = timestamp("10 Nov 2021 00:00 +0000") // default event for AVWAP hi
+evnLo = timestamp("21 Sep 2021 00:00 +0000") // default event for AVWAP lo
+evnHO = timestamp("24 Jan 2022 00:00 +0000") // default event for AVWAP handoff
+
+colHi = #ff00664d  // default color for AVWAP event hi
+colLo = #ff00ff4d  // default color for AVWAP event lo
+colHO = #9900ff4d  // default color for AVWAP handoff
+col1D = #0000ffb3  // default color for AVWAP daily
+col2D = #00ffffb3  // default color for AVWAP previous daily
+col1W = #00ff00b3  // default color for AVWAP weekly
+col1M = #ffff00b3  // default color for AVWAP monthly
+col3M = #ff6600b3  // default color for AVWAP quarterly
+col1Y = #ff0000b3  // default color for AVWAP yearly
+colah = #f23645ff  // default color for AVWAP auto1
+colal = #089981ff  // default color for AVWAP auto2
+
+toolD = "[Event Date] [Event Time]\nSet the desired Date & Time or drag the vertical anchor line to a significant Event on chart."
+toolE = "[Source] [Zone Type] [Zone Width] [Color]\nSet the anchored VWAP's desired Source, Zone Type, Zone Width, and Color."
+toolI = "[Source] [Interval] [Line Width] [Color]\nSet the periodic VWAP's desired Source, Interval, Line Width, and Color."
+toolA = "[Signal] [Source] [Line Width] [Color]\nSet the automatic VWAP's desired Signal, Source, Line Width, and Color."
+toolS = "[Length] [Bars Left] [Bars Right]\nSet the desired Length applicable for Highest, Lowest, Highest Volume " +
+ ", and Lowest Volume. Set the desired number of Bars Left & Bars Right applicable for Pivot Hi or Pivot Lo."
+
+dateH = input.time     (evnHi,     'Event Hi',                           tooltip = toolD, confirm = false)
+sho_H = input.bool     (true,      'Show',                                                 inline = 'A')
+src_H = input.source   (hlc3,      '',                                                     inline = 'A')
+zon_H = input.string   ('% Above', '',                                                     inline = 'A',
+ options = ['Off', '% Above', '% Below', '% Dual', 'StDev Above', 'StDev Below', 'StDev Dual'])
+fct_H = input.float    (3,         '',           minval = 0, step = 0.1,                   inline = 'A')
+col_H = input.color    (colHi,     '',                                   tooltip = toolE,  inline = 'A')
+
+dateL = input.time     (evnLo,     'Event Lo',                           tooltip = toolD, confirm = false)
+sho_L = input.bool     (true,      'Show',                                                 inline = 'B')
+src_L = input.source   (hlc3,      '',                                                     inline = 'B')
+zon_L = input.string   ('% Below', '',                                                     inline = 'B',
+ options = ['Off', '% Above', '% Below', '% Dual', 'StDev Above', 'StDev Below', 'StDev Dual'])
+fct_L = input.float    (3,         '',           minval = 0, step = 0.1,                   inline = 'B')
+col_L = input.color    (colLo,     '',                                   tooltip = toolE,  inline = 'B')
+
+dateC = input.time     (evnHO,     'HandOff',                            tooltip = toolD, confirm = false)
+sho_C = input.bool     (true,      'Show',                                                 inline = 'C')
+src_C = input.source   (hlc3,      '',                                                     inline = 'C')
+zon_C = input.string   ('% Below', '',                                                     inline = 'C',
+ options = ['Off', '% Above', '% Below', '% Dual', 'StDev Above', 'StDev Below', 'StDev Dual'])
+fct_C = input.float    (3,         '',           minval = 0, step = 0.1,                   inline = 'C')
+col_C = input.color    (colHO,     '',                                   tooltip = toolE,  inline = 'C')
+
+sho_D = input.bool     (false,     'Show',                                                 inline = 'D', group = 'Intervals')
+src_D = input.source   (hlc3,      '',                                                     inline = 'D', group = 'Intervals')
+res_D = input.timeframe('D',       '',                                                     inline = 'D', group = 'Intervals')
+wid_D = input.int      (2,         '',           minval = 0,                               inline = 'D', group = 'Intervals')
+col_D = input.color    (col1D,     '',                                   tooltip = toolI,  inline = 'D', group = 'Intervals')
+
+sho_P = input.bool     (false,     'Show',                                                 inline = 'P', group = 'Intervals')
+src_P = input.source   (hlc3,      '',                                                     inline = 'P', group = 'Intervals')
+res_P = input.timeframe('2D',      '',                                                     inline = 'P', group = 'Intervals')
+wid_P = input.int      (2,         '',           minval = 0,                               inline = 'P', group = 'Intervals')
+col_P = input.color    (col2D,     '',                                   tooltip = toolI,  inline = 'P', group = 'Intervals')
+
+sho_W = input.bool     (false,     'Show',                                                 inline = 'W', group = 'Intervals')
+src_W = input.source   (hlc3,      '',                                                     inline = 'W', group = 'Intervals')
+res_W = input.timeframe('W',       '',                                                     inline = 'W', group = 'Intervals')
+wid_W = input.int      (2,         '',           minval = 0,                               inline = 'W', group = 'Intervals')
+col_W = input.color    (col1W,     '',                                   tooltip = toolI,  inline = 'W', group = 'Intervals')
+
+sho_M = input.bool     (false,     'Show',                                                 inline = 'M', group = 'Intervals')
+src_M = input.source   (hlc3,      '',                                                     inline = 'M', group = 'Intervals')
+res_M = input.timeframe('M',       '',                                                     inline = 'M', group = 'Intervals')
+wid_M = input.int      (2,         '',           minval = 0,                               inline = 'M', group = 'Intervals')
+col_M = input.color    (col1M,     '',                                   tooltip = toolI,  inline = 'M', group = 'Intervals')
+
+sho_Q = input.bool     (false,     'Show',                                                 inline = 'Q', group = 'Intervals')
+src_Q = input.source   (hlc3,      '',                                                     inline = 'Q', group = 'Intervals')
+res_Q = input.timeframe('3M',      '',                                                     inline = 'Q', group = 'Intervals')
+wid_Q = input.int      (2,         '',           minval = 0,                               inline = 'Q', group = 'Intervals')
+col_Q = input.color    (col3M,     '',                                   tooltip = toolI,  inline = 'Q', group = 'Intervals')
+
+sho_Y = input.bool     (false,     'Show',                                                 inline = 'Y', group = 'Intervals')
+src_Y = input.source   (hlc3,      '',                                                     inline = 'Y', group = 'Intervals')
+res_Y = input.timeframe('12M',     '',                                                     inline = 'Y', group = 'Intervals')
+wid_Y = input.int      (2,         '',           minval = 0,                               inline = 'Y', group = 'Intervals')
+col_Y = input.color    (col1Y,     '',                                   tooltip = toolI,  inline = 'Y', group = 'Intervals')
+
+shoAH = input.bool     (false,     'Show',                                                 inline = 'H', group = 'Auto')
+typAH = input.string   ('Highest', '',                                   tooltip = toolA,  inline = 'H', group = 'Auto',
+ options = ['Highest', 'Lowest', 'Highest Volume', 'Lowest Volume', 'Pivot High', 'Pivot Low'])
+srcAH = input.source   (high,      '',                                                     inline = 'H', group = 'Auto')
+widAH = input.int      (2,         '',           minval = 1,                               inline = 'H', group = 'Auto')
+colAH = input.color    (colah,     '',                                                     inline = 'H', group = 'Auto')
+lenAH = input.int      (14,        'SignalBars', minval = 1,                               inline = 'h', group = 'Auto')
+plbAH = input.int      (2,         '',           minval = 0,                               inline = 'h', group = 'Auto')
+prbAH = input.int      (2,         '',           minval = 0,             tooltip = toolS,  inline = 'h', group = 'Auto')
+
+shoAL = input.bool     (false,     'Show',                                                 inline = 'L', group = 'Auto')
+typAL = input.string   ('Lowest',  '',                                   tooltip = toolA,  inline = 'L', group = 'Auto',
+ options = ['Highest', 'Lowest', 'Highest Volume', 'Lowest Volume', 'Pivot High', 'Pivot Low'])
+srcAL = input.source   (low,      '',                                                      inline = 'L', group = 'Auto')
+widAL = input.int      (2,         '',           minval = 1,                               inline = 'L', group = 'Auto')
+colAL = input.color    (colal,     '',                                                     inline = 'L', group = 'Auto')
+lenAL = input.int      (14,        'SignalBars', minval = 1,                               inline = 'l', group = 'Auto')
+plbAL = input.int      (2,         '',           minval = 0,                               inline = 'l', group = 'Auto')
+prbAL = input.int      (2,         '',           minval = 0,             tooltip = toolS,  inline = 'l', group = 'Auto')
+
+// returns event avwap tuples with upper/lower specified in percent or standard deviation
+avwap(price, anchor, shift, factor) =>
+    begin = time == anchor
+    [avwap, stdvU, stdvL] = ta.vwap(price, begin, factor)
+    zoneA = float(na)
+    zoneB = float(na)
+    if shift == '% Above' or shift == '% Dual'
+        zoneA := ta.vwap((1 + factor / 100) * price, begin)
+    if shift == '% Below' or shift == '% Dual'
+        zoneB := ta.vwap((1 - factor / 100) * price, begin)
+    if shift == 'StDev Above' or shift == 'StDev Dual'
+        zoneA := stdvU
+    if shift == 'StDev Below' or shift == 'StDev Dual'
+        zoneB := stdvL
+    [avwap, zoneA, zoneB]
+
+[vwapH, zonHA, zonHB] = avwap(src_H, dateH, zon_H, fct_H)
+[vwapL, zonLA, zonLB] = avwap(src_L, dateL, zon_L, fct_L)
+[vwapC, zonCA, zonCB] = avwap(src_C, dateC, zon_C, fct_C)
+
+// returns interva avwap
+shoTF(res) => timeframe.in_seconds(timeframe.period) < timeframe.in_seconds(res)   
+vwapD = sho_D and shoTF(res_D) ? ta.vwap(src_D, timeframe.change('1D'))  : float(na)
+vwapP = sho_P and shoTF(res_P) ? ta.vwap(src_P, timeframe.change('2D'))  : float(na)
+vwapW = sho_W and shoTF(res_W) ? ta.vwap(src_W, timeframe.change('1W'))  : float(na)
+vwapM = sho_M and shoTF(res_M) ? ta.vwap(src_M, timeframe.change('1M'))  : float(na)
+vwapQ = sho_Q and shoTF(res_Q) ? ta.vwap(src_Q, timeframe.change('3M'))  : float(na)
+vwapY = sho_Y and shoTF(res_Y) ? ta.vwap(src_Y, timeframe.change('12M')) : float(na)
+
+// plot event avwap tuples
+pltHV = plot(sho_H ? vwapH : na, 'Hi VWAP Line', color.new(col_H, 0), 2)
+pltHA = plot(sho_H ? zonHA : na, 'Hi VWAP Uppr', color.new(col_H, 100))
+pltHB = plot(sho_H ? zonHB : na, 'Hi VWAP Lowr', color.new(col_H, 100))
+fill(pltHV, pltHA, col_H)
+fill(pltHV, pltHB, col_H)
+pltLV = plot(sho_L ? vwapL : na, 'Lo VWAP Line', color.new(col_L, 0), 2)
+pltLA = plot(sho_L ? zonLA : na, 'Lo VWAP Uppr', color.new(col_L, 100))
+pltLB = plot(sho_L ? zonLB : na, 'Lo VWAP Lowr', color.new(col_L, 100))
+fill(pltLV, pltLA, col_L)
+fill(pltLV, pltLB, col_L)
+pltCV = plot(sho_C ? vwapC : na, 'HO VWAP Line', color.new(col_C, 0), 2)
+pltCA = plot(sho_C ? zonCA : na, 'HO VWAP Uppr', color.new(col_C, 100))
+pltCB = plot(sho_C ? zonCB : na, 'HO VWAP Lowr', color.new(col_C, 100))
+fill(pltCV, pltCA, col_C)
+fill(pltCV, pltCB, col_C)
+
+// plot interval avwap
+plt1D = plot(vwapD, 'DTD VWAP Line', col_D, wid_D)
+plt2D = plot(vwapP, 'PTD VWAP Line', col_P, wid_P)
+plt1W = plot(vwapW, 'WTD VWAP Line', col_W, wid_W)
+plt1M = plot(vwapM, 'MTD VWAP Line', col_M, wid_M)
+plt3M = plot(vwapQ, 'QTD VWAP Line', col_Q, wid_Q)
+plt1Y = plot(vwapY, 'YTD VWAP Line', col_Y, wid_Y)
+
+// returns auto vwaps from signals within lengths of bars or pivots
+svwap(
+ show1, source1, signal1, length1, barsL1, barsR1, color1, width1,
+ show2, source2, signal2, length2, barsL2, barsR2, color2, width2) =>
+    idxCB = bar_index              // index current bar
+
+    valS1 = float(na)              // value signal source1
+    idxS1 = int(na)                // index signal source1
+    sS1V1 = float(na)              // sum of source1 * volume1
+    sVol1 = float(na)              // sum of volume1
+    valP1 = float(na)              // previous value of svwap1
+    valC1 = float(na)              // current value of svwap1
+
+    valS2 = float(na)              // value signal source2
+    idxS2 = int(na)                // index signal source2
+    sS2V2 = float(na)              // sum of source2 * volume2
+    sVol2 = float(na)              // sum of volume2
+    valP2 = float(na)              // previous value of svwap2
+    valC2 = float(na)              // current value of svwap2
+    lines = line(na)               // lines drawn for each bar of avwap   
+     
+    if not show1 and not show2
+        valC1 := float(na)
+        valC2 := float(na)
+    else
+        a_allLines = line.all      // garbage collection
+        if array.size(a_allLines) > 0
+            for i = 0 to array.size(a_allLines) - 1
+                line.delete(array.get(a_allLines, i))  
+
+        if show1                   // calc auto vwap1
+            valS1 :=
+             signal1 == 'Highest' ? ta.highest(source1, length1) :
+             signal1 == 'Lowest'  ? ta.lowest (source1, length1) :
+             signal1 == 'Highest Volume' ? ta.highest(volume, length1) :
+             signal1 == 'Lowest Volume'  ? ta.lowest (volume, length1) :
+             signal1 == 'Pivot High' ?
+              ta.valuewhen(not na(ta.pivothigh(source1, barsL1, barsR1)), source1[barsR1], 0) :
+             signal1 == 'Pivot Low'  ?
+              ta.valuewhen(not na(ta.pivotlow (source1, barsL1, barsR1)), source1[barsR1], 0) :              
+             float(na)
+            if signal1 == 'Highest' or signal1 == 'Lowest'
+                for i = 0 to length1 - 1
+                    if source1[i] == valS1 
+                        idxS1 := bar_index[i]
+                        break
+            if signal1 == 'Highest Volume' or signal1 == 'Lowest Volume'
+                for i = 0 to length1 - 1
+                    if volume[i] == valS1 
+                        idxS1 := bar_index[i]
+                        break
+            if signal1 == 'Pivot High' or signal1 == 'Pivot Low'
+                idxS1 :=
+                 signal1 == 'Pivot High' ?
+                  ta.valuewhen(not na(ta.pivothigh(source1, barsL1, barsR1)), bar_index[barsR1], 0) :
+                 signal1 == 'Pivot Low'  ?
+                  ta.valuewhen(not na(ta.pivotlow (source1, barsL1, barsR1)), bar_index[barsR1], 0) :
+                 int(na)   
+
+            nBars = 1 + idxCB - idxS1    
+            for i = nBars - 1 to 0 // draw lines for current event vwap
+                sS1V1 := nz(sS1V1) + nz(source1[i] * volume[i])
+                sVol1 := nz(sVol1) + nz(volume[i])
+                valP1 := nz(valC1, na)
+                valC1 := sS1V1 / sVol1
+                lines := line.new(idxCB - i - 1, valP1, idxCB - i, valC1, xloc.bar_index, extend.none, color1, width = width1)
+
+        if show2                   // calc auto vwap2
+            valS2 :=
+             signal2 == 'Highest' ? ta.highest(source2, length2) :
+             signal2 == 'Lowest'  ? ta.lowest (source2, length2) :
+             signal2 == 'Highest Volume' ? ta.highest(volume, length2) :
+             signal2 == 'Lowest Volume'  ? ta.lowest (volume, length2) :             
+             signal2 == 'Pivot High' ?
+              ta.valuewhen(not na(ta.pivothigh(source2, barsL2, barsR2)), source1[barsR2], 0) :
+             signal2 == 'Pivot Low'  ?
+              ta.valuewhen(not na(ta.pivotlow (source2, barsL2, barsR2)), source1[barsR2], 0) :   
+             float(na)
+            if signal2 == 'Highest' or signal2 == 'Lowest'
+                for i = 0 to length2 - 1
+                    if source2[i] == valS2 
+                        idxS2 := bar_index[i]
+                        break
+            if signal2 == 'Highest Volume' or signal2 == 'Lowest Volume'
+                for i = 0 to length2 - 1
+                    if volume[i] == valS2 
+                        idxS2 := bar_index[i]
+                        break
+            if signal2 == 'Pivot High' or signal2 == 'Pivot Low'
+                idxS2 :=
+                 signal2 == 'Pivot High' ?
+                  ta.valuewhen(not na(ta.pivothigh(source2, barsL2, barsR2)), bar_index[barsR2], 0) :
+                 signal2 == 'Pivot Low'  ?
+                  ta.valuewhen(not na(ta.pivotlow (source2, barsL2, barsR2)), bar_index[barsR2], 0) :
+                 int(na)   
+
+            nBars = 1 + idxCB - idxS2     
+            for i = nBars - 1 to 0 // draw lines for current event vwap
+                sS2V2 := nz(sS2V2) + nz(source2[i] * volume[i])
+                sVol2 := nz(sVol2) + nz(volume[i])
+                valP2 := nz(valC2, na)
+                valC2 := sS2V2 / sVol2
+                lines := line.new(idxCB - i - 1, valP2, idxCB - i, valC2, xloc.bar_index, extend.none, color2, width = width2)
+        
+    [valC1, valC2]
+
+[vwap1, vwap2] = svwap(
+ shoAH, srcAH, typAH, lenAH, plbAH, prbAH, colAH, widAH,
+ shoAL, srcAL, typAL, lenAL, plbAL, prbAL, colAL, widAL)
+
+plot(vwap1, 'Auto1 VWAP Line', display = display.data_window)
+plot(vwap2, 'Auto2 VWAP Line', display = display.data_window)
