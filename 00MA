@@ -1,0 +1,32 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+//@version=5
+indicator("00MA", shorttitle="MA", overlay = true)
+
+length = input(14, title="Length")
+
+close_ma = ta.ema(close, length)
+high_ma = ta.ema(high, length)
+low_ma = ta.ema(low, length)
+
+colup = color.new(color.green, 0)
+coldown = color.new(color.red, 0)
+
+// Conditions for color change
+colorCondition = close_ma > close_ma[1] ? colup : coldown
+
+// Plotting the moving averages
+plot(close_ma, color=colorCondition)
+p1 = plot(high_ma, color=colorCondition)
+p2 = plot(low_ma, color=colorCondition)
+
+// Fill the area between high_ma and low_ma
+fill(p1, p2, color=color.new(colorCondition, 90))
+
+// Conditions for buy and sell signals
+buySignal = ta.crossover(close, high_ma)
+sellSignal = ta.crossunder(close, low_ma)
+
+plotshape(series=buySignal, location=location.belowbar, color=color.new(color.blue, 0), style=shape.triangleup, title="Buy Signal")
+plotshape(series=sellSignal, location=location.abovebar, color=color.new(color.red, 0), style=shape.triangledown, title="Sell Signal")
+
