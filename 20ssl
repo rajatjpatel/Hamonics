@@ -1,0 +1,158 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+//@version=4
+study(title="20SSL", overlay=true, shorttitle='20SSLShoonya')
+
+// ATR Bands
+
+ATR = atr(input(defval=14, title="ATR", type=input.integer))[1]
+MultipStop = input(defval=1.5, title="ATR Stoploss Multiplier", minval=0.5)
+MultiProfit = input(defval=3, title="ATR Profit Multiplier", minval=0.5)
+Longstop = low - ATR * MultipStop
+Shortstop = high + ATR * MultipStop
+LongProfit = high + ATR * MultiProfit
+ShortProfit = low - ATR * MultiProfit
+
+plot(Longstop, "ATR Long Stop Loss", color=color.white, transp=100)
+plot(Shortstop, "ATR Short Stop Loss", color=color.white, transp=100)
+plot(LongProfit, "ATR Long Profit Level", color=color.green, transp=100)
+plot(ShortProfit, "ATR Short Profit Level", color=color.green, transp=100)
+
+// SSL
+
+period = input(title="SSL Period", defval=30)
+len = input(title="SSL Period", defval=30)
+smaHigh = sma(high, len)
+smaLow = sma(low, len)
+Hlv = int(na)
+Hlv := close > smaHigh ? 1 : close < smaLow ? -1 : Hlv[1]
+sslDown = Hlv < 0 ? smaHigh : smaLow
+sslUp = Hlv < 0 ? smaLow : smaHigh
+sslcrossup = crossover(sslUp, sslDown)
+sslcrossdown = crossover(sslDown, sslUp)
+
+plotshape(sslcrossup, title="SSL Cross Up", style=shape.xcross, location=location.abovebar, color=color.lime, size=size.tiny, transp=0)
+plotshape(sslcrossdown, title="SSL Cross Down", style=shape.xcross, location=location.belowbar, color=color.red, size=size.tiny, transp=0)
+
+// WAE
+
+
+sensitivity = input(150, title="WAE Sensitivity")
+fastLength = input(20, title="WAE FastEMA Length")
+slowLength = input(40, title="WAE SlowEMA Length")
+channelLength = input(20, title="WAE BB Channel Length")
+mult = input(2.0, title="WAE BB Stdev Multiplier")
+
+DEAD_ZONE = nz(rma(tr(true), 100)) * 3.7
+
+calc_macd(source, fastLength, slowLength) =>
+    fastMA = ema(source, fastLength)
+    slowMA = ema(source, slowLength)
+    fastMA - slowMA
+
+calc_BBUpper(source, length, mult) =>
+    basis = sma(source, length)
+    dev = mult * stdev(source, length)
+    basis + dev
+
+calc_BBLower(source, length, mult) =>
+    basis = sma(source, length)
+    dev = mult * stdev(source, length)
+    basis - dev
+
+t1 = (calc_macd(close, fastLength, slowLength) -
+   calc_macd(close[1], fastLength, slowLength)) * sensitivity
+t2 = (calc_macd(close[2], fastLength, slowLength) -
+   calc_macd(close[3], fastLength, slowLength)) * sensitivity
+
+e1 = calc_BBUpper(close, channelLength, mult) -
+   calc_BBLower(close, channelLength, mult)
+
+trendUp = t1 >= 0 ? t1 : 0
+trendDown = t1 < 0 ? -1 * t1 : 0
+
+upInd = trendUp > e1 and trendUp > DEAD_ZONE
+downInd = trendDown > e1 and trendDown > DEAD_ZONE
+
+
+// Stochastic
+
+
+periodK = input(14, title="Stoch %K Length", minval=1)
+smoothK = input(1, title="Stoch %K Smoothing", minval=1)
+periodD = input(3, title="Stoch %D Smoothing", minval=1)
+kstoch = sma(stoch(close, high, low, periodK), smoothK)
+dstoch = sma(kstoch, periodD)
+stochoversold = 20
+stochoverbought = 80
+stochcrossup = crossover(kstoch, dstoch) and kstoch < stochoverbought
+stochcrossdown = crossunder(kstoch, dstoch) and kstoch > stochoversold
+
+plotshape(stochcrossup, title="Stochastic Cross Up", style=shape.circle, location=location.belowbar, color=color.lime, size=size.tiny, transp=50)
+plotshape(stochcrossdown, title="Stochastic Cross Down", style=shape.circle, location=location.abovebar, color=color.red, size=size.tiny, transp=50)
+
+
+// EMA
+
+EMAlen = input(200, minval=1, title="EMA Length")
+EMAsrc = input(close, title="EMA Source")
+EMA3len = input(20, minval=1, title="EMA 2 Length")
+EMA3src = input(close, title="EMA 2 Source")
+EMA4len = input(50, minval=1, title="EMA 3 Length")
+EMA4src = input(close, title="EMA 3 Source")
+
+EMAoffset = 0
+EMA1 = ema(EMAsrc, EMAlen)
+EMA2 = ema(close, 1)
+EMA3 = ema(EMA3src, EMA3len)
+EMA4 = ema(EMA4src, EMA4len)
+
+
+
+
+isrising = rising (EMA1,5)
+isfalling = falling (EMA1,5)
+
+color plotcolor = color.orange
+
+if isrising
+    plotcolor := color.lime
+
+else if isfalling
+    plotcolor := color.red
+
+EMA1plot = plot(EMA1, title="EMA", color=plotcolor, linewidth=4, transp= 65, offset=EMAoffset)   // EMA Plot
+
+EMA2plot = plot(EMA2, color=color.gray, linewidth=1, transp = 100)
+
+color Fillcolor = close > EMA1? color.green : color.red
+
+fill(EMA1plot, EMA2plot , Fillcolor, title = "EMA fill colour")
+
+EMA3plot = plot(EMA3, title="EMA 2", color= color.white, linewidth=2, transp= 0, offset=EMAoffset)
+EMA4plot = plot(EMA4, title="EMA 3", color=color.yellow, linewidth=2, transp= 0, offset=EMAoffset)
+
+
+plot(sslUp, linewidth=1, color=color.lime, title="Upper SSL Plot", transp=25)  // SSL Plot
+plot(sslDown, linewidth=1, color=color.red, title="Lower SSL Plot", transp=25)  // SSL Plot
+
+barColour = upInd ? color.lime : downInd ? color.red : na
+barcolor(color=barColour)
+
+plotshape(upInd, title="WAE Uptrend Confirm", style=shape.square, location=location.bottom, color=color.lime, size=size.tiny, transp=0)
+plotshape(downInd, title="WAE Downtrend Confirm", style=shape.square, location=location.bottom, color=color.red, size=size.tiny, transp=0)
+
+
+ssllongcond = sslcrossup and upInd and close > EMA1
+sslshortcond = sslcrossdown and downInd and close < EMA1
+eithercondition = ssllongcond or sslshortcond
+
+plotshape(ssllongcond ? 10 : na, style=shape.triangleup, color=color.lime, location=location.belowbar, size=size.small, title="Long")
+plotshape(sslshortcond ? 10 : na, style=shape.triangledown, color=color.red, location=location.abovebar, size=size.small, title="Short")
+
+alertcondition(sslcrossup, 'SSL Cross Up', 'Long')
+alertcondition(sslcrossdown, 'SSL Cross Down', 'Short')
+alertcondition(ssllongcond, title='Long', message='Long')
+alertcondition(sslshortcond, title='Short', message='Short')
+alertcondition(eithercondition, title='Short or Long', message='Short or Long')
