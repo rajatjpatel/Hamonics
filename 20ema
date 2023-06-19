@@ -1,0 +1,22 @@
+//@version=4
+study(title="20EMA", overlay=true)
+
+ema5 = ema(close, 5)
+ema21 = ema(close, 21)
+ema50 = ema(close, 50)
+ema200 = ema(close, 200)
+
+plot(ema5, title="ema5", color=color.lime, linewidth=2)
+plot(ema21, title="ema21", color=color.blue, linewidth=2)
+plot(ema50, title="ema50", color=color.blue, linewidth=2)
+plot(ema200, title="ema200", color=color.orange, linewidth=2)
+
+
+plot(cross(ema5, ema21) and ema5[1] < ema21[1] ? ema5 : na, title="al", style=plot.style_cross, linewidth=4, color=color.blue)
+plot(cross(ema5, ema21) and ema5[1] > ema21[1] ? ema5 : na, title="sat", style=plot.style_cross, linewidth=4, color=color.black)
+
+plotshape(cross(ema5, ema21) and ema5[1] < ema21[1] ? true : na, style=shape.triangleup, text="AL", color=color.green, size=size.small, location=location.belowbar, transp=0)
+plotshape(cross(ema5, ema21) and ema5[1] > ema21[1] ? true : na, style=shape.triangledown, text="SAT", color=color.black, size=size.small, location=location.abovebar, transp=0)
+
+cross_1 = cross(ema5, ema21)
+barcolor(cross(ema5, ema21) and ema5[1] < ema21[1] ? color.blue : cross_1 and ema5[1] > ema21[1] ? color.black : close < open ? color.red : color.green)
