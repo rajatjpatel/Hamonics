@@ -1,0 +1,372 @@
+//@version=5
+
+// @description Methods associated with Pitchfork and Pitchfork Drawing. Depends on the library PitchforkTypes for Pitchfork/PitchforkDrawing objects which in turn use DrawingTypes for basic objects Point/Line/LineProperties. Also depends on DrawingMethods for related methods
+library("PitchforkMethods", overlay = true)
+import HeWhoMustNotBeNamed/DrawingTypes/2 as dr
+import HeWhoMustNotBeNamed/DrawingMethods/2
+import HeWhoMustNotBeNamed/PitchforkTypes/2 as p
+
+method get(p.Fork this, string key)=>key== "ratio"? str.tostring(this.ratio) : key == "include"? str.tostring(this.include) : na
+
+// @function Converts PitchforkTypes/Fork object to string representation
+// @param this PitchforkTypes/Fork object
+// @returns string representation of PitchforkTypes/Fork
+export method tostring(p.Fork this)=>
+	str = ''
+	if(not na(this))
+		keys = array.from("ratio", "include")
+		keyValues = array.new<string>()
+		for key in keys
+			keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+		str := '{'+array.join(keyValues, ",")+'}'
+	str
+
+// @function Converts Array of PitchforkTypes/Fork object to string representation
+// @param this Array of PitchforkTypes/Fork object
+// @returns string representation of PitchforkTypes/Fork array
+export method tostring(array<p.Fork> this)=>
+	str = ''
+	if(not na(this))
+		values = array.new<string>()
+		for fork in this
+			values.push(fork.tostring())
+		str := '['+array.join(values, ",")+']'
+	str
+
+method get(p.PitchforkProperties this, string key)=>key == "forks"? str.tostring(this.forks.tostring()) : key == "type"? this.type : key == "inside"? (this.inside? 'true': 'false'): na
+
+// @function Converts PitchforkTypes/PitchforkProperties object to string representation
+// @param this PitchforkTypes/PitchforkProperties object
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @returns string representation of PitchforkTypes/PitchforkProperties
+export method tostring(p.PitchforkProperties this, bool sortKeys = false, int sortOrder = 1)=>
+	str = ''
+	if(not na(this))
+		keys = array.from("ratios", "type", "inside")
+		keyValues = array.new<string>()
+		if(sortKeys and not na(sortOrder) and sortOrder!=0)
+			keys.sort(sortOrder>0? order.ascending : order.descending)
+		
+		for key in keys
+			keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+		str := '{'+array.join(keyValues, ",")+'}'
+	str
+
+method get(p.PitchforkDrawingProperties this, string key)=>key == "extend"? (this.extend?'true':'false') :
+				 key == "fillTransparency"? str.tostring(this.fillTransparency) : 
+				 key == "fill"? (this.fill? 'true': 'false'): na
+
+// @function Converts PitchforkTypes/PitchforkDrawingProperties object to string representation
+// @param this PitchforkTypes/PitchforkDrawingProperties object
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @returns string representation of PitchforkTypes/PitchforkDrawingProperties
+export method tostring(p.PitchforkDrawingProperties this, bool sortKeys = false, int sortOrder = 1)=>
+	str = ''
+	if(not na(this))
+		keys = array.from("extend", "fill", "fillTransparency")
+		keyValues = array.new<string>()
+		if(sortKeys and not na(sortOrder) and sortOrder!=0)
+			keys.sort(sortOrder>0? order.ascending : order.descending)
+		
+		for key in keys
+			keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+		str := '{'+array.join(keyValues, ",")+'}'
+	str
+
+method get(p.Pitchfork this, string key)=>key == "a"? this.a.tostring() : key == "b"? this.b.tostring() : key == "c"? this.c.tostring() :
+											 key == "properties"? this.properties.tostring(): key == "dProperties"? this.dProperties.tostring() : na
+
+// @function Converts PitchforkTypes/Pitchfork object to string representation
+// @param this PitchforkTypes/Pitchfork object
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @returns string representation of PitchforkTypes/Pitchfork
+export method tostring(p.Pitchfork this, bool sortKeys = false, int sortOrder = 1)=>
+	str = ''
+	if(not na(this))
+		keys = array.from("a", "b", "c", "properties", "dProperties")
+		keyValues = array.new<string>()
+		if(sortKeys and not na(sortOrder) and sortOrder!=0)
+			keys.sort(sortOrder>0? order.ascending : order.descending)
+		
+		for key in keys
+			keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+		str := '{'+array.join(keyValues, ",")+'}'
+	str
+
+getParrallelPoint(p1Start, p1End, p2Start)=>
+	priceDiff = p1Start.price-p2Start.price
+	barDiff = p1Start.bar - p2Start.bar
+	barTimeDiff = p1Start.bartime - p2Start.bartime
+	dr.Point.new(p1End.price-priceDiff, p1End.bar-barDiff, p1End.bartime - barTimeDiff)
+
+// @function Creates PitchforkTypes/PitchforkDrawing from PitchforkTypes/Pitchfork object
+// @param this PitchforkTypes/Pitchfork object
+// @returns PitchforkTypes/PitchforkDrawing object created
+export method createDrawing(p.Pitchfork this)=>
+	this.lProperties := na(this.lProperties)? dr.LineProperties.new() : this.lProperties
+	this.properties := na(this.properties)? p.PitchforkProperties.new() : this.properties
+	this.dProperties := na(this.dProperties)? p.PitchforkDrawingProperties.new(commonColor = this.lProperties.color) : this.dProperties
+	
+	if(na(this.properties.forks))
+		this.properties.forks := array.new<p.Fork>()
+	
+	if(this.properties.forks.size()==0)
+		this.properties.forks.push(p.Fork.new(0.5, this.lProperties.color, true))
+		this.properties.forks.push(p.Fork.new(1.0, this.lProperties.color, true))
+
+	if(na(this.dProperties.commonColor))
+		this.dProperties.commonColor := this.lProperties.color
+		
+	dr.Point p1 = this.properties.type == "schiff"? dr.Point.new((this.a.price+this.b.price)/2, this.a.bar, this.a.bartime) : 
+					 this.properties.type == "mschiff"? dr.Point.new((this.a.price+this.b.price)/2, int((this.a.bar+this.b.bar)/2), int((this.a.bartime+this.b.bartime)/2)):
+					 this.a
+	dr.Point p2 = this.properties.inside? this.c : dr.Point.new((this.b.price+this.c.price)/2, int((this.b.bar+this.c.bar)/2), int((this.a.bartime+this.b.bartime)/2))
+	dr.Point p3 = dr.Point.new(2*p2.price-p1.price, 2*p2.bar-p1.bar, 2*p2.bartime-p1.bartime)
+
+	baseLineProperties = dr.LineProperties.copy(this.lProperties)
+	baseLineProperties.extend := this.dProperties.extend? extend.right : extend.none
+	medianLine = dr.Line.new(p1, p2, this.lProperties)
+
+	array<dr.Line> forkLines = array.new<dr.Line>()
+	array<dr.Linefill> fills = array.new<dr.Linefill>()
+
+	forkLines.push(dr.Line.new(p2, p3, baseLineProperties))
+    array<color> fillColors = array.new<color>()
+
+	for [i, fork] in this.properties.forks
+		if(fork.include)
+			forkColor = na(fork.forkColor) or fork.forkColor == color(na) or this.dProperties.forceCommonColor? this.dProperties.commonColor : fork.forkColor
+			diffPriceB = (this.b.price-p2.price)*fork.ratio
+			diffBarB = int((this.b.bar-p2.bar)*fork.ratio)
+			diffBarTimeB = int((this.b.bartime-p2.bar)*fork.ratio)
+			forkLineProperties = dr.LineProperties.copy(baseLineProperties)
+			forkLineProperties.color := forkColor
+			
+			dr.Point p1Edgeb = dr.Point.new(p2.price+diffPriceB, p2.bar+diffBarB, p2.bartime+diffBarTimeB)
+			dr.Point p2Edgeb = getParrallelPoint(p2, p3, p1Edgeb)
+			dr.Line forkLineEdgeB = dr.Line.new(p1Edgeb, p2Edgeb, forkLineProperties)
+			forkLines.push(forkLineEdgeB)
+            fillColors.push(forkColor)
+
+			if(not this.properties.inside)
+				dr.Point p1Edgec = dr.Point.new(p2.price-diffPriceB, p2.bar-diffBarB, p2.bartime-diffBarTimeB)
+				dr.Point p2Edgec = getParrallelPoint(p2, p3, p1Edgec)
+				dr.Line forkLineEdgeC = dr.Line.new(p1Edgec, p2Edgec, forkLineProperties)
+				forkLines.unshift(forkLineEdgeC)
+                fillColors.unshift(forkColor)
+
+    if(this.dProperties.fill)
+        for [index, forkColor] in fillColors
+            fills.push(dr.Linefill.new(forkLines.get(index), forkLines.get(index+1), forkColor, this.dProperties.fillTransparency))
+
+	baseLine = dr.Line.new(array.first(forkLines).start, array.last(forkLines).start, this.lProperties)
+	this.drawing := p.PitchforkDrawing.new(medianLine, baseLine, forkLines, fills)
+	this.drawing
+
+// @function Creates PitchforkTypes/PitchforkDrawing array from PitchforkTypes/Pitchfork array of objects
+// @param this array of PitchforkTypes/Pitchfork object
+// @returns array of PitchforkTypes/PitchforkDrawing object created
+export method createDrawing(array<p.Pitchfork> this)=>
+	array<p.PitchforkDrawing> drawings = array.new<p.PitchforkDrawing>()
+	if(not na(this))
+		for pitchfork in this
+			drawings.push(pitchfork.createDrawing())
+	drawings
+
+
+	
+// @function draws from PitchforkTypes/PitchforkDrawing object
+// @param this PitchforkTypes/PitchforkDrawing object
+// @returns PitchforkTypes/PitchforkDrawing object drawn
+export method draw(p.PitchforkDrawing this)=>
+	this.medianLine.draw()
+	this.baseLine.draw()
+	this.forkLines.draw()
+	this.linefills.draw()
+	this
+
+// @function deletes PitchforkTypes/PitchforkDrawing object
+// @param this PitchforkTypes/PitchforkDrawing object
+// @returns PitchforkTypes/PitchforkDrawing object deleted
+export method delete(p.PitchforkDrawing this)=>
+	this.medianLine.delete()
+	this.baseLine.delete()
+	this.linefills.delete()
+	this.forkLines.delete()
+	this
+
+// @function deletes underlying drawing of PitchforkTypes/Pitchfork object
+// @param this PitchforkTypes/Pitchfork object
+// @returns PitchforkTypes/Pitchfork object deleted
+export method delete(p.Pitchfork this)=>
+	if(not na(this))
+		this.drawing.delete()
+	this
+
+// @function deletes array of PitchforkTypes/PitchforkDrawing objects
+// @param this Array of PitchforkTypes/PitchforkDrawing object
+// @returns Array of PitchforkTypes/PitchforkDrawing object deleted
+export method delete(array<p.PitchforkDrawing> this)=>
+	if not na(this)
+		for drawing in this
+			drawing.delete()
+	this
+
+// @function deletes underlying drawing in array of PitchforkTypes/Pitchfork objects
+// @param this Array of PitchforkTypes/Pitchfork object
+// @returns Array of PitchforkTypes/Pitchfork object deleted
+export method delete(array<p.Pitchfork> this)=>
+	if not na(this)
+		for pitchfork in this
+			pitchfork.delete()
+	this
+
+// @function deletes array of PitchforkTypes/PitchforkDrawing objects and clears the array
+// @param this Array of PitchforkTypes/PitchforkDrawing object
+// @returns void
+export method clear(array<p.PitchforkDrawing> this)=>
+	if not na(this)
+		while(this.size()!=0)
+			this.pop().delete()
+
+// @function deletes array of PitchforkTypes/Pitchfork objects and clears the array
+// @param this Array of Pitchfork/Pitchfork object
+// @returns void
+export method clear(array<p.Pitchfork> this)=>
+	if(not na(this))
+		while(this.size()!=0)
+			this.pop().delete()
+
+// ###################################################################### Tests #############################################################
+// import HeWhoMustNotBeNamed/ZigzagTypes/1 as zg
+// import HeWhoMustNotBeNamed/ZigzagMethods/1
+// import HeWhoMustNotBeNamed/utils/1 as ut
+
+// import HeWhoMustNotBeNamed/Logger/1 as l
+// var logger = l.Logger.new(minimumLevel = 'DEBUG')
+// logger.init()
+
+
+// theme = input.string('Dark', title='Theme', options=['Light', 'Dark'], group='Generic Settings',
+//          tooltip='Chart theme settings. Line and label colors are generted based on the theme settings. If dark theme is selected, '+
+//          'lighter colors are used and if light theme is selected, darker colors are used.')
+// zigzagLength = input.int(13, step=5, minval=3, title='Length', group='Zigzag', tooltip='Zigzag length for level 0 zigzag')
+// depth = input.int(50, "Depth", step=25, maxval=500, group='Zigzag', tooltip='Zigzag depth refers to max number of pivots to show on chart')
+// useRealTimeBars = input.bool(true, 'Use Real Time Bars', group='Zigzag', tooltip = 'If enabled real time bars are used for calculation. Otherwise, only confirmed bars are used')
+
+// typeTooltip = 'Handle Type' +
+//                  '\n\tregular - Pivot A' +
+//                  '\n\tschiff - X of Pivot A and y from median of Pivot A and B' +
+//                  '\n\tmschiff - X and Y are median of Pivot A and Pivot B' +
+//              '\n\nNeck Type' +
+//                  '\n\tmedian - median of Pivot B and Pivot C' +
+//                  '\n\tinside - Pivot C'
+
+// pitchforkType = input.string("regular", "Type", ["regular", "schiff", "mschiff"], group="Pitchfork", inline="t")
+// neckType = input.string('median', '', ['median', 'inside'], group="Pitchfork", inline="t", tooltip=typeTooltip)
+
+// inside = neckType == 'inside'
+
+// ratioFrom = input.float(0.25, 'Ratio', minval=0.0, maxval=0.5, group='Pitchfork', inline='r')
+// ratioTo = input.float(1, '', minval=0.5, maxval=1.618, group='Pitchfork', inline='r', tooltip='Range of ratio for which drawing pitchfork is allowed')
+// useConfirmedPivot = input.bool(true, 'Use Confirmed Pivots', group="Pitchfork", tooltip="If set to true, uses last confirmed pivot and ignores the current moving pivot")
+
+// includeRatio1 = input.bool(false, '',  inline='r1', group='Forks')
+// ratio1 = input.float(0.236, '', inline='r1', group='Forks')
+// color1 = input.color(#f77c80, '', inline='r1', group='Forks')
+
+// includeRatio2 = input.bool(false, '', inline='r1', group='Forks')
+// ratio2 = input.float(0.382, '', inline='r1', group='Forks')
+// color2 = input.color(#ffb74d, '', inline='r1', group='Forks')
+
+// includeRatio3 = input.bool(true, '',  inline='r2', group='Forks')
+// ratio3 = input.float(0.500, '', inline='r2', group='Forks')
+// color3 = input.color(#fff176, '', inline='r2', group='Forks')
+
+// includeRatio4 = input.bool(false, '', inline='r2', group='Forks')
+// ratio4 = input.float(0.618, '', inline='r2', group='Forks')
+// color4 = input.color(#81c784, '', inline='r2', group='Forks')
+
+// includeRatio5 = input.bool(false, '',  inline='r3', group='Forks')
+// ratio5 = input.float(0.786, '', inline='r3', group='Forks')
+// color5 = input.color(#42bda8, '', inline='r3', group='Forks')
+
+// includeRatio6 = input.bool(false, '', inline='r3', group='Forks')
+// ratio6 = input.float(0.886, '', inline='r3', group='Forks')
+// color6 = input.color(#4dd0e1, '', inline='r3', group='Forks')
+
+// includeRatio7 = input.bool(true, '',  inline='r4', group='Forks')
+// ratio7 = input.float(1.000, '', inline='r4', group='Forks')
+// color7 = input.color(#5b9cf6, '', inline='r4', group='Forks')
+
+// includeRatio8 = input.bool(false, '', inline='r4', group='Forks')
+// ratio8 = input.float(1.130, '', inline='r4', group='Forks')
+// color8 = input.color(#9575cd, '', inline='r4', group='Forks')
+
+// includeRatio9 = input.bool(false, '',  inline='r5', group='Forks')
+// ratio9 = input.float(1.272, '', inline='r5', group='Forks')
+// color9 = input.color(#ba68c8, '', inline='r5', group='Forks')
+
+// includeRatio10 = input.bool(false, '', inline='r5', group='Forks')
+// ratio10 = input.float(1.382, '', inline='r5', group='Forks')
+// color10 = input.color(#f06292, '', inline='r5', group='Forks')
+
+// includeRatio11 = input.bool(false, '',  inline='r6', group='Forks')
+// ratio11 = input.float(1.618, '', inline='r6', group='Forks')
+// color11 = input.color(#faa1a4, '', inline='r6', group='Forks')
+
+// includeRatio12 = input.bool(false, '', inline='r6', group='Forks')
+// ratio12 = input.float(2.000, '', inline='r6', group='Forks')
+// color12 = input.color(#4caf50, '', inline='r6', group='Forks')
+
+// extend = input.bool(true, "Extend", group="Display", tooltip = "Extend fork lines to right")
+// fill = input.bool(true, "Fill", group="Display", inline='f')
+// transparency = input.int(95, "Transparency", group="Display", inline='f', tooltip = "Fill Forkline with background color")
+
+// offset = useRealTimeBars? 0 : 1
+
+// indicators = matrix.new<float>()
+// indicatorNames = array.new<string>()
+
+// themeColors = ut.getColors(theme)
+// var zg.Zigzag zigzag = zg.Zigzag.new(zigzagLength, depth, offset)
+// zigzag.calculate(array.from(high, low), indicators, indicatorNames)
+
+// startIndex = useConfirmedPivot? 1:0
+
+// includes = array.from(includeRatio1, includeRatio2, includeRatio3, includeRatio4, includeRatio5, includeRatio6,
+//                          includeRatio7, includeRatio8, includeRatio9, includeRatio10, includeRatio11, includeRatio12)
+// ratios = array.from(ratio1, ratio2, ratio3, ratio4, ratio5, ratio6, ratio7, ratio8, ratio9, ratio10, ratio11, ratio12)
+// colors = array.from(color1, color2, color3, color4, color5, color6, color7, color8, color9, color10, color11, color12)
+
+// array<p.Fork> forks = array.new<p.Fork>()
+// for [i, include] in includes
+// 	if(include)
+// 		forks.push(p.Fork.new(ratios.get(i), colors.get(i), include))
+
+// p.PitchforkProperties properties = p.PitchforkProperties.new(forks, pitchforkType, inside)
+// p.PitchforkDrawingProperties dProperties = p.PitchforkDrawingProperties.new(extend, fill, transparency)
+
+// if(barstate.islast)
+//     var array<p.Pitchfork> pitchforks = array.new<p.Pitchfork>()
+//     pitchforks.clear()
+//     mlzigzag = zigzag
+//     while(array.size(mlzigzag.zigzagPivots) >= 3+startIndex)
+//         lineColor = themeColors.pop()
+//         themeColors.unshift(lineColor)
+
+//         p3 = array.get(mlzigzag.zigzagPivots, startIndex)
+//         p3Point = p3.point
+//         p2Point = array.get(mlzigzag.zigzagPivots, startIndex+1).point
+//         p1Point = array.get(mlzigzag.zigzagPivots, startIndex+2).point
+
+//         if (p3.ratio >= ratioFrom and p3.ratio <= ratioTo and p3Point.bar - p1Point.bar <500)
+//             dr.LineProperties lProperties = dr.LineProperties.new(color=lineColor)
+//             p.Pitchfork pitchFork = p.Pitchfork.new(p1Point, p2Point, p3Point, properties, dProperties, lProperties)
+//             drawing = pitchFork.createDrawing()
+//             drawing.draw()
+//             pitchforks.push(pitchFork)
+//         mlzigzag := mlzigzag.nextlevel()
