@@ -1,0 +1,438 @@
+//@version=5
+library("DrawingMethods", overlay = true)
+import HeWhoMustNotBeNamed/DrawingTypes/2 as dr
+
+//******************************************************************* tostring *******************************************************/
+method get(dr.Point this, string key)=>key == "price"? str.tostring(this.price) : key == "bar"? str.tostring(this.bar) : key == "bartime"? str.tostring(this.bartime) : na
+
+// @function Converts DrawingTypes/Point object to string representation
+// @param this DrawingTypes/Point object
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @param includeKeys Array of string containing selective keys. Optional parmaeter. If not provided, all the keys are considered
+// @returns string representation of DrawingTypes/Point
+export method tostring(dr.Point this, bool sortKeys = false, int sortOrder = 1, array<string> includeKeys=na)=>
+	str = ''
+	if(not na(this))
+		keys = na(includeKeys)? array.from("price", "bar", "bartime") : includeKeys
+		keyValues = array.new<string>()
+		if(sortKeys and not na(sortOrder) and sortOrder!=0)
+			keys.sort(sortOrder>0? order.ascending : order.descending)
+		
+		for key in keys
+			keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+		str := '{'+array.join(keyValues, ",")+'}'
+	str
+
+method get(dr.LineProperties this, string key)=> key == "xloc"? this.xloc : key == "extend"? this.extend : key == "style"? this.style : key == "width"? str.tostring(this.width) : na
+// @function Converts DrawingTypes/LineProperties object to string representation
+// @param this DrawingTypes/LineProperties object
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @param includeKeys Array of string containing selective keys. Optional parmaeter. If not provided, all the keys are considered
+// @returns string representation of DrawingTypes/LineProperties
+export method tostring(dr.LineProperties this, bool sortKeys = false, int sortOrder = 1, array<string> includeKeys=na)=>
+	str = ''
+	if(not na(this))
+		keys = na(includeKeys)? array.from("xloc", "extend", "style", "width") : includeKeys
+		keyValues = array.new<string>()
+		if(sortKeys and not na(sortOrder) and sortOrder!=0)
+			keys.sort(sortOrder>0? order.ascending : order.descending)
+		
+		for key in keys
+			keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+		str := '{'+array.join(keyValues, ",")+'}'
+	str
+
+method get(dr.Line this, string key)=>key == "start"? this.start.tostring() : key == "end"? this.end.tostring() : key == "properties"? this.properties.tostring() : na
+// @function Converts DrawingTypes/Line object to string representation
+// @param this DrawingTypes/Line object
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @param includeKeys Array of string containing selective keys. Optional parmaeter. If not provided, all the keys are considered
+// @returns string representation of DrawingTypes/Line
+export method tostring(dr.Line this, bool sortKeys = false, int sortOrder = 1, array<string> includeKeys=na)=>
+	str = ''
+	if(not na(this))
+		keys = na(includeKeys)? array.from("start", "end", "properties") : includeKeys
+		keyValues = array.new<string>()
+		if(sortKeys and not na(sortOrder) and sortOrder!=0)
+			keys.sort(sortOrder>0? order.ascending : order.descending)
+		
+		for key in keys
+			keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+		str := '{'+array.join(keyValues, ",")+'}'
+	str
+
+method get(dr.LabelProperties this, string key)=> key == "xloc"? this.xloc : key == "yloc"? this.yloc : key == "style"? this.style :
+				 key == "size"? str.tostring(this.size) : key == "textalign"? this.textalign : key == "text_font_family"? this.text_font_family : na
+// @function Converts DrawingTypes/LabelProperties object to string representation
+// @param this DrawingTypes/LabelProperties object
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @param includeKeys Array of string containing selective keys. Optional parmaeter. If not provided, all the keys are considered
+// @returns string representation of DrawingTypes/LabelProperties
+export method tostring(dr.LabelProperties this, bool sortKeys = false, int sortOrder = 1, array<string> includeKeys=na)=>
+	str = ''
+	if(not na(this))
+		keys = na(includeKeys)? array.from("xloc", "yloc", "style", "size", "textalign", "text_font_family") : includeKeys
+		keyValues = array.new<string>()
+		if(sortKeys and not na(sortOrder) and sortOrder!=0)
+			keys.sort(sortOrder>0? order.ascending : order.descending)
+		
+		for key in keys
+			keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+		str := '{'+array.join(keyValues, ",")+'}'
+	str
+
+method get(dr.Label this, string key)=>key == "point"? this.point.tostring() : key == "lblText"? this.lblText : key == "tooltip"? this.tooltip : key == "properties"? this.properties.tostring() : na
+
+// @function Converts DrawingTypes/Label object to string representation
+// @param this DrawingTypes/Label object
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @param includeKeys Array of string containing selective keys. Optional parmaeter. If not provided, all the keys are considered
+// @returns string representation of DrawingTypes/Label
+export method tostring(dr.Label this, bool sortKeys = false, int sortOrder = 1, array<string> includeKeys=na)=>
+	str = ''
+	if(not na(this))
+		keys = na(includeKeys)? array.from("point", "lblText", "tooltip", "properties") : includeKeys
+		keyValues = array.new<string>()
+		if(sortKeys and not na(sortOrder) and sortOrder!=0)
+			keys.sort(sortOrder>0? order.ascending : order.descending)
+		
+		for key in keys
+			keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+		str := '{'+array.join(keyValues, ",")+'}'
+	str
+
+method get(dr.Linefill this, string key)=>key == "line1"? this.line1.tostring() : key == "line2"? this.line2.tostring() : key == "transparency"? str.tostring(this.transparency) : na
+
+// @function Converts DrawingTypes/Linefill object to string representation
+// @param this DrawingTypes/Linefill object
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @param includeKeys Array of string containing selective keys. Optional parmaeter. If not provided, all the keys are considered
+// @returns string representation of DrawingTypes/Linefill
+export method tostring(dr.Linefill this, bool sortKeys = false, int sortOrder = 1, array<string> includeKeys=na)=>
+	str = ''
+	if(not na(this))
+		keys = na(includeKeys)? array.from("line1", "line2", "transparency") : includeKeys
+		keyValues = array.new<string>()
+		if(sortKeys and not na(sortOrder) and sortOrder!=0)
+			keys.sort(sortOrder>0? order.ascending : order.descending)
+		
+		for key in keys
+			keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+		str := '{'+array.join(keyValues, ",")+'}'
+	str
+
+method get(dr.BoxProperties this, string key)=>key == "border_width"? str.tostring(this.border_width) :
+												 key == "border_style"? this.border_style :
+												 key == "extend"? this.extend :
+												 key == "xloc"? this.xloc : na
+
+// @function Converts DrawingTypes/BoxProperties object to string representation
+// @param this DrawingTypes/BoxProperties object
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @param includeKeys Array of string containing selective keys. Optional parmaeter. If not provided, all the keys are considered
+// @returns string representation of DrawingTypes/BoxProperties
+export method tostring(dr.BoxProperties this, bool sortKeys = false, int sortOrder = 1, array<string> includeKeys=na)=>
+	str = ''
+	if(not na(this))
+		keys = na(includeKeys)? array.from("border_width", "border_style", "extend", "xloc") : includeKeys
+		keyValues = array.new<string>()
+		if(sortKeys and not na(sortOrder) and sortOrder!=0)
+			keys.sort(sortOrder>0? order.ascending : order.descending)
+		
+		for key in keys
+			keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+		str := '{'+array.join(keyValues, ",")+'}'
+	str
+
+method get(dr.BoxText this, string key)=>key == "boxText"? this.boxText :
+												 key == "text_size"? this.text_size :
+												 key == "text_halign"? this.text_halign :
+												 key == "text_valign"? this.text_valign :
+												 key == "text_wrap"? this.text_wrap : 
+												 key == "text_font_family"? this.text_font_family : na
+
+// @function Converts DrawingTypes/BoxText object to string representation
+// @param this DrawingTypes/BoxText object
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @param includeKeys Array of string containing selective keys. Optional parmaeter. If not provided, all the keys are considered
+// @returns string representation of DrawingTypes/BoxText
+export method tostring(dr.BoxText this, bool sortKeys = false, int sortOrder = 1, array<string> includeKeys=na)=>
+	str = ''
+	if(not na(this))
+		keys = na(includeKeys)? array.from("boxText", "text_size", "text_halign", "text_valign", "text_wrap", "text_font_family") : includeKeys
+		keyValues = array.new<string>()
+		if(sortKeys and not na(sortOrder) and sortOrder!=0)
+			keys.sort(sortOrder>0? order.ascending : order.descending)
+		
+		for key in keys
+			keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+		str := '{'+array.join(keyValues, ",")+'}'
+	str
+
+method get(dr.Box this, string key)=>key == "p1"? this.p1.tostring() :
+												 key == "p2"? this.p2.tostring() :
+												 key == "properties"? this.properties.tostring() :
+												 key == "textProperties"? this.textProperties.tostring() : na
+
+// @function Converts DrawingTypes/Box object to string representation
+// @param this DrawingTypes/Box object
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @param includeKeys Array of string containing selective keys. Optional parmaeter. If not provided, all the keys are considered
+// @returns string representation of DrawingTypes/Box
+export method tostring(dr.Box this, bool sortKeys = false, int sortOrder = 1, array<string> includeKeys=na)=>
+	str = ''
+	if(not na(this))
+		keys = na(includeKeys)? array.from("p1", "p2", "properties", "textProperties") : includeKeys
+		keyValues = array.new<string>()
+		if(sortKeys and not na(sortOrder) and sortOrder!=0)
+			keys.sort(sortOrder>0? order.ascending : order.descending)
+		
+		for key in keys
+			keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+		str := '{'+array.join(keyValues, ",")+'}'
+	str
+
+//******************************************************************* delete and clear *******************************************************/
+deleteObj(this)=>
+	this.object.delete()
+	this
+
+// @function Deletes line from DrawingTypes/Line object
+// @param this DrawingTypes/Line object
+// @returns Line object deleted
+export method delete(dr.Line this)=>deleteObj(this)
+
+// @function Deletes label from DrawingTypes/Label object
+// @param this DrawingTypes/Label object
+// @returns Label object deleted
+export method delete(dr.Label this)=>deleteObj(this)
+
+// @function Deletes Linefill from DrawingTypes/Linefill object
+// @param this DrawingTypes/Linefill object
+// @returns Linefill object deleted
+export method delete(dr.Linefill this)=>deleteObj(this)
+
+// @function Deletes box from DrawingTypes/Box object
+// @param this DrawingTypes/Box object
+// @returns DrawingTypes/Box object deleted
+export method delete(dr.Box this)=>deleteObj(this)
+
+
+deleteAll(this)=>
+	if(not na(this))
+		for obj in this
+			obj.delete()
+	this
+
+// @function Deletes lines from array of DrawingTypes/Line objects
+// @param this Array of DrawingTypes/Line objects
+// @returns Array of DrawingTypes/Line objects
+export method delete(array<dr.Line> this)=>deleteAll(this)
+
+// @function Deletes labels from array of DrawingTypes/Label objects
+// @param this Array of DrawingTypes/Label objects
+// @returns Array of DrawingTypes/Label objects
+export method delete(array<dr.Label> this)=>deleteAll(this)
+
+// @function Deletes linefill from array of DrawingTypes/Linefill objects
+// @param this Array of DrawingTypes/Linefill objects
+// @returns Array of DrawingTypes/Linefill objects
+export method delete(array<dr.Linefill> this)=>deleteAll(this)
+
+// @function Deletes boxes from array of DrawingTypes/Box objects
+// @param this Array of DrawingTypes/Box objects
+// @returns Array of DrawingTypes/Box objects
+export method delete(array<dr.Box> this)=>deleteAll(this)
+
+// @function clear items from array of DrawingTypes/Line while deleting underlying objects
+// @param this array<DrawingTypes/Line>
+// @returns void
+export method clear(array<dr.Line> this)=>this.delete().clear()
+
+// @function clear items from array of DrawingTypes/Label while deleting underlying objects
+// @param this array<DrawingTypes/Label>
+// @returns void
+export method clear(array<dr.Label> this)=>this.delete().clear()
+
+// @function clear items from array of DrawingTypes/Linefill while deleting underlying objects
+// @param this array<DrawingTypes/Linefill>
+// @returns void
+export method clear(array<dr.Linefill> this)=>this.delete().clear()
+
+// @function clear items from array of DrawingTypes/Box while deleting underlying objects
+// @param this array<DrawingTypes/Box>
+// @returns void
+export method clear(array<dr.Box> this)=>this.delete().clear()
+
+
+//******************************************************************* draw *******************************************************/
+// @function Creates line from DrawingTypes/Line object
+// @param this DrawingTypes/Line object
+// @returns line created from DrawingTypes/Line object
+export method draw(dr.Line this)=>
+	this.object.delete()
+	this.properties := na(this.properties)? dr.LineProperties.new() : this.properties
+	this.object := line.new(this.properties.xloc==xloc.bar_index?this.start.bar:this.start.bartime, this.start.price,
+				 this.properties.xloc == xloc.bar_index? this.end.bar:this.end.bartime, this.end.price,
+				 this.properties.xloc, this.properties.extend, this.properties.color, this.properties.style, this.properties.width)
+	this.object
+
+// @function Creates lines from array of DrawingTypes/Line objects
+// @param this Array of DrawingTypes/Line objects
+// @returns Array of DrawingTypes/Line objects
+export method draw(array<dr.Line> this)=>
+	if(not na(this))
+		for ln in this
+			ln.draw()
+	this
+
+// @function Creates label from DrawingTypes/Label object
+// @param this DrawingTypes/Label object
+// @returns label created from DrawingTypes/Label object
+export method draw(dr.Label this)=>
+	this.object.delete()
+	this.properties := na(this.properties)? dr.LabelProperties.new() : this.properties
+	this.object := label.new(this.properties.xloc==xloc.bar_index?this.point.bar:this.point.bartime, this.point.price,
+				 this.lblText, this.properties.xloc, this.properties.yloc, this.properties.color, this.properties.style, this.properties.textcolor,
+				 this.properties.size, this.properties.textalign, this.tooltip, this.properties.text_font_family)
+	this.object
+
+// @function Creates labels from array of DrawingTypes/Label objects
+// @param this Array of DrawingTypes/Label objects
+// @returns Array of DrawingTypes/Label objects
+export method draw(array<dr.Label> this)=>
+	if(not na(this))
+		for lbl in this
+			lbl.draw()
+	this
+
+// @function Creates linefill object from DrawingTypes/Linefill
+// @param this DrawingTypes/Linefill objects
+// @returns linefill object created
+export method draw(dr.Linefill this)=>
+	if(not na(this.line1) and not na(this.line2) and not na(this.line1.object) and not na(this.line2.object))
+		this.object := linefill.new(this.line1.object, this.line2.object, color.new(this.fillColor, this.transparency))
+	this.object
+
+// @function Creates linefill objects from array of DrawingTypes/Linefill objects
+// @param this Array of DrawingTypes/Linefill objects
+// @returns Array of DrawingTypes/Linefill used for creating linefills
+export method draw(array<dr.Linefill> this)=>
+	if(not na(this))
+		for lfl in this
+			lfl.draw()
+	this
+
+// @function Creates box from DrawingTypes/Box object
+// @param this DrawingTypes/Box object
+// @returns box created from DrawingTypes/Box object
+export method draw(dr.Box this)=>
+	this.object.delete()
+	this.properties := na(this.properties)? dr.BoxProperties.new() : this.properties
+	top = math.max(this.p1.price, this.p2.price)
+	bottom = math.min(this.p1.price, this.p2.price)
+	left = this.properties.xloc == xloc.bar_index? math.min(this.p1.bar, this.p2.bar) : math.min(this.p1.bartime, this.p2.bartime)
+	right = this.properties.xloc == xloc.bar_index? math.max(this.p1.bar, this.p2.bar) : math.max(this.p1.bartime, this.p2.bartime)
+	
+	this.object := na(this.textProperties)? 
+						 box.new(left, top, right, bottom, this.properties.border_color, this.properties.border_width, this.properties.border_style,
+						 		 this.properties.extend, this.properties.xloc, this.properties.bgcolor) : 
+						 box.new(left, top, right, bottom, this.properties.border_color, this.properties.border_width, this.properties.border_style,
+						 		 this.properties.extend, this.properties.xloc, this.properties.bgcolor, this.textProperties.boxText,
+								 this.textProperties.text_size, this.textProperties.text_color, this.textProperties.text_halign,
+								 this.textProperties.text_valign, this.textProperties.text_wrap, this.textProperties.text_font_family)
+
+	this.object
+
+// @function Creates labels from array of DrawingTypes/Label objects
+// @param this Array of DrawingTypes/Label objects
+// @returns Array of DrawingTypes/Label objects
+export method draw(array<dr.Box> this)=>
+	if(not na(this))
+		for bx in this
+			bx.draw()
+	this
+
+//******************************************************************* createXXX *******************************************************/
+// @function Creates DrawingTypes/Label object from DrawingTypes/Point
+// @param this DrawingTypes/Point object
+// @param lblText Label text
+// @param tooltip Tooltip text. Default is na
+// @param properties DrawingTypes/LabelProperties object. Default is na - meaning default values are used.
+// @returns DrawingTypes/Label object
+export method createLabel(dr.Point this, string lblText, string tooltip=na, dr.LabelProperties properties=na)=>
+	dr.Label.new(this, lblText, tooltip, na(properties)?dr.LabelProperties.new():properties)
+
+// @function Creates DrawingTypes/Line object from one DrawingTypes/Point to other
+// @param this First DrawingTypes/Point object
+// @param other Second DrawingTypes/Point object
+// @param properties DrawingTypes/LineProperties object. Default set to na - meaning default values are used.
+// @returns DrawingTypes/Line object
+export method createLine(dr.Point this, dr.Point other, dr.LineProperties properties = na)=>
+	dr.Line.new(this, other, na(properties)? dr.LineProperties.new():properties)
+
+// @function Creates DrawingTypes/Linefill object from DrawingTypes/Line object to other DrawingTypes/Line object
+// @param this First DrawingTypes/Line object
+// @param other Other DrawingTypes/Line object
+// @param fillColor fill color of linefill. Default is color.blue
+// @param transparency fill transparency for linefill. Default is 80
+// @returns Array of DrawingTypes/Linefill object
+export method createLinefill(dr.Line this, dr.Line other, color fillColor=color.blue, int transparency=80)=>
+	dr.Linefill.new(this, other, fillColor, transparency)
+
+// @function Creates DrawingTypes/Box object from one DrawingTypes/Point to other
+// @param this First DrawingTypes/Point object
+// @param other Second DrawingTypes/Point object
+// @param properties DrawingTypes/BoxProperties object. Default set to na - meaning default values are used.
+// @param textProperties DrawingTypes/BoxText object. Default is na - meaning no text will be drawn
+// @returns DrawingTypes/Box object
+export method createBox(dr.Point this, dr.Point other, dr.BoxProperties properties = na, dr.BoxText textProperties = na)=>
+	dr.Box.new(this, other, na(properties)? dr.BoxProperties.new():properties, textProperties)
+
+// @function Creates DrawingTypes/Box object from DrawingTypes/Line as diagonal line
+// @param this Diagonal DrawingTypes/PoLineint object
+// @param properties DrawingTypes/BoxProperties object. Default set to na - meaning default values are used.
+// @param textProperties DrawingTypes/BoxText object. Default is na - meaning no text will be drawn
+// @returns DrawingTypes/Box object
+export method createBox(dr.Line this, dr.BoxProperties properties = na, dr.BoxText textProperties = na)=>
+	dr.Box.new(this.start, this.end, na(properties)? dr.BoxProperties.new():properties, textProperties)
+
+
+// ###################################################################### Tests #############################################################
+// import HeWhoMustNotBeNamed/Logger/1 as l
+// var logger = l.Logger.new(minimumLevel = 'DEBUG')
+// logger.init()
+
+// if(barstate.islast)
+// 	dr.Point p = dr.Point.new(high, bar_index, time)
+// 	logger.debug(p.tostring())
+// 	dr.Point p2 = dr.Point.new(low, bar_index+10, time)
+
+// 	dr.Label lbl = p.createLabel('This is my label')
+// 	logger.debug(lbl.tostring())
+// 	lbl.draw()
+
+// 	dr.Line ln = p.createLine(p2)
+// 	logger.debug(ln.tostring())
+// 	ln.draw()
+
+// 	dr.Line ln2 = dr.Line.new(dr.Point.new(low, bar_index, time), dr.Point.new(low, bar_index+10, time))
+// 	ln2.draw()
+
+// 	dr.Linefill lf = ln.createLinefill(ln2)
+// 	logger.debug(lf.tostring())
+// 	lf.draw()
+
+// 	dr.BoxText textProps = dr.BoxText.new('This is my box')
+// 	dr.Box bx = p.createBox(p2, textProperties=textProps)
+// 	bx.draw()
+
