@@ -1,0 +1,325 @@
+//@version=5
+// @description Supplementary array methods. 
+library("arraymethods", overlay = true)
+
+// @function remove int object from array of integers at specific index
+// @param arr int array
+// @param index index at which int object need to be removed
+// @returns void
+export method delete(int[] arr, int index)=>arr.remove(index)
+// @function remove float object from array of float at specific index
+// @param arr float array
+// @param index index at which float object need to be removed
+// @returns float
+export method delete(float[] arr, int index)=>arr.remove(index)
+// @function remove bool object from array of bool at specific index
+// @param arr bool array
+// @param index index at which bool object need to be removed
+// @returns bool
+export method delete(bool[] arr, int index)=>arr.remove(index)
+// @function remove string object from array of string at specific index
+// @param arr string array
+// @param index index at which string object need to be removed
+// @returns string
+export method delete(string[] arr, int index)=>arr.remove(index)
+// @function remove color object from array of color at specific index
+// @param arr color array
+// @param index index at which color object need to be removed
+// @returns color
+export method delete(color[] arr, int index)=>arr.remove(index)
+// @function remove line object from array of lines at specific index and deletes the line
+// @param arr line array
+// @param index index at which line object need to be removed and deleted
+// @returns void
+export method delete(line[] arr, int index)=>arr.remove(index).delete()
+// @function remove label object from array of labels at specific index and deletes the label
+// @param arr label array
+// @param index index at which label object need to be removed and deleted
+// @returns void
+export method delete(label[] arr, int index)=>arr.remove(index).delete()
+// @function remove box object from array of boxes at specific index and deletes the box
+// @param arr box array
+// @param index index at which box object need to be removed and deleted
+// @returns void
+export method delete(box[] arr, int index)=>arr.remove(index).delete()
+// @function remove table object from array of tables at specific index and deletes the table
+// @param arr table array
+// @param index index at which table object need to be removed and deleted
+// @returns void
+export method delete(table[] arr, int index)=>arr.remove(index).delete()
+// @function remove linefill object from array of linefills at specific index and deletes the linefill
+// @param arr linefill array
+// @param index index at which linefill object need to be removed and deleted
+// @returns void
+export method delete(linefill[] arr, int index)=>arr.remove(index).delete()
+
+
+// @function remove last int object from array
+// @param arr int array
+// @returns int
+export method popr(int[] arr)=>arr.pop()
+// @function remove last float object from array
+// @param arr float array
+// @returns float
+export method popr(float[] arr)=>arr.pop()
+// @function remove last bool object from array
+// @param arr bool array
+// @returns bool
+export method popr(bool[] arr)=>arr.pop()
+// @function remove last string object from array
+// @param arr string array
+// @returns string
+export method popr(string[] arr)=>arr.pop()
+// @function remove last color object from array
+// @param arr color array
+// @returns color
+export method popr(color[] arr)=>arr.pop()
+// @function remove and delete last line object from array
+// @param arr line array
+// @returns void
+export method popr(line[] arr)=>arr.pop().delete()
+// @function remove and delete last label object from array
+// @param arr label array
+// @returns void
+export method popr(label[] arr)=>arr.pop().delete()
+// @function remove and delete last box object from array
+// @param arr box array
+// @returns void
+export method popr(box[] arr)=>arr.pop().delete()
+// @function remove and delete last table object from array
+// @param arr table array
+// @returns void
+export method popr(table[] arr)=>arr.pop().delete()
+// @function remove and delete last linefill object from array
+// @param arr linefill array
+// @returns void
+export method popr(linefill[] arr)=>arr.pop().delete()
+
+
+// @function remove first int object from array
+// @param arr int array
+// @returns int
+export method shiftr(int[] arr)=>arr.shift()
+// @function remove first float object from array
+// @param arr float array
+// @returns float
+export method shiftr(float[] arr)=>arr.shift()
+// @function remove first bool object from array
+// @param arr bool array
+// @returns bool
+export method shiftr(bool[] arr)=>arr.shift()
+// @function remove first string object from array
+// @param arr string array
+// @returns string
+export method shiftr(string[] arr)=>arr.shift()
+// @function remove first color object from array
+// @param arr color array
+// @returns color
+export method shiftr(color[] arr)=>arr.shift()
+// @function remove and delete first line object from array
+// @param arr line array
+// @returns void  
+export method shiftr(line[] arr)=>arr.shift().delete()
+// @function remove and delete first label object from array
+// @param arr label array
+// @returns void  
+export method shiftr(label[] arr)=>arr.shift().delete()
+// @function remove and delete first box object from array
+// @param arr box array
+// @returns void  
+export method shiftr(box[] arr)=>arr.shift().delete()
+// @function remove and delete first table object from array
+// @param arr table array
+// @returns void  
+export method shiftr(table[] arr)=>arr.shift().delete()
+// @function remove and delete first linefill object from array
+// @param arr linefill array
+// @returns void  
+export method shiftr(linefill[] arr)=>arr.shift().delete()
+
+
+push_to_array(arr, val, maxItems)=>
+    arr.push(val)
+    while (arr.size() > maxItems)
+        arr.shiftr()
+    arr
+
+unshift_to_array(arr, val, maxItems)=>
+    arr.unshift(val)
+    while (arr.size() > maxItems)
+        arr.popr()
+    arr
+
+// @function add int to the end of an array with max items cap. Objects are removed from start to maintain max items cap
+// @param arr int array
+// @param val int object to be pushed
+// @param maxItems max number of items array can hold
+// @returns int[]
+export method push(int[] arr, int val, int maxItems)=>push_to_array(arr, val, maxItems)
+// @function add float to the end of an array with max items cap. Objects are removed from start to maintain max items cap
+// @param arr float array
+// @param val float object to be pushed
+// @param maxItems max number of items array can hold
+// @returns float[]
+export method push(float[] arr, float val, int maxItems)=>push_to_array(arr, val, maxItems)
+// @function add bool to the end of an array with max items cap. Objects are removed from start to maintain max items cap
+// @param arr bool array
+// @param val bool object to be pushed
+// @param maxItems max number of items array can hold
+// @returns bool[]
+export method push(bool[] arr, bool val, int maxItems)=>push_to_array(arr, val, maxItems)
+// @function add string to the end of an array with max items cap. Objects are removed from start to maintain max items cap
+// @param arr string array
+// @param val string object to be pushed
+// @param maxItems max number of items array can hold
+// @returns string[]
+export method push(string[] arr, string val, int maxItems)=>push_to_array(arr, val, maxItems)
+// @function add color to the end of an array with max items cap. Objects are removed from start to maintain max items cap
+// @param arr color array
+// @param val color object to be pushed
+// @param maxItems max number of items array can hold
+// @returns color[]
+export method push(color[] arr, color val, int maxItems)=>push_to_array(arr, val, maxItems)
+// @function add line to the end of an array with max items cap. Objects are removed and deleted from start to maintain max items cap
+// @param arr line array
+// @param val line object to be pushed
+// @param maxItems max number of items array can hold
+// @returns line[]
+export method push(line[] arr, line val, int maxItems)=>push_to_array(arr, val, maxItems)
+// @function add label to the end of an array with max items cap. Objects are removed and deleted from start to maintain max items cap
+// @param arr label array
+// @param val label object to be pushed
+// @param maxItems max number of items array can hold
+// @returns label[]
+export method push(label[] arr, label val, int maxItems)=>push_to_array(arr, val, maxItems)
+// @function add box to the end of an array with max items cap. Objects are removed and deleted from start to maintain max items cap
+// @param arr box array
+// @param val box object to be pushed
+// @param maxItems max number of items array can hold
+// @returns box[]
+export method push(box[] arr, box val, int maxItems)=>push_to_array(arr, val, maxItems)
+// @function add table to the end of an array with max items cap. Objects are removed and deleted from start to maintain max items cap
+// @param arr table array
+// @param val table object to be pushed
+// @param maxItems max number of items array can hold
+// @returns table[]
+export method push(table[] arr, table val, int maxItems)=>push_to_array(arr, val, maxItems)
+// @function add linefill to the end of an array with max items cap. Objects are removed and deleted from start to maintain max items cap
+// @param arr linefill array
+// @param val linefill object to be pushed
+// @param maxItems max number of items array can hold
+// @returns linefill[]
+export method push(linefill[] arr, linefill val, int maxItems)=>push_to_array(arr, val, maxItems)
+
+// @function add int to the beginning of an array with max items cap. Objects are removed from end to maintain max items cap
+// @param arr int array
+// @param val int object to be unshift
+// @param maxItems max number of items array can hold
+// @returns int[]
+export method unshift(int[] arr, int val, int maxItems)=>unshift_to_array(arr, val, maxItems)
+// @function add float to the beginning of an array with max items cap. Objects are removed from end to maintain max items cap
+// @param arr float array
+// @param val float object to be unshift
+// @param maxItems max number of items array can hold
+// @returns float[]
+export method unshift(float[] arr, float val, int maxItems)=>unshift_to_array(arr, val, maxItems)
+// @function add bool to the beginning of an array with max items cap. Objects are removed from end to maintain max items cap
+// @param arr bool array
+// @param val bool object to be unshift
+// @param maxItems max number of items array can hold
+// @returns bool[]
+export method unshift(bool[] arr, bool val, int maxItems)=>unshift_to_array(arr, val, maxItems)
+// @function add string to the beginning of an array with max items cap. Objects are removed from end to maintain max items cap
+// @param arr string array
+// @param val string object to be unshift
+// @param maxItems max number of items array can hold
+// @returns string[]
+export method unshift(string[] arr, string val, int maxItems)=>unshift_to_array(arr, val, maxItems)
+// @function add color to the beginning of an array with max items cap. Objects are removed from end to maintain max items cap
+// @param arr color array
+// @param val color object to be unshift
+// @param maxItems max number of items array can hold
+// @returns color[]
+export method unshift(color[] arr, color val, int maxItems)=>unshift_to_array(arr, val, maxItems)
+// @function add line to the beginning of an array with max items cap. Objects are removed and deleted from end to maintain max items cap
+// @param arr line array
+// @param val line object to be unshift
+// @param maxItems max number of items array can hold
+// @returns line[]
+export method unshift(line[] arr, line val, int maxItems)=>unshift_to_array(arr, val, maxItems)
+// @function add label to the beginning of an array with max items cap. Objects are removed and deleted from end to maintain max items cap
+// @param arr label array
+// @param val label object to be unshift
+// @param maxItems max number of items array can hold
+// @returns label[]
+export method unshift(label[] arr, label val, int maxItems)=>unshift_to_array(arr, val, maxItems)
+// @function add box to the beginning of an array with max items cap. Objects are removed and deleted from end to maintain max items cap
+// @param arr box array
+// @param val box object to be unshift
+// @param maxItems max number of items array can hold
+// @returns box[]
+export method unshift(box[] arr, box val, int maxItems)=>unshift_to_array(arr, val, maxItems)
+// @function add table to the beginning of an array with max items cap. Objects are removed and deleted from end to maintain max items cap
+// @param arr table array
+// @param val table object to be unshift
+// @param maxItems max number of items array can hold
+// @returns table[]
+export method unshift(table[] arr, table val, int maxItems)=>unshift_to_array(arr, val, maxItems)
+// @function add linefill to the beginning of an array with max items cap. Objects are removed and deleted from end to maintain max items cap
+// @param arr linefill array
+// @param val linefill object to be unshift
+// @param maxItems max number of items array can hold
+// @returns linefill[]
+export method unshift(linefill[] arr, linefill val, int maxItems)=>unshift_to_array(arr, val, maxItems)
+
+clear_array_objects(arr)=>
+    while arr.size() > 0
+        arr.popr()
+    arr
+
+clear(arr)=>
+    arr.clear()
+    arr
+
+// @function remove all int objects in an array
+// @param arr int array
+// @returns int[]
+export method flush(int[] arr)=>clear(arr)
+// @function remove all float objects in an array
+// @param arr float array
+// @returns float[]
+export method flush(float[] arr)=>clear(arr)
+// @function remove all bool objects in an array
+// @param arr bool array
+// @returns bool[]
+export method flush(bool[] arr)=>clear(arr)
+// @function remove all string objects in an array
+// @param arr string array
+// @returns string[]
+export method flush(string[] arr)=>clear(arr)
+// @function remove all color objects in an array
+// @param arr color array
+// @returns color[]
+export method flush(color[] arr)=>clear(arr)
+// @function remove and delete all line objects in an array
+// @param arr line array
+// @returns line[]
+export method flush(line[] arr)=>clear_array_objects(arr)
+// @function remove and delete all label objects in an array
+// @param arr label array
+// @returns label[]
+export method flush(label[] arr)=>clear_array_objects(arr)
+// @function remove and delete all box objects in an array
+// @param arr box array
+// @returns box[]
+export method flush(box[] arr)=>clear_array_objects(arr)
+// @function remove and delete all table objects in an array
+// @param arr table array
+// @returns table[]
+export method flush(table[] arr)=>clear_array_objects(arr)
+// @function remove and delete all linefill objects in an array
+// @param arr linefill array
+// @returns linefill[]
+export method flush(linefill[] arr)=>clear_array_objects(arr)
+
+
