@@ -1,0 +1,169 @@
+//@version=5
+
+// @description Few essentials captured together (subset of arrayutils)
+library("utils")
+// @function finds difference between two timestamps
+// @param timeStart start timestamp
+// @param endTime end timestamp
+// @returns [days, hours, minutes, seconds, milliseconds]
+export timer(int timeStart, int timeEnd=timenow)=>
+    timeDiff = math.abs(timeEnd - timeStart)
+    mseconds = timeDiff
+    seconds = mseconds/1000
+    minutes = seconds/60
+    hours = minutes/60
+    days = hours/24
+    
+    tmSeconds = mseconds%1000
+    tSeconds = seconds%60
+    tMinutes = minutes%60
+    tHours = hours%24
+    [days, tHours, tMinutes, tSeconds, tmSeconds]
+
+// @function finds difference between two timestamps
+// @param pivots pivots array
+// @param barArray pivot bar array
+// @param dir direction for which overflow need to be checked
+// @returns bool overflow
+export check_overflow(float[] pivots, float[] barArray, int dir)=>
+    cBar = int(array.get(barArray, 0))
+    aBar = int(array.get(barArray, array.size(barArray)-1))
+    c = array.get(pivots, 0)
+    a = array.get(pivots, array.size(pivots)-1)
+    ln = line.new(aBar, a, cBar, c)
+    overflow = false
+    for [i, currentBar] in barArray
+        peak = array.get(pivots, i)
+        linePrice = line.get_price(ln, int(currentBar))
+        if(dir*peak > dir*linePrice)
+            overflow := true
+            break
+    line.delete(ln)
+    overflow
+
+// @function finds series of pivots in particular trend
+// @param pivots pivots array
+// @param length length for which trend series need to be checked
+// @param highLow filter pivot high or low
+// @param trend Uptrend or Downtrend
+// @returns int[] trendIndexes
+export get_trend_series(float[] pivots, int length, int highLow, int trend)=>
+    startLength = 1
+    endLength = math.min(array.size(pivots), length)
+    trendIndexes = array.new_int()
+
+    if(startLength < endLength)
+        first = array.get(pivots, 0)
+        sec = array.get(pivots, 1)
+        
+        dir = first > sec? 1 : -1
+
+        while(startLength+(dir==highLow?1:0) < endLength)
+            oTrend = trend*highLow
+            min = array.slice(pivots, startLength, endLength)
+            peak = highLow == 1? array.max(min) : array.min(min)
+            
+            peakIndex = oTrend == 1? array.indexof(min, peak) : array.lastindexof(min, peak)
+            if oTrend == 1
+                array.insert(trendIndexes, 0, startLength+peakIndex)
+            else
+                array.push(trendIndexes, startLength+peakIndex)
+            if(oTrend == 1? startLength+peakIndex == endLength : peakIndex == 0)
+                break
+            if oTrend == 1
+                startLength := startLength+peakIndex+1+(dir>0?1:0)
+            else
+                endLength := peakIndex
+    trendIndexes
+
+
+// @function finds series of pivots in particular trend
+// @param pivots pivots array
+// @param firstIndex First index of the series
+// @param lastIndex Last index of the series
+// @returns int[] trendIndexes
+export get_trend_series(float[] pivots, int firstIndex, int lastIndex)=>
+    startIndex = firstIndex
+    endIndex = math.min(array.size(pivots), lastIndex)
+
+    trendIndexes = array.new_int()
+
+    if(startIndex+1 < endIndex)
+        first = array.get(pivots, startIndex)
+        sec = array.get(pivots, startIndex+1)
+        
+        dir = first > sec? 1 : -1
+
+        min = array.slice(pivots, startIndex, endIndex)
+        while(array.size(min) > 1)
+            peak = (dir == 1? array.min(min) : array.max(min))
+            peakIndex = array.lastindexof(min, peak)
+            min := array.slice(pivots, startIndex, startIndex+peakIndex)
+            reversePeak = (dir == 1? array.max(min) : array.min(min))
+            if(reversePeak == first)
+                array.push(trendIndexes, startIndex+peakIndex)
+    trendIndexes
+
+// @function Consolidates labels into single string by concatenating it with given separator
+// @param include array of conditions to include label or not
+// @param labels string array of labels
+// @param separator Separator for concatenating labels
+// @returns string labelText
+export getConsolidatedLabel(simple bool[] include, simple string[] labels, simple string separator = '\n')=>
+    labelText = ''
+    
+    for i=0 to array.size(include)-1
+        labelText := labelText + (array.get(include, i)  ? (labelText == '' ? '' : separator) + array.get(labels, i)  : '')
+        
+    labelText
+
+// @function gets array of colors based on theme
+// @param theme dark or light theme
+// @returns color[] themeColors
+export getColors(simple string theme="dark")=>
+    str.lower(theme)=="dark"? array.from(
+         color.rgb(251, 244, 109),
+         color.rgb(141, 186, 81),
+         color.rgb(74, 159, 245),
+         color.rgb(255, 153, 140),
+         color.rgb(255, 149, 0),
+         color.rgb(0, 234, 211),
+         color.rgb(167, 153, 183),
+         color.rgb(255, 210, 113),
+         color.rgb(119, 217, 112),
+         color.rgb(95, 129, 228),
+         color.rgb(235, 146, 190),
+         color.rgb(198, 139, 89),
+         color.rgb(200, 149, 149),
+         color.rgb(196, 182, 182),
+         color.rgb(255, 190, 15),
+         color.rgb(192, 226, 24),
+         color.rgb(153, 140, 235),
+         color.rgb(206, 31, 107),
+         color.rgb(251, 54, 64),
+         color.rgb(194, 255, 217),
+         color.rgb(255, 219, 197),
+         color.rgb(121, 180, 183)
+         ) : array.from(
+         color.rgb(61, 86, 178),
+         color.rgb(57, 163, 136),
+         color.rgb(250, 30, 14),
+         color.rgb(169, 51, 58),
+         color.rgb(225, 87, 138),
+         color.rgb(62, 124, 23),
+         color.rgb(244, 164, 66),
+         color.rgb(134, 72, 121),
+         color.rgb(113, 159, 176),
+         color.rgb(170, 46, 230),
+         color.rgb(161, 37, 104),
+         color.rgb(189, 32, 0),
+         color.rgb(16, 86, 82),
+         color.rgb(200, 92, 92),
+         color.rgb(63, 51, 81),
+         color.rgb(114, 106, 149),
+         color.rgb(171, 109, 35),
+         color.rgb(247, 136, 18),
+         color.rgb(51, 71, 86),
+         color.rgb(12, 123, 147),
+         color.rgb(195, 43, 173)
+         )
