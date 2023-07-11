@@ -1,0 +1,331 @@
+//@version=5
+// @description User Defined Types and Methods for reversal chart patterns - Double Top, Double Bottom, Triple Top, Triple Bottom, Cup and Handle, Inverted Cup and Handle, Head and Shoulders, Inverse Head and Shoulders
+library("ReversalChartPatternLibrary", overlay = true)
+import HeWhoMustNotBeNamed/DrawingTypes/2 as dr
+import HeWhoMustNotBeNamed/DrawingMethods/2
+import HeWhoMustNotBeNamed/ZigzagTypes/5 as zg
+import HeWhoMustNotBeNamed/ZigzagMethods/6
+import HeWhoMustNotBeNamed/TradeTracker/1 as t
+
+// @type Type which holds the drawing objects for Reversal Chart Pattern Types
+// @field patternLines array of Line objects representing pattern
+// @field entry Entry price Line
+// @field stop Stop price Line
+// @field target Target price Line
+export type ReversalChartPatternDrawing
+    array<dr.Line> patternLines
+    dr.Line entry
+    array<dr.Line> targets
+    dr.Line stop
+    dr.Label patternLabel
+
+// @type Trade properties of ReversalChartPattern
+// @field riskAdjustment Risk Adjustment for calculation of stop
+// @field useFixedTarget Boolean flag saying use fixed target type wherever possible. If fixed target type is not possible, then risk reward/fib ratios are used for calculation of targets
+// @field variableTargetType Integer value which defines whether to use fib based targets or risk reward based targets. 1 - Risk Reward, 2 - Fib Ratios
+// @field variableTargetRatios Risk reward or Fib Ratios to be used for calculation of targets when fixed target is not possible or not enabled
+// @field entryPivotForWm which Pivot should be considered as entry point for WM patterns. 0 refers to the latest breakout pivot where as 5 refers to initial pivot of the pattern
+export type ReversalChartTradeProperties
+	float riskAdjustment = 13.0
+    bool useFixedTarget = true
+    int variableTargetType = 2
+    array<float> variableTargetRatios
+    int entryPivotForWm = 0
+
+// @type Reversal Chart Pattern master type which holds the pattern components, drawings and trade details
+// @field pivots Array of Zigzag Pivots forming the pattern
+// @field patternType Defines the main type of pattern 1 - Double Tap, 1 - Triple Tap, 3 - Cup and Handle, 4 - Head and Shoulders, 5- W/M Patterns, 6 - Full Trend, 7 - Half Trend
+// @field patternColor Color in which the pattern will be drawn on chart
+// @field ReversalChartTradeProperties object contains the properties needed for setting entry, stop and targets
+// @field drawing ReversalChartPatternDrawing object which holds the drawing components
+// @field trade TradeTracker.Trade object holding trade components
+export type ReversalChartPattern
+	array<zg.Pivot> pivots
+	int patternType = 0
+	color patternColor = color.blue
+    ReversalChartTradeProperties properties
+	ReversalChartPatternDrawing drawing
+	t.Trade trade
+
+// @function Deletes the drawing components of ReversalChartPatternDrawing object
+// @param this ReversalChartPatternDrawing object
+// @returns current ReversalChartPatternDrawing object
+export method delete(ReversalChartPatternDrawing this)=>
+    for ln in this.patternLines
+        ln.delete()
+    this.entry.delete()
+    for ln in this.targets
+        ln.delete()
+    this.stop.delete()
+    this.patternLabel.delete()
+    this
+
+// @function Deletes the drawing components of ReversalChartPattern object. In turn calls the delete of ReversalChartPatternDrawing
+// @param this ReversalChartPattern object
+// @returns current ReversalChartPattern object
+export method delete(ReversalChartPattern this)=>
+    this.drawing.delete()
+    this
+
+// @function Array push with limited number of items in the array. Old items are deleted when new one comes and exceeds the limit
+// @param this array<ReversalChartPattern> object
+// @param obj ReversalChartPattern object which need to be pushed to the array
+// @param limit max items on the array. Default is 10
+// @param deleteOld If set to true, also deletes the drawing objects. If not, the drawing objects are kept but the pattern object is removed from array. Default is false.
+// @returns current ReversalChartPattern object
+export method lpush(array<ReversalChartPattern> this, ReversalChartPattern obj, int limit =10, bool deleteOld = false)=>
+    this.push(obj)
+    while(this.size() > limit)
+        removed = this.shift()
+        if(deleteOld)
+            removed.delete()
+    this
+
+// @function Draws the components of ReversalChartPatternDrawing
+// @param this ReversalChartPatternDrawing object
+// @returns current ReversalChartPatternDrawing object
+export method draw(ReversalChartPatternDrawing this)=>
+    for ln in this.patternLines
+		ln.draw()
+    this.entry.draw()
+    for ln in this.targets
+		ln.draw()
+    this.stop.draw()
+    this.patternLabel.draw()
+    this
+
+// @function Draws the components of ReversalChartPatternDrawing within the ReversalChartPattern object.
+// @param this ReversalChartPattern object
+// @returns current ReversalChartPattern object
+export method draw(ReversalChartPattern this)=>
+    this.drawing.draw()
+    this
+
+method checkExistingPatterns(zg.Zigzag zigzag, array<ReversalChartPattern> patterns, int offset=0)=>
+    existingPattern = false
+    for pattern in patterns
+        matchingPattern = true
+        if(pattern.pivots.size() <= zigzag.zigzagPivots.size()+offset)
+            for [index, pivot] in pattern.pivots
+                if(index > 0) and (zigzag.zigzagPivots.get(index+offset).point.bar != pattern.pivots.get(index).point.bar)
+                    matchingPattern := false
+                    break
+        else
+            false
+        if(matchingPattern)
+            existingPattern := true
+            break
+    existingPattern
+
+method scanWMPatterns(zg.Zigzag zigzag, array<ReversalChartPattern> patterns, int offset = 0)=>
+    isPattern = false
+    if(zigzag.zigzagPivots.size()>=5+offset)
+        existingPattern = zigzag.checkExistingPatterns(patterns, offset)
+        if(not existingPattern)
+            dPivot = zigzag.zigzagPivots.get(offset)
+            cPivot = zigzag.zigzagPivots.get(offset+1)
+            bPivot = zigzag.zigzagPivots.get(offset+2)
+            aPivot = zigzag.zigzagPivots.get(offset+3)
+			xPivot = zigzag.zigzagPivots.get(offset+4)
+			r1 = dPivot.ratio
+            r2 = cPivot.ratio
+            r3 = bPivot.ratio
+			r4 = aPivot.ratio
+			r5 = xPivot.ratio
+
+            isPattern := r4 > 1 and r3 < 1 and r2 < 1 and r1 > 1 and (dPivot.point.price*dPivot.dir > xPivot.point.price*dPivot.dir)
+    isPattern
+
+method fullTrendPattern(zg.Zigzag zigzag, array<ReversalChartPattern> patterns, int offset = 0)=>
+    isPattern = false
+    if(zigzag.zigzagPivots.size()>=5+offset)
+        existingPattern = zigzag.checkExistingPatterns(patterns, offset)
+        if(not existingPattern)
+            dPivot = zigzag.zigzagPivots.get(offset)
+            cPivot = zigzag.zigzagPivots.get(offset+1)
+            bPivot = zigzag.zigzagPivots.get(offset+2)
+            aPivot = zigzag.zigzagPivots.get(offset+3)
+			xPivot = zigzag.zigzagPivots.get(offset+4)
+            r1 = dPivot.ratio
+            r2 = cPivot.ratio
+            r3 = bPivot.ratio
+			r4 = aPivot.ratio
+			r5 = xPivot.ratio
+            isPattern := r5 > 1 and r4 < 1 and r3 > 1 and r2 < 1 and r1 > 1
+
+    isPattern
+
+method halfTrendPattern(zg.Zigzag zigzag, array<ReversalChartPattern> patterns, int offset = 0)=>
+    isPattern = false
+    if(zigzag.zigzagPivots.size()>=6+offset)
+        existingPattern = zigzag.checkExistingPatterns(patterns, offset)
+        if(not existingPattern)
+            dPivot = zigzag.zigzagPivots.get(offset)
+            cPivot = zigzag.zigzagPivots.get(offset+1)
+            bPivot = zigzag.zigzagPivots.get(offset+2)
+            aPivot = zigzag.zigzagPivots.get(offset+3)
+			xPivot = zigzag.zigzagPivots.get(offset+4)
+            oPivot = zigzag.zigzagPivots.get(offset+5)
+			direction = math.sign(dPivot.dir)
+			r1 = dPivot.ratio
+            r2 = cPivot.ratio
+            r3 = bPivot.ratio
+			r4 = aPivot.ratio
+			r5 = xPivot.ratio
+
+            isPattern := r5 > 1 and r4 < 1 and r3 < 1 and
+                     (r2 < 1 or cPivot.point.price*direction >=oPivot.point.price*direction) and 
+                     (r1 > 1 and dPivot.point.price >= xPivot.point.price)
+    isPattern
+
+// @function Scans zigzag for ReversalChartPattern occurences
+// @param zigzag ZigzagTypes.Zigzag object having array of zigzag pivots and other information on each pivots
+// @param patterns Existing patterns array. Used for validating duplicates
+// @param errorPercent Error threshold for considering ratios. Default is 13
+// @param shoulderStart Starting range of shoulder ratio. Used for identifying shoulders, handles and necklines
+// @param shoulderEnd Ending range of shoulder ratio. Used for identifying shoulders, handles and necklines
+// @param allowedPatterns array of int containing allowed pattern types
+// @param offset Offset of zigzag to consider only confirmed pivots
+// @returns int pattern type
+export method scan(zg.Zigzag zigzag, array<ReversalChartPattern> patterns, float errorPercent = 13.0, float shoulderStart = 0.1, float shoulderEnd = 0.5, array<int> allowedPatterns = na, int offset = 0)=>
+    patternType = 0
+    allowedPatternsLocal = na(allowedPatterns)? array.from(1,2,3,4,5,6,7) : allowedPatterns
+    if(zigzag.zigzagPivots.size()>=4)
+        existingPattern = zigzag.checkExistingPatterns(patterns, offset)
+		
+        if(not existingPattern)
+            cPivot = zigzag.zigzagPivots.get(offset)
+            bPivot = zigzag.zigzagPivots.get(offset+1)
+            aPivot = zigzag.zigzagPivots.get(offset+2)
+			xPivot = zigzag.zigzagPivots.get(offset+3)
+			r1 = cPivot.ratio
+            r2 = bPivot.ratio
+			r3 = aPivot.ratio
+			r4 = xPivot.ratio
+       
+            min = (1-errorPercent/100)
+            max = (1+errorPercent/100)
+
+			r1IsTap = (r1 >= min and r1 <= max) and r1 > nz(array.max(cPivot.indicatorRatios))
+			r2IsTap = (r2 >= min and r2 <= max) and r2 > nz(array.max(bPivot.indicatorRatios))
+			r3IsTap = (r3 >= min and r3 <= max) and r3 > nz(array.max(aPivot.indicatorRatios))
+			r4IsTap = (r4 >= min and r4 <= max) and r4 > nz(array.max(xPivot.indicatorRatios))
+
+			r1IsShoulder = (r1 <= shoulderEnd) and (r1 >=shoulderStart)
+			r2IsShoulder = (r2 <= shoulderEnd) and (r2 >= shoulderStart)
+			r4IsShoulder = (r4 <= shoulderEnd) and (r4 >= shoulderStart)
+
+			r3IsHead = (r3 >= 1/shoulderEnd) and (r3 <= 1/shoulderStart)
+
+            isWm = allowedPatternsLocal.includes(5) and zigzag.scanWMPatterns(patterns, offset)
+            isFullTrend = allowedPatternsLocal.includes(6) and zigzag.fullTrendPattern(patterns, offset)
+            isHalfTrend = allowedPatternsLocal.includes(7) and zigzag.halfTrendPattern(patterns, offset)
+			headAndShoulder = r1IsShoulder and r2IsTap and r3IsHead and r4IsShoulder and allowedPatternsLocal.includes(4)
+			tripleTap = r1IsTap and r2IsTap and r3IsTap and r4IsShoulder and allowedPatternsLocal.includes(2)
+
+			cupAndHandle = not headAndShoulder and r1IsShoulder and r2IsTap and allowedPatternsLocal.includes(3)
+			doubleTap = not tripleTap and r1IsTap and r2IsShoulder and allowedPatternsLocal.includes(1)
+
+			patternType := doubleTap? 1 : tripleTap? 2 : cupAndHandle? 3 : headAndShoulder? 4 : isWm? 5 : isFullTrend? 6 : isHalfTrend? 7 : 0
+	patternType
+
+// @function Create Pattern from ZigzagTypes.Zigzag object
+// @param zigzag ZigzagTypes.Zigzag object having array of zigzag pivots and other information on each pivots
+// @param patternType Type of pattern being created. 1 - Double Tap, 2 - Triple Tap, 3 - Cup and Handle, 4 - Head and Shoulders
+// @param patternColor Color in which the patterns are drawn
+// @param riskAdjustment Used for calculating stops
+// @returns ReversalChartPattern object created
+export method createPattern(zg.Zigzag zigzag, int patternType = 1, color patternColor = color.blue, ReversalChartTradeProperties properties = na, int offset=0)=>
+    patternPivots = zigzag.zigzagPivots.slice(offset, (patternType >= 5? 5 : (patternType %2 == 1 ? 4 : 6)+offset))
+    tProperties = na(properties)?ReversalChartTradeProperties.new():properties
+    tProperties.variableTargetRatios := na(tProperties.variableTargetRatios)? array.from(1.0) : tProperties.variableTargetRatios
+    ReversalChartPattern.new(patternPivots, patternType, patternColor, tProperties)
+
+// @function get pattern name of ReversalChartPattern object
+// @param this ReversalChartPattern object
+// @returns string name of the pattern
+export method getName(ReversalChartPattern this)=>
+    this.patternType == 1? (this.trade.direction > 0? 'Double Bottom' : 'Double Top') :
+					 this.patternType == 2? (this.trade.direction > 0? 'Triple Bottom' : 'Triple Top') :
+					 this.patternType == 3? (this.trade.direction > 0? 'Cup and Handle' : 'Inverted Cup and Handle') :
+					 this.patternType == 4? (this.trade.direction > 0? 'Inverse Head and Shoulders' : 'Head and Shoulders'):
+                     this.patternType == 5? (this.trade.direction > 0? 'W Pattern' : 'M Pattern'):
+                     this.patternType == 6? (this.trade.direction > 0? 'Full Uptrend' : 'Full Downtrend'):
+                     this.patternType == 7? (this.trade.direction > 0? 'Half Uptrend' : 'Half Downtrend'): 'None'
+
+// @function get consolidated description of ReversalChartPattern object
+// @param this ReversalChartPattern object
+// @returns string consolidated description
+export method getDescription(ReversalChartPattern this)=>
+	risk = math.abs(this.trade.entry - this.trade.stop)
+    reward = not na(this.trade.targets) ? this.trade.targets.size() != 0? math.abs(this.trade.entry - this.trade.targets.first()) : na : na 
+
+    riskReward = not na(this.trade.targets) ? this.trade.targets.size() != 0 ? reward/risk : na : na
+    entryLabel = not na(this.trade) ? not na(this.trade.entry) ? 'Entry : '+str.tostring(this.trade.entry, format.mintick)+'\n' : '' : ''
+    stopLabel = not na(this.trade) ? not na(this.trade.stop) ? 'Stop : '+str.tostring(this.trade.stop, format.mintick)+'\n' : '' : ''
+    targetLabel = not na(this.trade) ? not na(this.trade.targets)? this.trade.targets.size()!=0? 'Targets :'+str.tostring(this.trade.targets.first(), format.mintick)+'\n':
+                         '': '' : ''
+    rrLabel = not na(riskReward)? 'Estimated RR : '+str.tostring(riskReward, '#.##') : ''
+    'Pattern :'+this.getName()+'\n'+entryLabel+stopLabel+targetLabel+rrLabel
+
+// @function initializes the ReversalChartPattern object and creates sub object types
+// @param this ReversalChartPattern object
+// @returns ReversalChartPattern current object
+export method init(ReversalChartPattern this)=>
+    entryPrice = this.pivots.get(this.patternType < 5 ? 1 : this.properties.entryPivotForWm).point.price
+	direction = int(math.sign(this.pivots.last().dir))
+
+    patternSize = this.patternType == 5? math.max(math.abs(this.pivots.get(0).point.price - this.pivots.get(1).point.price), math.abs(this.pivots.get(0).point.price - this.pivots.get(3).point.price)):
+                         math.max(math.abs(this.pivots.get(0).point.price - this.pivots.get(1).point.price), math.abs(this.pivots.get(2).point.price - this.pivots.get(1).point.price))
+    stop = this.pivots.get(this.patternType >= 5? 3 : 0).point.price - direction*this.properties.riskAdjustment*(entryPrice - this.pivots.first().point.price)/100    
+                        
+    array<float> targetPrices = array.new<float>()
+    if(this.properties.useFixedTarget and this.patternType <= 2) or na(this.properties.variableTargetRatios)? true : this.properties.variableTargetRatios.size() == 0
+        targetPrices.push(this.pivots.last().point.price)
+    else
+        for ratio in this.properties.variableTargetRatios
+            targetPrice = entryPrice + direction*ratio* (this.properties.variableTargetType == 2 ? patternSize : math.abs(entryPrice-stop))
+            targetPrices.push(targetPrice)
+
+    this.trade := t.Trade.new(0, direction, entryPrice, entryPrice, stop, stop, targetPrices)
+
+    dr.LineProperties properties = dr.LineProperties.new()
+    this.drawing := ReversalChartPatternDrawing.new()
+    properties.color := this.patternColor
+    
+	this.drawing.patternLines := array.new<dr.Line>()
+	for i = 0 to this.pivots.size()-2
+		this.drawing.patternLines.push(this.pivots.get(i).point.createLine(this.pivots.get(i+1).point, properties))
+
+    startBar = this.pivots.get(this.patternType >= 5? 2: 1).point.bar
+    endBar =  2*this.pivots.first().point.bar-this.pivots.get(this.patternType < 5 ? 1: 0).point.bar
+  
+    dr.Point entryPointStart = dr.Point.new(entryPrice, startBar)
+    dr.Point entryPointEnd = dr.Point.new(entryPrice, endBar)
+    dr.LineProperties entryLineProp = properties.copy()
+    entryLineProp.style := line.style_dotted
+    entryLineProp.color := color.blue
+    this.drawing.entry := entryPointStart.createLine(entryPointEnd, entryLineProp)
+
+    dr.Point stopPointStart = dr.Point.new(stop, startBar)
+    dr.Point stopPointEnd = dr.Point.new(stop, endBar)
+    dr.LineProperties stopLineProp = entryLineProp.copy()
+    stopLineProp.color := color.red
+    this.drawing.stop := stopPointStart.createLine(stopPointEnd, stopLineProp)
+
+    dr.LineProperties targetLineProp = entryLineProp.copy()
+    targetLineProp.color := color.green
+    
+    this.drawing.targets := array.new<dr.Line>()
+    for target in this.trade.targets
+        dr.Point targetPointStart = dr.Point.new(target, startBar)
+        dr.Point targetPointEnd = dr.Point.new(target, endBar)
+        this.drawing.targets.push(targetPointStart.createLine(targetPointEnd, targetLineProp))
+
+    dr.LabelProperties lblProperties = dr.LabelProperties.new()
+    lblProperties.color := this.patternColor
+    lblProperties.textcolor := this.patternColor
+    lblProperties.style := direction > 0 ? label.style_arrowup : label.style_arrowdown
+    lblProperties.yloc := direction > 0? yloc.belowbar : yloc.abovebar
+    this.drawing.patternLabel := this.pivots.get(this.patternType >= 5? 3 : 0).point.createLabel(this.getName(), this.getDescription(), lblProperties)
+    this
