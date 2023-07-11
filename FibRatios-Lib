@@ -1,0 +1,43 @@
+//@version=5
+
+// @description Library with calculation logic for fib retracement, extension and ratios
+library("FibRatios")
+
+round(value, precision)=> precision < 0? math.round_to_mintick(value) : math.round(value, precision)
+// @function Calculates the retracement for points a, b with given ratio and scale
+// @param a Starting point a
+// @param b Second point b
+// @param ratio Ratio for which we need to calculate retracement c
+// @param logScale Flag to get calculations in log scale. Default is false
+// @param precision rounding precision. If set to netagive number, round_to_mintick is applied. Default is -1
+// @returns retracement point c for points a,b with given ratio and scale
+export retracement(float a, float b, float ratio, bool logScale = false, int precision = -1) => round(logScale? b * math.pow(a/b, ratio) : b - (b-a)*ratio, precision)
+
+// @function Calculates the retracement ratio for points a, b, c with given scale
+// @param a Starting point a
+// @param b Second point b
+// @param c Retracement point. c should be placed between a and b
+// @param logScale Flag to get calculations in log scale. Default is false
+// @param precision rounding precision. If set to netagive number, round_to_mintick is applied. Default is 3
+// @returns retracement ratio for points a,b,c on given scale
+export retracementRatio(float a, float b, float c, bool logScale = false, int precision = 3) => round(logScale? math.log(c/b)/math.log(a/b) : (b-c)/(b-a), precision)
+
+// @function Calculates the extensions for points a, b, c with given ratio and scale
+// @param a Starting point a
+// @param b Second point b
+// @param c Retracement point. c should be placed between a and b
+// @param ratio Ratio for which we need to calculate extension d
+// @param logScale Flag to get calculations in log scale. Default is false
+// @param precision rounding precision. If set to netagive number, round_to_mintick is applied. Default is -1
+// @returns extensoin point d for points a,b,c with given ratio and scale
+export extension(float a, float b, float c, float ratio, bool logScale = false, int precision = -1) => round(logScale? c * math.pow(b/a, ratio) : c + (b-a)*ratio, precision)
+
+// @function Calculates the extension ratio for points a, b, c, d with given scale
+// @param a Starting point a
+// @param b Second point b
+// @param c Retracement point. c should be placed between a and b
+// @param d Extension point. d should be placed beyond a, c. But, can be with b,c or beyond b
+// @param logScale Flag to get calculations in log scale. Default is false
+// @param precision rounding precision. If set to netagive number, round_to_mintick is applied. Default is 3
+// @returns extension ratio for points a,b,c,d on given scale
+export extensionRatio(float a, float b, float c, float d, bool logScale = false, int precision = 3) => round(logScale? math.log(d/c)/math.log(b/a) : (d-c)/(b-a), precision)
