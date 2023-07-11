@@ -1,0 +1,468 @@
+//@version=5
+
+// @description Matrix implementation of zigzag to allow further possibilities. 
+//                   Main advantage of this library over previous zigzag methods is that you can attach any number of indicator/oscillator information to zigzag
+library("mZigzag", overlay=true)
+import HeWhoMustNotBeNamed/_matrix/5 as ma
+import HeWhoMustNotBeNamed/arrays/1 as pa
+import HeWhoMustNotBeNamed/enhanced_ta/14 as eta
+import HeWhoMustNotBeNamed/supertrend/6 as st
+
+pivots(length, float[] ohlc) =>
+    highSource = array.max(ohlc)
+    lowSource = array.min(ohlc)
+    int phighbar = ta.highestbars(highSource, length)
+    int plowbar = ta.lowestbars(lowSource, length)
+    float phigh = ta.highest(highSource, length)
+    float plow = ta.lowest(lowSource, length)
+    [phigh, phighbar, plow, plowbar]
+
+calculateDivergence(oDir, pDir, sDir) =>
+    divergence = pDir == oDir ? sDir == pDir or sDir * 2 == -pDir ? -sDir : sDir * 4 : sDir == pDir or sDir == -oDir ? 0 : (math.abs(oDir) > math.abs(pDir) ? sDir : -sDir) * (sDir == oDir ? 2 : 3)
+    divergence
+
+getSentimentDetails(sentiment) =>
+    sentimentSymbol = sentiment == 4 ? '⬆' : sentiment == -4 ? '⬇' : sentiment == 3 ? '↗' : sentiment == -3 ? '↘' : sentiment == 2 ? '⤴' : sentiment == -2 ? '⤵' : sentiment == 1 ? '⤒' : sentiment == -1 ? '⤓' : '▣'
+    sentimentColor = sentiment == 4 ? color.green : sentiment == -4 ? color.red : sentiment == 3 ? color.lime : sentiment == -3 ? color.orange : sentiment == 2 ? color.rgb(202, 224, 13, 0) : sentiment == -2 ? color.rgb(250, 128, 114, 0) : color.silver
+    sentimentLabel = math.abs(sentiment) == 4 ? 'C' : math.abs(sentiment) == 3 ? 'H' : math.abs(sentiment) == 2 ? 'D' : 'I'
+    [sentimentSymbol, sentimentLabel, sentimentColor]
+
+addnewpivot(valueMatrix, directionMatrix, ratioMatrix, divergenceMatrix, doubleDivergenceMatrix, barArray, trendArray, value, bar, dir, indicatorHigh, indicatorLow, numberOfPivots, supertrendDir)=>
+    array<float> indicatorArray = dir > 0? indicatorHigh[bar_index-bar] : indicatorLow[bar_index-bar]
+    
+    if(na(indicatorArray))
+        indicatorArray := array.new_float(array.size(indicatorHigh))
+    
+    newValueArray = array.from(value)
+    array.concat(newValueArray, indicatorArray)
+
+    size = array.size(newValueArray)
+    newRatios = array.new_float(size, 1.0)
+    newDirections = array.new_int(size, int(dir))
+    newDivergences = array.new_int(size, 0)
+    newDoubleDivergences =array.new_int(size, 0)
+    if(matrix.rows(valueMatrix)>=2)
+        lastValues = matrix.row(valueMatrix, matrix.rows(valueMatrix)-1)
+        llastValues = matrix.row(valueMatrix, matrix.rows(valueMatrix)-2)
+        llastDivergence = matrix.row(divergenceMatrix, matrix.rows(divergenceMatrix)-2)
+        for i = 0 to array.size(lastValues)-1
+            cValue = array.get(newValueArray, i)
+            lastPoint = array.get(lastValues, i)
+            llastPoint = array.get(llastValues, i)
+            newDir = dir * cValue > dir * llastPoint ? dir * 2 : dir
+            newRatio = math.round(math.abs(cValue-lastPoint)/math.abs(llastPoint-lastPoint), 2)
+            array.set(newDirections, i, int(newDir))
+            array.set(newRatios, i, newRatio)
+            pDir = array.get(newDirections, 0)
+            divergence = calculateDivergence(newDir, pDir, supertrendDir)
+            array.set(newDivergences, i, divergence)
+            doubleDivergence = 0
+            if(matrix.rows(valueMatrix) >= 4)
+                lastDivergence = array.get(llastDivergence, i)
+                doubleDivergence := divergence == lastDivergence ? divergence : 0
+            array.set(newDoubleDivergences, i, doubleDivergence)
+
+    ma.push(valueMatrix, newValueArray, numberOfPivots)
+    ma.push(directionMatrix, newDirections, numberOfPivots)
+    ma.push(ratioMatrix, newRatios, numberOfPivots)
+    ma.push(divergenceMatrix, newDivergences, numberOfPivots)
+    ma.push(doubleDivergenceMatrix, newDoubleDivergences, numberOfPivots)
+    pa.push(barArray, bar, numberOfPivots)
+    pa.push(trendArray, supertrendDir, numberOfPivots)
+
+
+addnewpivotplain(valueMatrix, directionArray, barArray, value, bar, dir, indicatorHigh, indicatorLow, numberOfPivots)=>
+    array<float> indicatorArray = dir > 0? indicatorHigh[bar_index-bar] : indicatorLow[bar_index-bar]
+    
+    if(na(indicatorArray))
+        indicatorArray := array.new_float(array.size(indicatorHigh))
+    
+    newValueArray = array.from(value)
+    array.concat(newValueArray, indicatorArray)
+
+    size = array.size(newValueArray)
+    newDir = dir
+    if(matrix.rows(valueMatrix)>=2)
+        llastValue = matrix.get(valueMatrix, 1, 0)
+        newDir := dir * value > dir * llastValue ? dir * 2 : dir
+        
+    ma.unshift(valueMatrix, newValueArray, numberOfPivots)
+    pa.unshift(directionArray, newDir, numberOfPivots)
+    pa.unshift(barArray, bar, numberOfPivots)
+    
+
+zigzagcore(int length, float[] ohlc, float[] indicatorHigh, float[] indicatorLow, simple int numberOfPivots=20, simple int supertrendLength=5) =>
+    var matrix<float> valueMatrix = matrix.new<float>()
+    var matrix<int> directionMatrix = matrix.new<int>()
+    var matrix<float> ratioMatrix = matrix.new<float>()
+    var matrix<int> divergenceMatrix = matrix.new<int>()
+    var matrix<int> doubleDivergenceMatrix = matrix.new<int>()
+    var array<int> barArray = array.new<int>()
+    var array<int> trendArray = array.new<int>()
+
+    [phigh, phighbar, plow, plowbar] = pivots(length, ohlc)
+    float pDir = 1
+    newPivot = phighbar == 0 or plowbar == 0
+    doublePivot = phighbar == 0 and plowbar == 0
+    updateLastPivot = false
+    
+    int supertrendDir = na
+    float supertrend = na
+    if(matrix.rows(valueMatrix) > supertrendLength*2 + 1)
+        zigzagpivotArray = array.copy(matrix.col(valueMatrix, 0))
+        array.reverse(zigzagpivotArray)
+        [sDir, sTrend] = st.zsupertrend(zigzagpivotArray, supertrendLength)
+        supertrendDir := sDir
+        supertrend := sTrend
+        
+    if(matrix.columns(directionMatrix) >=1)
+        pDir := math.sign(matrix.get(directionMatrix, matrix.rows(directionMatrix)-1, 0))
+
+    newBar = bar_index
+    if ((pDir == 1 and phighbar == 0) or (pDir == -1 and plowbar == 0)) and matrix.rows(valueMatrix)>=1
+        value = pDir == 1 ? phigh : plow
+        ipivot = pDir == 1? plow : phigh
+        pivotbar = array.get(barArray, matrix.rows(valueMatrix)-1)
+        pivot = matrix.get(valueMatrix, matrix.rows(valueMatrix)-1, 0)
+        pivotdir = matrix.get(directionMatrix, matrix.rows(directionMatrix)-1, 0)
+        removeOld = value * pivotdir > pivot * pivotdir
+        addInverse = false
+        if(removeOld)
+            updateLastPivot := true
+        	ma.pop(valueMatrix)
+            ma.pop(ratioMatrix)
+        	ma.pop(directionMatrix)
+        	ma.pop(divergenceMatrix)
+        	ma.pop(doubleDivergenceMatrix)
+        	pa.pop(barArray)
+            pa.pop(trendArray)
+        	
+            addnewpivot(valueMatrix, directionMatrix, ratioMatrix, divergenceMatrix, doubleDivergenceMatrix, barArray, trendArray,
+                                 value, newBar, pDir, indicatorHigh, indicatorLow, numberOfPivots, supertrendDir)
+                     
+        	if(matrix.rows(valueMatrix) > 1 and doublePivot)
+        	    llastPivot = matrix.get(valueMatrix, matrix.rows(valueMatrix)-2, 0)
+        	    if(-pDir*llastPivot >= -pDir*ipivot)
+        	        addInverse := true
+        	        
+        else if (not removeOld and not doublePivot) or addInverse
+            ipivotbar = pDir == 1? newBar+plowbar : newBar+phighbar
+            ipivottime = time[newBar-ipivotbar]
+            addnewpivot(valueMatrix, directionMatrix, ratioMatrix, divergenceMatrix, doubleDivergenceMatrix, barArray, trendArray,
+                             ipivot, ipivotbar, -pDir,  indicatorHigh, indicatorLow, numberOfPivots, supertrendDir)
+            doublePivot := true
+    if (pDir == 1 and plowbar == 0) or (pDir == -1 and phighbar == 0)
+        value = pDir == 1 ? plow : phigh
+        addnewpivot(valueMatrix, directionMatrix, ratioMatrix, divergenceMatrix, doubleDivergenceMatrix, barArray, trendArray,
+                             value, newBar, -pDir,  indicatorHigh, indicatorLow, numberOfPivots, supertrendDir)
+
+    [valueMatrix, directionMatrix, ratioMatrix, divergenceMatrix, doubleDivergenceMatrix, barArray, trendArray, supertrendDir, supertrend, newPivot, doublePivot]
+
+
+zigzagcoreplain(int length, float[] ohlc, float[] indicatorHigh, float[] indicatorLow, simple int numberOfPivots=20, simple int offset=0) =>
+    
+    var matrix<float> valueMatrix = matrix.new<float>()
+    var array<int> directionArray = array.new<int>()
+    var array<int> barArray = array.new<int>()
+
+    [phigh, phighbar, plow, plowbar] = pivots(length, ohlc)
+    float pDir = 1
+    newZG = false
+    doubleZG = phigh and plow
+    
+    if(array.size(directionArray) > 0)
+        pDir := math.sign(array.get(directionArray, 0))
+
+
+    if ((pDir == 1 and phigh) or (pDir == -1 and plow)) and matrix.rows(valueMatrix)>=1
+        pivotbar = array.shift(barArray)
+        pivot = matrix.get(valueMatrix, 0, 0)
+        pivotdir = array.shift(directionArray)
+        ma.shift(valueMatrix)
+
+        value = pDir == 1 ? phigh : plow
+
+        useNewValues = value * pivotdir > pivot * pivotdir
+        value := useNewValues ? value : pivot
+        bar = useNewValues ? (bar_index-offset) : pivotbar
+        newZG := useNewValues
+        addnewpivotplain(valueMatrix, directionArray, barArray, value, bar, pDir, indicatorHigh, indicatorLow, numberOfPivots)
+
+    if (pDir == 1 and plow) or (pDir == -1 and phigh)
+        value = pDir == 1 ? plow : phigh
+        bar = bar_index-offset
+        dir = pDir == 1 ? -1 : 1
+        newZG := true
+        addnewpivotplain(valueMatrix, directionArray, barArray, value, bar, dir,  indicatorHigh, indicatorLow, numberOfPivots)
+
+    [valueMatrix, directionArray, barArray, newZG, doubleZG]
+    
+draw_zg_line(idx1, idx2, zigzaglines, zigzaglabels, valueMatrix, directionMatrix, ratioMatrix,  divergenceMatrix, doubleDivergenceMatrix,
+                                         barArray, indicatorLabels, lineColor, lineWidth, lineStyle, showLabel, showIndicators) =>
+    if matrix.rows(valueMatrix) > 2
+        idxLen1 = matrix.rows(valueMatrix)-idx1
+        idxLen2 = matrix.rows(valueMatrix)-idx2
+        lastValues = matrix.row(valueMatrix, idxLen1)
+        llastValues = matrix.row(valueMatrix, idxLen2)
+        
+        lastDirections = matrix.row(directionMatrix, idxLen1)
+        lastRatios = matrix.row(ratioMatrix, idxLen1)
+        lastDivergence = matrix.row(divergenceMatrix, idxLen1)
+        lastDoubleDivergence = matrix.row(doubleDivergenceMatrix, idxLen1)
+
+        y1 = array.get(lastValues, 0)
+        y2 = array.get(llastValues, 0)
+        x1 = array.get(barArray, idxLen1)
+        x2 = array.get(barArray, idxLen2)
+        zline = line.new(x1=x1, y1=y1, x2=x2, y2=y2, color=lineColor, width=lineWidth, style=lineStyle)
+        currentDir = y1 > y2? 1 : -1
+        label zlabel = na
+        if(showLabel)
+            allLabels = array.from('Price')
+            array.concat(allLabels, indicatorLabels)
+            
+            color lblColor = na
+            array<string> allLabelsArray = array.new<string>()
+            for int i = 0 to array.size(allLabels)-1
+                dir = array.get(lastDirections, i)
+                ratio = array.get(lastRatios, i)
+
+                [hhllText, labelColor] = switch dir
+                    1 => ["LH", color.orange]
+                    2 => ["HH", color.green]
+                    -1 => ["HL", color.lime]
+                    -2 => ["LL", color.red]
+                    => ["NA", color.silver]
+                lblColor := na(lblColor)? labelColor : lblColor
+                lbl = array.get(allLabels, i) + " : " + str.tostring(array.get(lastValues, i)) + (i==0 ? " - " +str.tostring(array.get(lastRatios, i)) : "") + " ( " + hhllText + " )"
+                if(i!=0)
+                    divergence = array.get(lastDivergence, i)
+                    doubleDivergence = array.get(lastDoubleDivergence, i)
+                    [dSymbol, dLabel, dColor] = getSentimentDetails(divergence)
+                    [ddSymbol, ddLabel, ddColor] = getSentimentDetails(doubleDivergence)
+                    lbl := lbl + ' ' + str.tostring(dSymbol) + ' ' + str.tostring(ddSymbol) 
+                array.push(allLabelsArray, lbl)
+                
+                
+            finalLabel = showIndicators? array.join(allLabelsArray, '\n') : array.get(allLabelsArray, 0)
+            tooltip = showIndicators? '' : array.join(allLabelsArray, '\n')
+
+            labelStyle = currentDir > 0? label.style_label_down : label.style_label_up
+            zlabel := label.new(x=x1, y=y1, yloc=yloc.price, color=lblColor, style=labelStyle, text=finalLabel, 
+                                     textcolor=color.black, size = size.small, tooltip=tooltip)
+        
+        if array.size(zigzaglines) > 0
+            lastLine = array.get(zigzaglines, array.size(zigzaglines)-1)
+            if line.get_x2(lastLine) == x2 and line.get_x1(lastLine) <= x1
+                pa.pop(zigzaglines)
+                pa.pop(zigzaglabels)
+        
+        pa.push(zigzaglines, zline, 500)
+        pa.push(zigzaglabels, zlabel, 500)
+
+
+    
+// @function calculates zigzag and related information
+// @param length is zigzag length
+// @param ohlc array of OHLC values to be used for zigzag calculation
+// @param indicatorHigh Array of indicator values calculated based on high price of OHLC
+// @param indicatorLow Array of indicators values calculated based on low price of OHLC
+// @param numberOfPivots Number of pivots to be returned
+// @param supertrendLength is number of pivot history to calculate supertrend
+// @returns valueMatrix Matrix containing zigzag pivots for price and indicators
+//          directionMatrix Matrix containing direction of price and indicator values at pivots
+//          ratioMatrix Matrix containing ratios of price and indicator values at pivots
+//          divergenceMatrix matrix containing divergence details for each indicators
+//          doubleDivergenceMatrix matrix containing double divergence details for each indicators
+//          barArray Array containing pivot bars
+//          supertrendDir is direction of zigzag based supertrend
+//          supertrend is supertrend value of zigzag based supertrend
+//          newZG is true if a new pivot is added to array
+//          doubleZG is true if last calculation returned two new pivots (Happens on extreme price change)
+export calculate(simple int length, float[] ohlc, float[] indicatorHigh, float[] indicatorLow, simple int numberOfPivots=20, simple int supertrendLength = 5) => 
+    zigzagcore(length, ohlc, indicatorHigh, indicatorLow, numberOfPivots, supertrendLength)
+
+
+// @function calculates zigzag and related information uses shift/unshift rather than pop and push. Also does not calculate divergence and ratios.
+// @param length is zigzag length
+// @param ohlc array of OHLC values to be used for zigzag calculation
+// @param indicatorHigh Array of indicator values calculated based on high price of OHLC
+// @param indicatorLow Array of indicators values calculated based on low price of OHLC
+// @param numberOfPivots Number of pivots to be returned
+// @returns valueMatrix Matrix containing zigzag pivots for price and indicators
+//          directionArray Matrix containing direction of price and indicator values at pivots
+//          barArray Array containing pivot bars
+//          newZG is true if a new pivot is added to array
+//          doubleZG is true if last calculation returned two new pivots (Happens on extreme price change)
+export calculateplain(simple int length, float[] ohlc, float[] indicatorHigh, float[] indicatorLow, simple int numberOfPivots=20, simple int offset=0) => 
+    zigzagcoreplain(length, ohlc, indicatorHigh, indicatorLow, numberOfPivots, offset)
+
+// @function draws zigzag and related information based on preprocessed values
+// @param valueMatrix is matrix containing values of price and indicators
+// @param directionMatrix is matrix containing direction of price and indicators
+// @param ratioMatrix is matrix containing retracement ratios of price and indicators
+// @param barArray is array of pivot bars
+// @param newZG is bool which tells whether new zigzag pivot is formed or not
+// @param doubleZG is bool which teels us if the bar has both high and low zigzag
+// @param lineColor zigzag line color. set to blue by default
+// @param lineWidth zigzag line width. set to 1 by default
+// @param lineStyle zigzag line style. set to line.style_solid by default
+// @param showLabel Show pivot label
+// @param showIndicators Include indicators in labels. If set to false, indicators are shown as tooltips
+// @returns valueMatrix Matrix containing zigzag pivots for price and indicators
+//          directionMatrix Matrix containing direction of price and indicator values at pivots
+//          ratioMatrix Matrix containing ratios of price and indicator values at pivots
+//          divergenceMatrix matrix containing divergence details for each indicators
+//          doubleDivergenceMatrix matrix containing double divergence details for each indicators
+//          barArray Array containing pivot bars
+//          zigzaglines array of zigzag lines
+//          zigzaglabels array of zigzag labels
+export draw(matrix<float> valueMatrix, matrix<int> directionMatrix, matrix<float> ratioMatrix,  matrix<int> divergenceMatrix, matrix<int> doubleDivergenceMatrix, array<int> barArray,
+                 bool newZG, bool doubleZG,
+                 string[] indicatorLabels, color lineColor = color.blue, int lineWidth = 1, string lineStyle = line.style_solid,
+                 bool showLabel=true, bool showIndicators=true)=>
+    var zigzaglines = array.new_line(0)
+    var zigzaglabels = array.new_label(0)
+    if(newZG)
+        if doubleZG
+            draw_zg_line(2, 3, zigzaglines, zigzaglabels, valueMatrix, directionMatrix, ratioMatrix, divergenceMatrix, doubleDivergenceMatrix, barArray,
+                             indicatorLabels, lineColor, lineWidth, lineStyle, showLabel, showIndicators)
+
+        if matrix.rows(valueMatrix) >= 2
+            draw_zg_line(1, 2, zigzaglines, zigzaglabels, valueMatrix, directionMatrix, ratioMatrix,  divergenceMatrix, doubleDivergenceMatrix, barArray,
+                             indicatorLabels, lineColor, lineWidth, lineStyle, showLabel, showIndicators)
+    [valueMatrix, directionMatrix, ratioMatrix, divergenceMatrix, doubleDivergenceMatrix, barArray, zigzaglines, zigzaglabels]
+    
+
+// @function draws zigzag and related information
+// @param length is zigzag length
+// @param ohlc array of OHLC values to be used for zigzag calculation
+// @param indicatorLabels Array of name of indicators passed
+// @param indicatorHigh Array of indicator values calculated based on high price of OHLC
+// @param indicatorLow Array of indicators values calculated based on low price of OHLC
+// @param numberOfPivots Number of pivots to be returned
+// @param lineColor zigzag line color. set to blue by default
+// @param lineWidth zigzag line width. set to 1 by default
+// @param lineStyle zigzag line style. set to line.style_solid by default
+// @param showLabel Show pivot label
+// @param showIndicators Include indicators in labels. If set to false, indicators are shown as tooltips
+// @returns valueMatrix Matrix containing zigzag pivots for price and indicators
+//          directionMatrix Matrix containing direction of price and indicator values at pivots
+//          ratioMatrix Matrix containing ratios of price and indicator values at pivots
+//          divergenceMatrix matrix containing divergence details for each indicators
+//          doubleDivergenceMatrix matrix containing double divergence details for each indicators
+//          barArray Array containing pivot bars
+//          zigzaglines array of zigzag lines
+//          zigzaglabels array of zigzag labels
+export draw(simple int length, float[] ohlc, string[] indicatorLabels, float[] indicatorHigh, float[] indicatorLow, simple int numberOfPivots=20,
+                 color lineColor = color.blue, int lineWidth = 1, string lineStyle = line.style_solid,
+                 bool showLabel=true, bool showIndicators=true) =>
+    [valueMatrix, directionMatrix, ratioMatrix, divergenceMatrix, doubleDivergenceMatrix, barArray, trendArray, supertrendDir, supertrend, newZG, doubleZG] = 
+                                     zigzagcore(length, ohlc, indicatorHigh, indicatorLow, numberOfPivots)
+    draw(valueMatrix, directionMatrix, ratioMatrix,  divergenceMatrix, doubleDivergenceMatrix, barArray, newZG, doubleZG,
+                                     indicatorLabels, lineColor, lineWidth, lineStyle, showLabel, showIndicators)
+
+
+// Usage Example(s)
+
+// //*********************** Debug method *************************//
+// i_start = 0
+// i_page = 100
+// i_maxLogSize = 1000
+// i_showHistory = false
+// i_showBarIndex = false
+// var DebugArray = array.new_string(0)
+// var DebugBarArray = array.new_string(0)
+// add_to_debug_array(arr, val, maxItems) =>
+//     array.unshift(arr, str.tostring(val))
+//     if array.size(arr) > maxItems
+//         array.pop(arr)
+
+// debug(debugMsg) =>
+//     if barstate.islast or i_showHistory
+//         barTimeString = str.tostring(year, '0000') + '/' + str.tostring(month, '00') + '/' + str.tostring(dayofmonth, '00') + (timeframe.isintraday ? '-' + str.tostring(hour, '00') + ':' + str.tostring(minute, '00') + ':' + str.tostring(second, '00') : '')
+
+//         add_to_debug_array(DebugBarArray, i_showBarIndex ? str.tostring(bar_index) : barTimeString, i_maxLogSize)
+//         add_to_debug_array(DebugArray, debugMsg, i_maxLogSize)
+// //*********************** Debug method *************************//
+
+// length = input.int(8)
+// showIndicators = input.bool(false)
+
+// includeMa = input.bool(true, "Moving Average", inline="ma", group="Indicators")
+// matype = input.string("sma", title="", group="Indicators", options=["sma", "ema", "hma", "rma", "wma", "vwma", "swma", "median"], inline="ma")
+// malength = input.int(20, title="", group="Indicators", inline="ma")
+
+// includeOscillator = input.bool(true, "Oscillator", inline="osc", group="Indicators")
+// oscillatorType = input.string("rsi", title="", group="Indicators", inline="osc", options=["cci", "cmo", "cog", "mfi", "roc", "rsi"])
+// oscLength = input.int(14, title="", group="Indicators", inline="osc")
+
+// includeVolume = input.bool(true, "Volume", inline="vol", group="Indicators")
+// volType = input.string("obv", title="", group="Indicators", inline="vol", options=["obv", "pvi", "nvi", "pvt", "vwap"])
+
+// drawSupertrend = input.bool(true, "Draw Zigzag Supertrend", inline='st', group="Trend")
+// supertrendLength = input.int(5, '', inline='st', group='Trend')
+
+// indicatorHigh = array.new_float()
+// indicatorLow = array.new_float()
+// indicatorLabels = array.new_string()
+
+// if(includeMa)
+//     maHigh = eta.ma(high, matype, malength)
+//     maLow = eta.ma(low, matype, malength)
+//     array.push(indicatorHigh, maHigh)
+//     array.push(indicatorLow, maLow)
+//     array.push(indicatorLabels, matype+str.tostring(malength))
+
+// if(includeOscillator)
+//     [oscHigh, _, _] = eta.oscillator(oscillatorType, oscLength, oscLength, oscLength, high)
+//     [oscLow, _, _] = eta.oscillator(oscillatorType, oscLength, oscLength, oscLength, low)
+//     array.push(indicatorHigh, oscHigh)
+//     array.push(indicatorLow, oscLow)
+//     array.push(indicatorLabels, oscillatorType+str.tostring(oscLength))
+
+// if(includeVolume)
+//     volHigh = volType == "obv"? ta.obv:
+//              volType == "pvi"? ta.pvi:
+//              volType == "nvi"? ta.nvi:
+//              volType == "pvt"? ta.pvt: ta.vwap(high)
+//     volLow = volType == "obv"? ta.obv:
+//              volType == "pvi"? ta.pvi:
+//              volType == "nvi"? ta.nvi:
+//              volType == "pvt"? ta.pvt: ta.vwap(low)
+//     array.push(indicatorHigh, volHigh)
+//     array.push(indicatorLow, volLow)
+//     array.push(indicatorLabels, volType)
+
+// ohlc = array.from(open, high, low, close)
+
+// //Zigzag with any number of indicators
+// // draw(length, ohlc, indicatorLabels, indicatorHigh, indicatorLow, showIndicators = showIndicators)
+
+// // Simple zigzag without adding any indicators
+// // [pivotMatrix, zigzaglines, zigzaglabels] = draw(length, ohlc, array.new_string(), array.new_float(), array.new_float())
+
+// // Just calculate without drawing zigzag
+// [valueMatrix, directionMatrix, ratioMatrix, divergenceMatrix, doubleDivergenceMatrix, barArray, supertrendDir, supertrend, newZG, doubleZG] = 
+//                                                          calculate(length, ohlc, indicatorHigh, indicatorLow, supertrendLength = supertrendLength)
+// // [valueMatrix2, directionArray2, barArray2, newZG2, doubleZG2] =                                                          
+// //                                                          calculateplain(length, ohlc, indicatorHigh, indicatorLow)
+                                                         
+// // debug(directionMatrix)
+// // debug(directionArray2)
+// draw(valueMatrix, directionMatrix, ratioMatrix,  divergenceMatrix, doubleDivergenceMatrix, barArray, newZG, doubleZG, indicatorLabels, showIndicators=showIndicators)
+// //drawplain(valueMatrix2, directionArray2, barArray2,  newZG2, doubleZG2) - yet to be implemented
+
+// debug(ratioMatrix)
+// plot(drawSupertrend? supertrend:na, color=supertrendDir>0? color.green:color.red, style=plot.style_linebr)
+
+// //************************************************************ Print debug message on table ********************************************************/
+// var debugTable = table.new(position=position.top_right, columns=2, rows=i_page + 1, border_width=1)
+// if array.size(DebugArray) > 0
+//     table.cell(table_id=debugTable, column=0, row=0, text=i_showBarIndex ? 'Bar Index' : 'Bar Time', bgcolor=color.teal, text_color=color.white, text_size=size.normal)
+//     table.cell(table_id=debugTable, column=1, row=0, text='Debug Message', bgcolor=color.teal, text_color=color.white, text_size=size.normal)
+//     for i = 0 to math.min(array.size(DebugArray) - 1 - i_start, i_page - 1) by 1
+//         table.cell(table_id=debugTable, column=0, row=i + 1, text=array.get(DebugBarArray, i + i_start), bgcolor=color.black, text_color=color.white, text_size=size.normal)
+//         table.cell(table_id=debugTable, column=1, row=i + 1, text=array.get(DebugArray, i + i_start), bgcolor=color.black, text_color=color.white, text_size=size.normal)
+// //************************************************************ Finish Printing ********************************************************/
+
