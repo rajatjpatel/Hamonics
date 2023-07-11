@@ -1,0 +1,328 @@
+//@version=5
+// @description Recursive Zigzag Using Matrix allows to create zigzags recursively on multiple levels
+library("rzigzag", overlay=true)
+import HeWhoMustNotBeNamed/_matrix/5 as ma
+import HeWhoMustNotBeNamed/arrays/1 as pa
+
+pivots(float[] ohlc, length) =>
+    highSource = array.max(ohlc)
+    lowSource = array.min(ohlc)
+    int phighbar = ta.highestbars(highSource, length)
+    int plowbar = ta.lowestbars(lowSource, length)
+    float phigh = ta.highest(highSource, length)
+    float plow = ta.lowest(lowSource, length)
+    [phigh, phighbar, plow, plowbar]
+
+iPivots(float[] h, float[] l, int i, int length) =>
+    startIndex = math.max(0, i-length+1)
+    highSource = array.slice(h, startIndex, i+1)
+    lowSource = array.slice(l, startIndex, i+1)
+
+    highIndex = array.sort_indices(highSource, order.descending)
+    lowIndex = array.sort_indices(lowSource, order.ascending)
+    int pHighIndex = array.get(highIndex, 0)
+    int pLowIndex = array.get(lowIndex, 0)
+    
+    float phigh = array.get(highSource, pHighIndex)
+    float plow = array.get(lowSource, pLowIndex)
+    [phigh, startIndex+pHighIndex, plow, startIndex+pLowIndex]
+
+addNewIPivot(zigzagmatrix, zigzagpivot, numberOfPivots)=>
+    dir = math.sign(array.get(zigzagpivot, 1))
+    if(matrix.rows(zigzagmatrix) >=1)
+        lastpivotDir = matrix.get(zigzagmatrix, 0, 1)
+        if(math.sign(lastpivotDir) == math.sign(dir))
+            runtime.error('Direction mismatch')
+        if(matrix.rows(zigzagmatrix)>=2)
+            value = array.get(zigzagpivot, 0)
+            llastValue = matrix.get(zigzagmatrix, 1, 0)
+            newDir =  dir * value > dir * llastValue ? dir * 2 : dir
+            array.set(zigzagpivot, 1, newDir)
+    
+    ma.unshift(zigzagmatrix, zigzagpivot, numberOfPivots)
+
+addnewpivot(zigzagmatrix, zigzagpivot, numberOfPivots)=>
+    dir = math.sign(array.get(zigzagpivot, 3))
+    if(matrix.rows(zigzagmatrix) >=1)
+        lastpivotDir = matrix.get(zigzagmatrix, 0, 3)
+        if(math.sign(lastpivotDir) == math.sign(dir))
+            runtime.error('Direction mismatch')
+        if(matrix.rows(zigzagmatrix)>=2)
+            value = array.get(zigzagpivot, 0)
+            llastValue = matrix.get(zigzagmatrix, 1, 0)
+            newDir =  dir * value > dir * llastValue ? dir * 2 : dir
+            array.set(zigzagpivot, 3, newDir)
+    
+    ma.unshift(zigzagmatrix, zigzagpivot, numberOfPivots)
+
+draw_zg_line(idx1, zigzaglines, zigzaglabels, zigzagmatrix,
+                 lineColor, lineWidth, lineStyle, showLabel, xloc) =>
+    idx2 = idx1+1
+    if matrix.rows(zigzagmatrix) > idx2
+        lastValues = matrix.row(zigzagmatrix, idx1)
+        llastValues = matrix.row(zigzagmatrix, idx2)
+        
+        y1 = array.get(lastValues, 0)
+        y2 = array.get(llastValues, 0)
+        x1 = array.get(lastValues, xloc == xloc.bar_index? 1 : 2)
+        x2 = array.get(llastValues, xloc == xloc.bar_index? 1 : 2)
+        zline = line.new(x1=int(x1), y1=y1, x2=int(x2), y2=y2, xloc=xloc, color=lineColor, width=lineWidth, style=lineStyle)
+        dir = array.get(lastValues, 3)
+        label zlabel = na
+        if(showLabel)
+            [hhllText, labelColor] = switch dir
+                1 => ["LH", color.orange]
+                2 => ["HH", color.green]
+                -1 => ["HL", color.lime]
+                -2 => ["LL", color.red]
+                => ["NA", color.silver]
+
+
+            labelStyle = dir > 0? label.style_label_down : label.style_label_up
+            zlabel := label.new(x=int(x1), y=y1, yloc=yloc.price, xloc=xloc, color=labelColor, style=labelStyle, text=hhllText, 
+                                     textcolor=color.black, size = size.small)
+        
+        pa.push(zigzaglines, zline, 500)
+        pa.push(zigzaglabels, zlabel, 500)
+
+
+// @function calculates plain zigzag based on input
+// @param length Zigzag Length
+// @param ohlc Array containing ohlc values. Can also contain custom series
+// @param numberOfPivots Number of max pivots to be returned
+// @param offset Offset from current bar. Can be used for calculations based on confirmed bars
+// @returns [matrix<float> zigzagmatrix, bool[] flags]
+export zigzag(int length, float[] ohlc, simple int numberOfPivots=20, simple int offset=0) =>
+    [phigh, phighbar, plow, plowbar] = pivots(na(ohlc[offset])? ohlc : ohlc[offset], length)
+    newBar = bar_index-offset
+    newBarTime = time[offset]
+    forceDoublePivot = false
+    distanceFromLastPivot = 0.0
+    float pDir = 1
+    var matrix<float> zigzagmatrix = matrix.new<float>()
+
+    if(matrix.rows(zigzagmatrix) > 0)
+        pDir := math.sign(matrix.get(zigzagmatrix, 0, 3))
+        distanceFromLastPivot := newBar - matrix.get(zigzagmatrix, 0, 1)
+
+    if(matrix.rows(zigzagmatrix) > 1)
+        llastPrice = matrix.get(zigzagmatrix, 1, 0)
+        forceDoublePivot := pDir == 1 and plowbar == 0 ? plow < llastPrice : pDir == -1 and phighbar == 0 ? phigh > llastPrice : false
+
+    overflow = distanceFromLastPivot >= length
+
+    newPivot = false
+    doublePivot = false
+    updateLastPivot = false
+
+    if ((pDir == 1 and phighbar == 0) or (pDir == -1 and plowbar == 0)) and matrix.rows(zigzagmatrix)>=1
+        value = pDir == 1 ? phigh : plow
+        ipivot = pDir == 1? plow : phigh
+        pivot = matrix.get(zigzagmatrix, 0, 0)
+        pivotbar = matrix.get(zigzagmatrix, 0, 1)
+        pivottime = matrix.get(zigzagmatrix, 0, 2)
+        pivotdir = matrix.get(zigzagmatrix, 0, 3)
+        removeOld = value * pivotdir > pivot * pivotdir
+        if(removeOld)
+            updateLastPivot := true
+            ma.shift(zigzagmatrix)
+            addnewpivot(zigzagmatrix, array.from(value, newBar, newBarTime, pDir, 0), numberOfPivots)
+            newPivot := true
+
+    if (pDir == 1 and plowbar == 0) or (pDir == -1 and phighbar == 0) and (not newPivot or forceDoublePivot)
+        value = pDir == 1 ? plow : phigh
+        addnewpivot(zigzagmatrix, array.from(value, newBar, newBarTime, -pDir, 0), numberOfPivots)
+        doublePivot := newPivot
+        newPivot := true
+
+    if(overflow and not newPivot)
+        ipivot = pDir == 1? plow : phigh
+        ipivotbar = pDir == 1? newBar+plowbar : newBar+phighbar
+        ipivottime = time[newBar-ipivotbar+offset]
+        addnewpivot(zigzagmatrix, array.from(ipivot, ipivotbar, ipivottime, -pDir, 0), numberOfPivots)
+        newPivot := true
+
+    [zigzagmatrix, array.from(updateLastPivot, newPivot, doublePivot)]
+
+// @function calculates plain zigzag based on input array
+// @param length Zigzag Length
+// @param h array containing high values of a series
+// @param l array containing low values of a series
+// @param numberOfPivots Number of max pivots to be returned
+// @returns matrix<float> zigzagmatrix
+export iZigzag(int length,  array<float> h, array<float> l, simple int numberOfPivots=500) =>
+    matrix<float> zigzagmatrix = matrix.new<float>()
+    for i=0 to array.size(h) >0? array.size(h)-1: na
+        [phigh, phighbar, plow, plowbar] = iPivots(h, l, i, length)
+        float pDir = 1
+        newPivot = phighbar == i or plowbar == i
+        doublePivot = phighbar == i and plowbar == i
+        updateLastPivot = false
+
+        if(matrix.rows(zigzagmatrix) > 0)
+            pDir := math.sign(matrix.get(zigzagmatrix, 0, 1))
+
+        if ((pDir == 1 and phighbar == i) or (pDir == -1 and plowbar == i)) and matrix.rows(zigzagmatrix)>=1
+            value = pDir == 1 ? phigh : plow
+            ipivot = pDir == 1? plow : phigh
+            pivot = matrix.get(zigzagmatrix, 0, 0)
+            pivotdir = matrix.get(zigzagmatrix, 0, 1)
+            removeOld = value * pivotdir > pivot * pivotdir
+            addInverse = false
+            if(removeOld)
+                updateLastPivot := true
+                ma.shift(zigzagmatrix)
+                addNewIPivot(zigzagmatrix, array.from(value, pDir, i), numberOfPivots)
+                if(matrix.rows(zigzagmatrix) > 1 and doublePivot)
+                    llastPivot = matrix.get(zigzagmatrix, 1, 0)
+                    if(-pDir*llastPivot >= -pDir*ipivot)
+                        addInverse := true
+                        
+            else if (not removeOld and not doublePivot) or addInverse
+                ipivotbar = pDir == 1? plowbar : phighbar
+                addNewIPivot(zigzagmatrix, array.from(ipivot, -pDir, ipivotbar), numberOfPivots)
+                doublePivot := true
+
+        if (pDir == 1 and plowbar == i) or (pDir == -1 and phighbar == i)
+            value = pDir == 1 ? plow : phigh
+            addNewIPivot(zigzagmatrix, array.from(value, -pDir, i), numberOfPivots)
+    zigzagmatrix
+
+// @function calculates next level zigzag based on present zigzag coordinates
+// @param zigzagmatrix Matrix containing zigzag pivots, bars, bar time, direction and level
+// @param numberOfPivots Number of max pivots to be returned
+// @returns matrix<float> zigzagmatrix
+export nextlevel(matrix<float> zigzagmatrix, simple int numberOfPivots = 20)=>
+    mlZigzagMatrix = matrix.new<float>()
+    if(matrix.rows(zigzagmatrix) > 0)
+        tempRowBullish = array.new<float>()
+        tempRowBearish = array.new<float>()
+        for i=(matrix.rows(zigzagmatrix)-1) to 0
+            row = array.copy(matrix.row(zigzagmatrix, i))
+            dir = array.get(row, 3)
+            newDir = math.sign(dir)
+            value = array.get(row, 0)
+            array.set(row, 4, array.get(row, 4)+1)
+
+            if(matrix.rows(mlZigzagMatrix) > 0)
+                lastDir = math.sign(matrix.get(mlZigzagMatrix, 0, 3))
+                lastPivot = matrix.get(mlZigzagMatrix, 0, 0)
+                if(math.abs(dir) == 2)
+                    if(lastDir == newDir)
+                        if(dir*lastPivot < dir*value)
+                            ma.shift(mlZigzagMatrix)
+                        else
+                            tempRow = newDir >0 ? tempRowBearish : tempRowBullish
+                            if(array.size(tempRow) > 0)
+                                addnewpivot(mlZigzagMatrix, array.copy(tempRow), numberOfPivots)
+                            else
+                                continue
+                    else
+                        tempRowFirst = newDir >0 ? tempRowBullish : tempRowBearish
+                        tempRowSecond = newDir >0 ? tempRowBearish : tempRowBullish
+                        if(array.size(tempRowFirst) > 0 and array.size(tempRowSecond) > 0)
+                            tempVal = array.get(tempRowFirst, 0)
+                            val =array.get(row, 0)
+                            if(newDir*tempVal > newDir*val)
+                                addnewpivot(mlZigzagMatrix, array.copy(tempRowFirst), numberOfPivots)
+                                addnewpivot(mlZigzagMatrix, array.copy(tempRowSecond), numberOfPivots)
+                    addnewpivot(mlZigzagMatrix, row, numberOfPivots)
+                    array.clear(tempRowBearish)
+                    array.clear(tempRowBullish)
+                else
+                    tempRow = newDir > 0 ? tempRowBullish : tempRowBearish
+
+                    if(array.size(tempRow) != 0)
+                        tempDir = array.get(tempRow, 3)
+                        tempVal = array.get(tempRow, 0)
+                        val =array.get(row, 0)
+                        if(val*dir > tempVal*dir)
+                            array.clear(tempRow)
+                            array.concat(tempRow, row)
+                    else
+                        array.concat(tempRow, row)
+            else if(math.abs(dir) == 2)
+                addnewpivot(mlZigzagMatrix, row, numberOfPivots)
+
+    if(matrix.rows(mlZigzagMatrix) >= matrix.rows(zigzagmatrix))
+        ma.clear(mlZigzagMatrix)
+    mlZigzagMatrix
+
+
+// @function draws zigzag based on the zigzagmatrix input
+// @param zigzagmatrix Matrix containing zigzag pivots, bars, bar time, direction and level
+// @param flags Zigzag pivot flags
+// @param lineColor Zigzag line color
+// @param lineWidth Zigzag line width
+// @param lineStyle Zigzag line style
+// @param showLabel Flag to indicate display pivot labels
+// @param xloc xloc preference for drawing lines/labels
+// @returns [array<line> zigzaglines, array<label> zigzaglabels]
+export draw(matrix<float> zigzagmatrix, bool[] flags,
+                 color lineColor = color.blue, int lineWidth = 1, string lineStyle = line.style_solid,
+                 bool showLabel=false, string xloc=xloc.bar_time)=>
+    var zigzaglines = array.new<line>()
+    var zigzaglabels = array.new<label>()
+    if array.size(zigzaglines) > 0 and array.get(flags, 0)
+        pa.pop(zigzaglines)
+        pa.pop(zigzaglabels)
+    
+    if(array.get(flags, 1))
+        if array.get(flags, 2) and matrix.rows(zigzagmatrix) >=3
+            draw_zg_line(1, zigzaglines, zigzaglabels, zigzagmatrix, lineColor, lineWidth, lineStyle, showLabel, xloc)
+
+        if matrix.rows(zigzagmatrix) >= 2
+            draw_zg_line(0, zigzaglines, zigzaglabels, zigzagmatrix, lineColor, lineWidth, lineStyle, showLabel, xloc)
+    [zigzaglines, zigzaglabels]
+
+// @function calculates and draws zigzag based on zigzag length and source input
+// @param length Zigzag Length
+// @param ohlc Array containing ohlc values. Can also contain custom series
+// @param numberOfPivots Number of max pivots to be returned
+// @param offset Offset from current bar. Can be used for calculations based on confirmed bars
+// @param lineColor Zigzag line color
+// @param lineWidth Zigzag line width
+// @param lineStyle Zigzag line style
+// @param showLabel Flag to indicate display pivot labels
+// @param xloc xloc preference for drawing lines/labels
+// @returns [matrix<float> zigzagmatrix, array<line> zigzaglines, array<label> zigzaglabels, bool[] flags]
+export draw(int length, float[] ohlc, simple int numberOfPivots=20, simple int offset=0,
+                 color lineColor = color.blue, int lineWidth = 1, string lineStyle = line.style_solid, bool showLabel=false, string xloc=xloc.bar_time)=>
+    [zigzagmatrix, flags] = zigzag(length, ohlc, numberOfPivots, offset)
+    [zigzaglines, zigzaglabels] = draw(zigzagmatrix, flags, lineColor, lineWidth, lineStyle, showLabel, xloc)
+    [zigzagmatrix, zigzaglines, zigzaglabels, flags]
+
+
+// @function draws fresh zigzag for all pivots in the input matrix.
+// @param zigzagmatrix Matrix containing zigzag pivots, bars, bar time, direction and level
+// @param zigzaglines array to which all newly created lines will be added
+// @param zigzaglabels array to which all newly created lables will be added
+// @param lineColor Zigzag line color
+// @param lineWidth Zigzag line width
+// @param lineStyle Zigzag line style
+// @param showLabel Flag to indicate display pivot labels
+// @param xloc xloc preference for drawing lines/labels
+// @returns [array<line> zigzaglines, array<label> zigzaglabels]
+export drawfresh(matrix<float> zigzagmatrix, array<line> zigzaglines, array<label> zigzaglabels,
+                     color lineColor = color.blue, int lineWidth = 1, string lineStyle = line.style_solid, bool showLabel = false, string xloc = xloc.bar_time)=>
+    rows = matrix.rows(zigzagmatrix)
+    for i=1 to rows>1? rows-1 :na
+        lastValues = matrix.row(zigzagmatrix, i)
+        llastValues = matrix.row(zigzagmatrix, i-1)
+        
+        y1 = array.get(lastValues, 0)
+        y2 = array.get(llastValues, 0)
+        x1 = array.get(lastValues, xloc== xloc.bar_time?2:1)
+        x2 = array.get(llastValues, xloc == xloc.bar_time?2:1)
+        level = array.get(lastValues, 4)
+        zline = line.new(x1=int(x1), y1=y1, x2=int(x2), y2=y2, xloc=xloc, color=lineColor, width=lineWidth, style=lineStyle)
+        dir = array.get(lastValues, 2)
+        label zlabel = na
+        if(showLabel)
+            labelStyle = dir > 0? label.style_label_down : label.style_label_up
+            zlabel := label.new(x=int(x1), y=y1, yloc=yloc.price, color=lineColor, style=labelStyle, text=str.tostring(level), 
+                                     textcolor=color.black, size = size.small, xloc=xloc)
+        
+        pa.push(zigzaglines, zline, 500)
+        pa.push(zigzaglabels, zlabel, 500)
+    [zigzaglines, zigzaglabels]
