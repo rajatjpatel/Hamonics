@@ -1,0 +1,65 @@
+//@version=5
+
+// @description User Defined Types to be used for Pitchfork and Drawing elements of Pitchfork. Depends on DrawingTypes for Point, Line, and LineProperties objects
+library("PitchforkTypes", overlay = true)
+import HeWhoMustNotBeNamed/DrawingTypes/2 as dr
+
+// @type Pitchfork Drawing Properties object
+// @field extend If set to true, forks are extended towards right. Default is true
+// @field fill Fill forklines with transparent color. Default is true
+// @field fillTransparency Transparency at which fills are made. Only considered when fill is set. Default is 80
+// @field forceCommonColor Force use of common color for forks and fills. Default is false
+// @field commonColor common fill color. Used only if ratio specific fill colors are not available or if forceCommonColor is set to true.
+export type PitchforkDrawingProperties
+    bool extend = true
+    bool fill = true
+    int fillTransparency = 95
+    bool forceCommonColor = false
+    color commonColor = color.blue
+
+// @type Pitchfork drawing components
+// @field medianLine Median line of the pitchfork
+// @field baseLine Base line of the pitchfork
+// @field forkLines fork lines of the pitchfork
+// @field linefills Linefills between forks
+export type PitchforkDrawing
+    dr.Line medianLine
+    dr.Line baseLine
+	array<dr.Line> forkLines
+    array<dr.Linefill> linefills
+
+// @type Fork object property
+// @field ratio Fork ratio
+// @field forkColor color of fork. Default is blue
+// @field include flag to include the fork in drawing. Default is true
+export type Fork
+    float ratio
+    color forkColor
+    bool include = true
+
+// @type Pitchfork Properties
+// @field forks Array of Fork objects
+// @field type Pitchfork type. Supported values are "regular", "schiff", "mschiff", Default is regular
+// @field inside Flag to identify if to draw inside fork. If set to true, inside fork will be drawn
+export type PitchforkProperties
+    array<Fork> forks
+    string type = "regular"
+    bool inside = false
+
+// @type Pitchfork object
+// @field a Pivot Point A of pitchfork
+// @field b Pivot Point B of pitchfork
+// @field c Pivot Point C of pitchfork
+// @field properties PitchforkProperties object which determines type and composition of pitchfork
+// @field dProperties Drawing properties for pitchfork
+// @field lProperties Common line properties for Pitchfork lines
+// @field drawing PitchforkDrawing object
+export type Pitchfork
+    dr.Point a
+    dr.Point b
+    dr.Point c
+    PitchforkProperties properties
+    PitchforkDrawingProperties dProperties
+    dr.LineProperties lProperties
+    PitchforkDrawing drawing
+    
