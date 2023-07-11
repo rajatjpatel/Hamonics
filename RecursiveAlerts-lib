@@ -1,0 +1,34 @@
+
+//@version=5
+
+// @description The library provides options to run alert() calls in loop without worrying about limitations of frequency options.
+//      When an alert statement is called within a loop,
+//          it will fire just once per bar irrespective of how many iterations allowed when fequency is set to alert.freq_once_per_bar or alert.freq_once_per_bar_close
+//          it will fire continuously till it breaks when frequency is set to alert.freq_all
+//      The function helps overcome this issue by using varip key array which resets on every bar
+library("RecursiveAlerts", overlay=true)
+
+// @function Enhanced alert which can be used in loops
+// @param message Alert message to be fired
+// @param key Key to be checked to avoid repetitive alerts
+// @returns array containing id of already fired alerts
+export rAlert(string message, string key) =>
+    varip fired = array.new<string>()
+    if(barstate.isrealtime)
+	    if(barstate.isnew)
+	        array.clear(fired)
+	    if not array.includes(fired, key)
+	        alert(message, alert.freq_all)
+	        array.push(fired, key)
+	fired
+
+// @function Updates alert template with given keys and values
+// @param template Alert message template
+// @param keys array containing placeholders to be replaced
+// @param values array containing values which will replace placeholder keys
+// @returns updated alert message
+export updateAlertTemplate(string template, string[] keys, string[] values)=>
+    updatedAlert = template
+    for [i, key] in keys
+        updatedAlert := str.replace_all(updatedAlert, key, array.get(values, i))
+    updatedAlert
