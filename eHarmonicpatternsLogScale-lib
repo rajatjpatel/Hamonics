@@ -1,0 +1,599 @@
+//@version=5
+// @description Library provides functions to scan harmonic patterns both or normal and log scale
+library("eHarmonicpatternsLogScale", overlay=true)
+import HeWhoMustNotBeNamed/FibRatios/1 as fibs
+
+isInRange(ratio, min, max)=> ratio >= min and ratio <= max
+
+getadj(p1, p2, adj, logScale)=>math.max(0, fibs.retracement(p1, p2, adj, logScale))
+
+getrange(float p1, float p2, simple float min, simple float max, 
+             simple float ep, simple float adjs, simple float adje,
+             bool[] pArray, float[] startRange, float[] endRange, simple int index, bool logScale)=>
+    returnval = false
+    if(array.get(pArray, index))
+        eamin = (100 - (ep+adjs)) / 100
+        eamax = (100 + ep+adje) / 100
+        start = getadj(p1, p2, min*eamin, logScale)
+        end = getadj(p1, p2, max*eamax, logScale)
+        array.set(startRange, index, start)
+        array.set(endRange, index, end)
+        returnval := true
+    returnval
+        
+getrange(float p1, float p2, simple float min1, simple float max1,
+             float p3, float p4, simple float min2, simple float max2,
+             bool[] pArray, float[] startRange, float[] endRange, simple int index, simple bool logScale)=>
+    returnval = false
+    if(array.get(pArray, index))
+        start1 = getadj(p1, p2, min1, logScale)
+        end1 = getadj(p1, p2, max1, logScale)
+        start2 = getadj(p3, p4, min2, logScale)
+        end2 = getadj(p3, p4, max2, logScale)
+        
+        start = start1 > end1? math.min(start1, start2) : math.max(start1, start2)
+        end = start1 > end1? math.max(end1, end2) : math.min(end1, end2)
+        d1 = start1>end1? 1 : -1
+        d2 = start2>end2? 1 : -1
+        d = start>end? 1 : -1
+        if(d1 == d2 and d == d1 and (start > 0 or end > 0))
+            returnval := true
+            array.set(startRange, index, start)
+            array.set(endRange, index, end)
+        else
+            array.set(pArray, index, false)
+    returnval
+    
+getrange(float p1, float p2, simple float min1, simple float max1, 
+             float p3, float p4, simple float min2, simple float max2, 
+             simple float ep1, simple float ep2,
+             simple float adjs, simple float adje,
+             bool[] pArray, float[] startRange, float[] endRange, simple int index, bool logScale)=>
+    returnval = false
+    if(array.get(pArray, index))
+        eamin1 = (100 - (ep1+adjs)) / 100
+        eamax1 = (100 + ep1+adje) / 100
+        eamin2 = (100 - (ep2+adjs)) / 100
+        eamax2 = (100 + ep2+adje) / 100
+        start1 = getadj(p1, p2, min1*eamin1, logScale)
+        end1 = getadj(p1, p2, max1*eamax1, logScale)
+        start2 = getadj(p3, p4, min2*eamin2, logScale)
+        end2 = getadj(p3, p4, max2*eamax2, logScale)
+        
+        start = start1 > end1? math.min(start1, start2) : math.max(start1, start2)
+        end = start1 > end1? math.max(end1, end2) : math.min(end1, end2)
+        d1 = start1>end1? 1 : -1
+        d2 = start2>end2? 1 : -1
+        d = start>end? 1 : -1
+        if(d1 == d2 and d == d1 and (start > 0 or end > 0))
+            returnval := true
+            array.set(startRange, index, start)
+            array.set(endRange, index, end)
+        else
+            array.set(pArray, index, false)
+    returnval
+
+getNumberOfSupportedPatterns()=>25
+
+evaluate(patternArray, index, ratio, min, max, err_min, err_max)=>
+    if array.get(patternArray, index)
+        array.set(patternArray, index, isInRange(ratio, min*err_min, max*err_max))
+
+export getSupportedPatterns()=>
+    patternLabelArray = array.new_string()
+    array.push(patternLabelArray, "Gartley")
+    array.push(patternLabelArray, "Crab")
+    array.push(patternLabelArray, "DeepCrab")
+    array.push(patternLabelArray, "Bat")
+    array.push(patternLabelArray, "Butterfly")
+    array.push(patternLabelArray, "Shark")
+    array.push(patternLabelArray, "Cypher")
+    array.push(patternLabelArray, "NenStar")
+    
+    array.push(patternLabelArray, "Anti NenStar")
+    array.push(patternLabelArray, "Anti Shark")
+    array.push(patternLabelArray, "Anti Cypher")
+    array.push(patternLabelArray, "Anti Crab")
+    array.push(patternLabelArray, "Anti Butterfly")
+    array.push(patternLabelArray, "Anti Bat")
+    array.push(patternLabelArray, "Anti Gartley")
+    array.push(patternLabelArray, "Navarro200")
+
+    array.push(patternLabelArray, "Five Zero")
+    array.push(patternLabelArray, "Three Drives")
+    array.push(patternLabelArray, "White Swan")
+    array.push(patternLabelArray, "Black Swan")
+    array.push(patternLabelArray, "Sea Pony")
+    array.push(patternLabelArray, "Leonardo")
+    array.push(patternLabelArray, "121")
+    array.push(patternLabelArray, "Snorm")
+    array.push(patternLabelArray, "Total")
+    patternLabelArray
+    
+
+scan_xab(float xabRatio, simple float err_min, simple float err_max, bool[] patternArray)=>
+    if(array.includes(patternArray, true))
+        //Gartley
+        evaluate(patternArray, 0, xabRatio, 0.618, 0.618, err_min, err_max)
+        //Crab
+        evaluate(patternArray, 1, xabRatio, 0.382, 0.618, err_min, err_max)
+        //DeepCrab
+        evaluate(patternArray, 2, xabRatio, 0.886, 0.886, err_min, err_max)
+        //Bat
+        evaluate(patternArray, 3, xabRatio, 0.382, 0.500, err_min, err_max)
+        //Butterfly
+        evaluate(patternArray, 4, xabRatio, 0.786, 0.786, err_min, err_max)
+        //Shark
+        evaluate(patternArray, 5, xabRatio, 0.446, 0.618, err_min, err_max)
+        //Cypher
+        evaluate(patternArray, 6, xabRatio, 0.382, 0.618, err_min, err_max)
+        //NenStar
+        evaluate(patternArray, 7, xabRatio, 0.382, 0.618, err_min, err_max)
+        //Anti NenStar
+        evaluate(patternArray, 8, xabRatio, 0.500, 0.786, err_min, err_max)
+        //Anti Shark
+        evaluate(patternArray, 9, xabRatio, 0.446, 0.618, err_min, err_max)
+        //Anti Cypher
+        evaluate(patternArray, 10, xabRatio, 0.500, 0.786, err_min, err_max)
+        //Anti Crab
+        evaluate(patternArray, 11, xabRatio, 0.276, 0.446, err_min, err_max)
+        //Anti Butterfly
+        evaluate(patternArray, 12, xabRatio, 0.382, 0.618, err_min, err_max)
+        //Anti Bat
+        evaluate(patternArray, 13, xabRatio, 0.382, 0.618, err_min, err_max)
+        //Anti Gartley
+        evaluate(patternArray, 14, xabRatio, 0.618, 0.786, err_min, err_max)
+        //Navarro200
+        evaluate(patternArray, 15, xabRatio, 0.382, 0.786, err_min, err_max)
+        //5-0
+        evaluate(patternArray, 16, xabRatio, 1.270, 1.618, err_min, err_max)
+        //Three Drives
+        evaluate(patternArray, 17, xabRatio, 0.618, 0.786, err_min, err_max)
+        //White Swan
+        evaluate(patternArray, 18, xabRatio, 0.382, 0.786, err_min, err_max)
+        //Black Swan
+        evaluate(patternArray, 19, xabRatio, 1.382, 2.618, err_min, err_max)
+        //Sea Pony
+        evaluate(patternArray, 20, xabRatio, 0.128, 3.618, err_min, err_max)
+        //Leonardo
+        evaluate(patternArray, 21, xabRatio, 0.500, 0.500, err_min, err_max)
+        //121
+        evaluate(patternArray, 22, xabRatio, 0.500, 0.786, err_min, err_max)
+        //Snorm
+        evaluate(patternArray, 23, xabRatio, 0.900, 1.100, err_min, err_max)
+        //Total
+        evaluate(patternArray, 24, xabRatio, 0.236, 0.786, err_min, err_max)
+        
+scan_abc_axc(float abcRatio, float axcRatio, simple float err_min, simple float err_max, bool[] patternArray)=>
+    if(array.includes(patternArray, true))
+        //Gartley
+        evaluate(patternArray, 0, abcRatio, 0.382, 0.886, err_min, err_max)
+        //Crab
+        evaluate(patternArray, 1, abcRatio, 0.382, 0.886, err_min, err_max)
+        //DeepCrab
+        evaluate(patternArray, 2, abcRatio, 0.382, 0.886, err_min, err_max)
+        //Bat
+        evaluate(patternArray, 3, abcRatio, 0.382, 0.886, err_min, err_max)
+        //Butterfly
+        evaluate(patternArray, 4, abcRatio, 0.382, 0.886, err_min, err_max)
+        //Shark
+        evaluate(patternArray, 5, abcRatio, 1.130, 1.618, err_min, err_max)
+        //Cypher
+        evaluate(patternArray, 6, axcRatio, 1.130, 1.414, err_min, err_max)
+        //NenStar
+        evaluate(patternArray, 7, abcRatio, 1.414, 2.140, err_min, err_max)
+        //Anti NenStar
+        evaluate(patternArray, 8, abcRatio, 0.467, 0.707, err_min, err_max)
+        //Anti Shark
+        evaluate(patternArray, 9, abcRatio, 0.618, 0.886, err_min, err_max)
+        //Anti Cypher
+        evaluate(patternArray, 10, abcRatio, 0.467, 0.707, err_min, err_max)
+        //Anti Crab
+        evaluate(patternArray, 11, abcRatio, 1.128, 2.618, err_min, err_max)
+        //Anti Butterfly
+        evaluate(patternArray, 12, abcRatio, 1.128, 2.618, err_min, err_max)
+        //Anti Bat
+        evaluate(patternArray, 13, abcRatio, 1.128, 2.618, err_min, err_max)
+        //Anti Gartley
+        evaluate(patternArray, 14, abcRatio, 1.128, 2.618, err_min, err_max)
+        //Navarro200
+        evaluate(patternArray, 15, abcRatio, 0.886, 1.127, err_min, err_max)
+        //5-0
+        evaluate(patternArray, 16, abcRatio, 1.168, 2.240, err_min, err_max)
+        //Three Drives
+        evaluate(patternArray, 17, abcRatio, 1.272, 1.618, err_min, err_max)
+        //White Swan
+        evaluate(patternArray, 18, abcRatio, 2.000, 4.237, err_min, err_max)
+        //Black Swan
+        evaluate(patternArray, 19, abcRatio, 0.236, 0.500, err_min, err_max)
+        //Sea Pony
+        evaluate(patternArray, 20, abcRatio, 0.382, 0.500, err_min, err_max)
+        //Leonardo
+        evaluate(patternArray, 21, abcRatio, 0.382, 0.886, err_min, err_max)
+        //121
+        evaluate(patternArray, 22, abcRatio, 1.128, 3.618, err_min, err_max)
+        //Snorm
+        evaluate(patternArray, 23, abcRatio, 0.900, 1.100, err_min, err_max)
+        //Total
+        evaluate(patternArray, 24, abcRatio, 0.382, 2.618, err_min, err_max)
+
+scan_bcd(float bcdRatio, simple float err_min, simple float err_max, bool[] patternArray)=>
+    if(array.includes(patternArray, true))
+        //Gartley
+        evaluate(patternArray, 0, bcdRatio, 1.272, 1.618, err_min, err_max)
+        //Crab
+        evaluate(patternArray, 1, bcdRatio, 2.240, 3.618, err_min, err_max)
+        //DeepCrab
+        evaluate(patternArray, 2, bcdRatio, 2.000, 3.618, err_min, err_max)
+        //Bat
+        evaluate(patternArray, 3, bcdRatio, 1.618, 2.618, err_min, err_max)
+        //Butterfly
+        evaluate(patternArray, 4, bcdRatio, 1.618, 2.618, err_min, err_max)
+        //Shark
+        evaluate(patternArray, 5, bcdRatio, 1.618, 2.236, err_min, err_max)
+        //Cypher
+        // Not required
+        //NenStar
+        evaluate(patternArray, 7, bcdRatio, 1.272, 2.000, err_min, err_max)
+        //Anti NenStar
+        evaluate(patternArray, 8, bcdRatio, 1.618, 2.618, err_min, err_max)
+        //Anti Shark
+        evaluate(patternArray, 9, bcdRatio, 1.618, 2.618, err_min, err_max)
+        //Anti Cypher
+        evaluate(patternArray, 10, bcdRatio, 1.618, 2.618, err_min, err_max)
+        //Anti Crab
+        evaluate(patternArray, 11, bcdRatio, 1.618, 2.618, err_min, err_max)
+        //Anti Butterfly
+        evaluate(patternArray, 12, bcdRatio, 1.272, 1.272, err_min, err_max)
+        //Anti Bat
+        evaluate(patternArray, 13, bcdRatio, 2.000, 2.618, err_min, err_max)
+        //Anti Gartley
+        evaluate(patternArray, 14, bcdRatio, 1.618, 1.618, err_min, err_max)
+        //Navarro200
+        evaluate(patternArray, 15, bcdRatio, 0.886, 3.618, err_min, err_max)
+        //5-0
+        evaluate(patternArray, 16, bcdRatio, 0.500, 0.500, err_min, err_max)
+        //Three Drives
+        evaluate(patternArray, 17, bcdRatio, 0.618, 0.786, err_min, err_max)
+        //White Swan
+        evaluate(patternArray, 18, bcdRatio, 0.500, 0.886, err_min, err_max)
+        //Black Swan
+        evaluate(patternArray, 19, bcdRatio, 1.128, 2.000, err_min, err_max)
+        //Sea Pony
+        evaluate(patternArray, 20, bcdRatio, 1.618, 2.618, err_min, err_max)
+        //Leonardo
+        evaluate(patternArray, 21, bcdRatio, 1.128, 2.618, err_min, err_max)
+        //121
+        evaluate(patternArray, 22, bcdRatio, 0.388, 0.786, err_min, err_max)
+        //Snorm
+        evaluate(patternArray, 23, bcdRatio, 0.900, 1.100, err_min, err_max)
+        //Total
+        evaluate(patternArray, 24, bcdRatio, 1.272, 4.236, err_min, err_max)
+       
+scan_xad_xcd(float xadRatio, float xcdRatio, simple float err_min, simple float err_max, bool[] patternArray)=>
+    if(array.includes(patternArray, true))
+        //Gartley
+        evaluate(patternArray, 0, xadRatio, 0.786, 0.786, err_min, err_max)
+        //Crab
+        evaluate(patternArray, 1, xadRatio, 1.618, 1.618, err_min, err_max)
+        //DeepCrab
+        evaluate(patternArray, 2, xadRatio, 1.618, 1.618, err_min, err_max)
+        //Bat
+        evaluate(patternArray, 3, xadRatio, 0.886, 0.886, err_min, err_max)
+        //Butterfly
+        evaluate(patternArray, 4, xadRatio, 1.272, 1.618, 1, 1)
+        //Shark
+        evaluate(patternArray, 5, xadRatio, 0.886, 0.886, err_min, err_max)
+        //Cypher
+        evaluate(patternArray, 6, xcdRatio, 0.786, 0.786, err_min, err_max)
+        //NenStar
+        evaluate(patternArray, 7, xadRatio, 1.272, 1.272, err_min, err_max)
+        //Anti NenStar
+        evaluate(patternArray, 8, xadRatio, 0.786, 0.786, err_min, err_max)
+        //Anti Shark
+        evaluate(patternArray, 9, xadRatio, 1.130, 1.130, err_min, err_max)
+        //Anti Cypher
+        evaluate(patternArray, 10, xadRatio, 1.272, 1.272, err_min, err_max)
+        //Anti Crab
+        evaluate(patternArray, 11, xadRatio, 0.618, 0.618, err_min, err_max)
+        //Anti Butterfly
+        evaluate(patternArray, 12, xadRatio, 0.618, 0.786, err_min, err_max)
+        //Anti Bat
+        evaluate(patternArray, 13, xadRatio, 1.128, 1.128, err_min, err_max)
+        //Anti Gartley
+        evaluate(patternArray, 14, xadRatio, 1.272, 1.272, err_min, err_max)
+        //Navarro200
+        evaluate(patternArray, 15, xadRatio, 0.886, 1.127, 1, 1)
+        //5-0
+        evaluate(patternArray, 16, xadRatio, 0.886, 1.130, 1, 1)
+        //Three Drives
+        evaluate(patternArray, 17, xadRatio, 0.130, 0.886, 1, 1)
+        //White Swan
+        evaluate(patternArray, 18, xadRatio, 0.230, 0.886, 1, 1)
+        //Black Swan
+        evaluate(patternArray, 19, xadRatio, 1.128, 2.618, 1, 1)
+        //Sea Pony
+        evaluate(patternArray, 20, xadRatio, 0.618, 3.618, 1, 1)
+        //Leonardo
+        evaluate(patternArray, 21, xadRatio, 0.786, 0.786, err_min, err_max)
+        //121
+        evaluate(patternArray, 22, xadRatio, 0.382, 0.786, 1, 1)
+        //Snorm
+        evaluate(patternArray, 23, xadRatio, 0.618, 1.618, 1, 1)
+        //Total
+        evaluate(patternArray, 24, xadRatio, 0.618, 1.618, 1, 1)
+        
+// @function Provides PRZ range based on BCD and XAD ranges
+// @param x X coordinate value
+// @param a A coordinate value
+// @param b B coordinate value
+// @param c C coordinate value
+// @param patternArray Pattern flags for which PRZ range needs to be calculated
+// @param errorPercent Error threshold
+// @param start_adj - Adjustments for entry levels
+// @param end_adj - Adjustments for stop levels
+// @param logScale - calculate on log scale. Default is false
+// @returns [dStart, dEnd] Start and end of consolidated PRZ range
+export get_prz_range(float x, float a, float b, float c, bool[] patternArray, simple float errorPercent = 8, simple float start_adj=0, simple float end_adj=0, bool logScale=false)=>
+    startRange = array.new_float(array.size(patternArray), na)
+    endRange = array.new_float(array.size(patternArray), na)
+    if(array.includes(patternArray, true))
+        //Gartley
+        getrange(x, a, 0.786, 0.786, b, c, 1.272, 1.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 0, logScale)
+        //Crab
+        getrange(x, a, 1.618, 1.618, b, c, 2.240, 3.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 1, logScale)
+        //DeepCrab
+        getrange(x, a, 1.618, 1.618, b, c, 2.000, 3.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 2, logScale)
+        //Bat
+        getrange(x, a, 0.886, 0.886, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 3, logScale)
+        //Butterfly
+        getrange(x, a, 1.272, 1.618, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 4, logScale)
+        //Shark
+        getrange(x, a, 0.886, 0.886, b, c, 1.618, 2.236, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 5, logScale)
+        //Cypher
+        getrange(x, c, 0.786, 0.786, x, c, 0.786, 0.786, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 6, logScale)
+        //NenStar
+        getrange(x, a, 1.272, 1.272, b, c, 1.272, 2.000, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 7, logScale)
+        //Anti NenStar
+        getrange(x, a, 0.786, 0.786, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 8, logScale)
+        //Anti Shark
+        getrange(x, a, 1.130, 1.130, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 9, logScale)
+        //Anti Cypher
+        getrange(x, a, 1.272, 1.272, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 10, logScale)
+        //Anti Crab
+        getrange(x, a, 0.618, 0.618, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 11, logScale)
+        //Anti Butterfly
+        getrange(x, a, 0.618, 0.786, b, c, 1.272, 1.272, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 12, logScale)
+        //Anti Bat
+        getrange(x, a, 1.128, 1.128, b, c, 2.000, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 13, logScale)
+        //Anti Gartley
+        getrange(x, a, 1.272, 1.272, b, c, 1.618, 1.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 14, logScale)
+        //Navarro200
+        getrange(x, a, 0.886, 1.127, b, c, 0.886, 3.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 15, logScale)
+        //5-0
+        getrange(x, a, 0.886, 1.13, b, c, 0.5, 0.5, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 16, logScale)
+        //Three Drives
+        getrange(x, a, 0.13, 1.886, b, c, 0.618, 1.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 17, logScale)
+        //White Swan
+        getrange(x, a, 0.236, 0.886, b, c, 0.5, 0.886, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 18, logScale)
+        //Black Swan
+        getrange(x, a, 1.128, 2.618, b, c, 1.128, 2.0, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 19, logScale)
+        //Sea Pony
+        getrange(x, a, 0.618, 3.618, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 20, logScale)
+        //Leonardo
+        getrange(x, a, 0.786, 0.786, b, c, 1.128, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 21, logScale)
+        //121
+        getrange(x, a, 0.382, 0.786, b, c, 0.382, 0.786, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 22, logScale)
+        //Snorm
+        getrange(x, a, 0.618, 1.618, b, c, 0.9, 1.1, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 23, logScale)
+        //Total
+        getrange(x, a, 0.618, 1.618, b, c, 1.272, 4.236, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 24, logScale)
+        
+    dStart = b > c? array.min(startRange) : array.max(startRange)
+    dEnd = b > c? array.max(endRange) : array.min(endRange)
+    [dStart, dEnd]
+
+// @function Provides PRZ range based on XAD range only
+// @param x X coordinate value
+// @param a A coordinate value
+// @param b B coordinate value
+// @param c C coordinate value
+// @param patternArray Pattern flags for which PRZ range needs to be calculated
+// @param errorPercent Error threshold
+// @param start_adj - Adjustments for entry levels
+// @param end_adj - Adjustments for stop levels
+// @param logScale - calculate on log scale. Default is false
+// @returns [dStart, dEnd] Start and end of consolidated PRZ range
+export get_prz_range_xad(float x, float a, float b, float c, bool[] patternArray, simple float errorPercent = 8, simple float start_adj=0, simple float end_adj=0, bool logScale=false)=>
+    startRange = array.new_float(array.size(patternArray), na)
+    endRange = array.new_float(array.size(patternArray), na)
+    if(array.includes(patternArray, true))
+        //Gartley
+        getrange(x, a, 0.786, 0.786, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 0, logScale)
+        //Crab
+        getrange(x, a, 1.618, 1.618, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 1, logScale)
+        //DeepCrab
+        getrange(x, a, 1.618, 1.618, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 2, logScale)
+        //Bat
+        getrange(x, a, 0.886, 0.886, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 3, logScale)
+        //Butterfly
+        getrange(x, a, 1.272, 1.618, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 4, logScale)
+        //Shark
+        getrange(x, a, 0.886, 0.886, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 5, logScale)
+        //Cypher
+        getrange(x, c, 0.786, 0.786, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 6, logScale)
+        //NenStar
+        getrange(x, a, 1.272, 1.272, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 7, logScale)
+        //Anti NenStar
+        getrange(x, a, 0.786, 0.786, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 8, logScale)
+        //Anti Shark
+        getrange(x, a, 1.130, 1.130, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 9, logScale)
+        //Anti Cypher
+        getrange(x, a, 1.272, 1.272, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 10, logScale)
+        //Anti Crab
+        getrange(x, a, 0.618, 0.618, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 11, logScale)
+        //Anti Butterfly
+        getrange(x, a, 0.618, 0.786, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 12, logScale)
+        //Anti Bat
+        getrange(x, a, 1.128, 1.128, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 13, logScale)
+        //Anti Gartley
+        getrange(x, a, 1.272, 1.272, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 14, logScale)
+        //Navarro200
+        getrange(x, a, 0.886, 1.127, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 15, logScale)
+        //5-0
+        getrange(x, a, 0.886, 1.130, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 16, logScale)
+        //Three Drives
+        getrange(x, a, 0.130, 1.886, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 17, logScale)
+        //White Swan
+        getrange(x, a, 0.236, 0.886, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 18, logScale)
+        //Black Swan
+        getrange(x, a, 1.128, 2.618, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 19, logScale)
+        //Sea Pony
+        getrange(x, a, 0.618, 3.618, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 20, logScale)
+        //Leonardo
+        getrange(x, a, 0.786, 0.786, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 21, logScale)
+        //121
+        getrange(x, a, 0.382, 0.786, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 22, logScale)
+        //Snorm
+        getrange(x, a, 0.618, 1.618, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 23, logScale)
+        //Total
+        getrange(x, a, 0.618, 1.618, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 24, logScale)
+    dStart = b > c? array.min(startRange) : array.max(startRange)
+    dEnd = b > c? array.max(endRange) : array.min(endRange)
+    [dStart, dEnd]
+    
+// @function Provides Projection range based on BCD and XAD ranges
+// @param x X coordinate value
+// @param a A coordinate value
+// @param b B coordinate value
+// @param c C coordinate value
+// @param patternArray Pattern flags for which PRZ range needs to be calculated
+// @param errorPercent Error threshold
+// @param start_adj - Adjustments for entry levels
+// @param end_adj - Adjustments for stop levels
+// @param logScale - calculate on log scale. Default is false
+// @returns [startRange, endRange] Array containing start and end ranges
+export get_projection_range(float x, float a, float b, float c, bool[] patternArray, simple float errorPercent = 8, simple float start_adj=0, simple float end_adj=0, bool logScale=false)=>
+    startRange = array.new_float(array.size(patternArray), na)
+    endRange = array.new_float(array.size(patternArray), na)
+    if(array.includes(patternArray, true))
+        //Gartley
+        getrange(x, a, 0.786, 0.786, b, c, 1.272, 1.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 0, logScale)
+        //Crab
+        getrange(x, a, 1.618, 1.618, b, c, 2.240, 3.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 1, logScale)
+        //DeepCrab
+        getrange(x, a, 1.618, 1.618, b, c, 2.000, 3.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 2, logScale)
+        //Bat
+        getrange(x, a, 0.886, 0.886, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 3, logScale)
+        //Butterfly
+        getrange(x, a, 1.272, 1.618, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 4, logScale)
+        //Shark
+        getrange(x, a, 0.886, 0.886, b, c, 1.618, 2.236, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 5, logScale)
+        //Cypher
+        getrange(x, c, 0.786, 0.786, x, c, 0.786, 0.786, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 6, logScale)
+        //NenStar
+        getrange(x, a, 1.272, 1.272, b, c, 1.272, 2.000, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 7, logScale)
+        //Anti NenStar
+        getrange(x, a, 0.786, 0.786, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 8, logScale)
+        //Anti Shark
+        getrange(x, a, 1.130, 1.130, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 9, logScale)
+        //Anti Cypher
+        getrange(x, a, 1.272, 1.272, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 10, logScale)
+        //Anti Crab
+        getrange(x, a, 0.618, 0.618, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 11, logScale)
+        //Anti Butterfly
+        getrange(x, a, 0.618, 0.786, b, c, 1.272, 1.272, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 12, logScale)
+        //Anti Bat
+        getrange(x, a, 1.128, 1.128, b, c, 2.000, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 13, logScale)
+        //Anti Gartley
+        getrange(x, a, 1.272, 1.272, b, c, 1.618, 1.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 14, logScale)
+        //Navarro200
+        getrange(x, a, 0.886, 1.127, b, c, 0.886, 3.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 15, logScale)
+        //5-0
+        getrange(x, a, 0.886, 1.13, b, c, 0.5, 0.5, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 16, logScale)
+        //Three Drives
+        getrange(x, a, 0.13, 1.886, b, c, 0.618, 1.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 17, logScale)
+        //White Swan
+        getrange(x, a, 0.236, 0.886, b, c, 0.5, 0.886, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 18, logScale)
+        //Black Swan
+        getrange(x, a, 1.128, 2.618, b, c, 1.128, 2.0, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 19, logScale)
+        //Sea Pony
+        getrange(x, a, 0.618, 3.618, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 20, logScale)
+        //Leonardo
+        getrange(x, a, 0.786, 0.786, b, c, 1.128, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 21, logScale)
+        //121
+        getrange(x, a, 0.382, 0.786, b, c, 0.382, 0.786, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 22, logScale)
+        //Snorm
+        getrange(x, a, 0.618, 1.618, b, c, 0.9, 1.1, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 23, logScale)
+        //Total
+        getrange(x, a, 0.618, 1.618, b, c, 1.272, 4.236, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 24, logScale)
+        
+    [startRange, endRange]
+    
+
+// @function Checks for harmonic patterns
+// @param x X coordinate value
+// @param a A coordinate value
+// @param b B coordinate value
+// @param c C coordinate value
+// @param d D coordinate value
+// @param flags flags to check patterns. Send empty array to enable all 
+// @param errorPercent Error threshold
+// @param logScale - calculate on log scale. Default is false
+// @returns [patternArray, patternLabelArray] Array of boolean values which says whether valid pattern exist and array of corresponding pattern names
+export isHarmonicPattern(float x, float a, float b, float c, float d,
+                         simple bool[] flags, simple bool defaultEnabled = true, simple int errorPercent = 8, bool logScale=false)=>
+
+    numberOfPatterns = getNumberOfSupportedPatterns()
+    
+    err_min = (100 - errorPercent) / 100
+    err_max = (100 + errorPercent) / 100
+
+    xabRatio = fibs.retracementRatio(x,a,b,logScale)
+    abcRatio = fibs.retracementRatio(a,b,c,logScale)
+    axcRatio = fibs.retracementRatio(a,x,c,logScale)
+    bcdRatio = fibs.retracementRatio(b,c,d,logScale)
+    xadRatio = fibs.retracementRatio(x,a,d,logScale)
+    xcdRatio = fibs.retracementRatio(x,c,d,logScale)
+
+    patternArray = array.new_bool()
+    
+    for i=0 to numberOfPatterns-1
+        array.push(patternArray, array.size(flags)>i ? array.get(flags, i) : defaultEnabled)
+            
+    scan_xab(xabRatio, err_min, err_max, patternArray)
+    scan_abc_axc(abcRatio, axcRatio, err_min, err_max, patternArray)
+    scan_bcd(bcdRatio, err_min, err_max, patternArray)
+    scan_xad_xcd(xadRatio, xcdRatio, err_min, err_max, patternArray)
+    patternArray
+ 
+
+// @function Checks for harmonic pattern projection
+// @param x X coordinate value
+// @param a A coordinate value
+// @param b B coordinate value
+// @param c C coordinate value
+// @param flags flags to check patterns. Send empty array to enable all 
+// @param errorPercent Error threshold
+// @param logScale - calculate on log scale. Default is false
+// @returns [patternArray, patternLabelArray] Array of boolean values which says whether valid pattern exist and array of corresponding pattern names.
+export isHarmonicProjection(float x, float a, float b, float c,
+                         simple bool[] flags, simple bool defaultEnabled = true, simple int errorPercent = 8, bool logScale=false)=>
+
+    numberOfPatterns = getNumberOfSupportedPatterns()
+    
+    err_min = (100 - errorPercent) / 100
+    err_max = (100 + errorPercent) / 100
+
+    xabRatio = fibs.retracementRatio(x,a,b,logScale)
+    abcRatio = fibs.retracementRatio(a,b,c,logScale)
+    axcRatio = fibs.retracementRatio(a,x,c,logScale)
+
+    patternArray = array.new_bool()
+    
+    for i=0 to numberOfPatterns-1
+        array.push(patternArray, array.size(flags)>i ? array.get(flags, i) : defaultEnabled)
+    
+    scan_xab(xabRatio, err_min, err_max, patternArray)
+    scan_abc_axc(abcRatio, axcRatio, err_min, err_max, patternArray)
+    patternArray
