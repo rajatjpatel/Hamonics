@@ -1,0 +1,467 @@
+//@version=5
+// @description Object oriented implementation of Zigzag methods. Please refer to ZigzagTypes library for User defined types used in this library
+library("ZigzagMethods", overlay=true)
+import HeWhoMustNotBeNamed/DrawingTypes/2 as dr
+import HeWhoMustNotBeNamed/DrawingMethods/2
+import HeWhoMustNotBeNamed/ZigzagTypes/5 as Objects
+
+//*************************************************************************************************************************************************************//
+//*************************************************************** TYPE Indicator  *****************************************************************************//
+//*************************************************************************************************************************************************************//
+method init(array<Objects.Indicator> indicators, matrix<float> indicatorValues)=>
+	for i=0 to na(indicatorValues) ? na : indicatorValues.rows()==0? na : indicatorValues.rows()-1
+		iRow = indicatorValues.row(i)
+		Objects.Indicator indicator = Objects.Indicator.new(iRow.first(), iRow.last())
+		indicators.push(indicator)
+    indicators
+
+//*************************************************************************************************************************************************************//
+//*************************************************************** TYPE PivotCandle  ***************************************************************************//
+//*************************************************************************************************************************************************************//
+
+method init(Objects.PivotCandle candle, matrix<float> indicators=na)=>
+	candle.pHighBar := ta.highestbars(candle._high, candle.length)
+	candle.pLowBar := ta.lowestbars(candle._low, candle.length)
+	candle.pHigh := ta.highest(candle._high, candle.length)
+	candle.pLow := ta.lowest(candle._low, candle.length)
+    candle.indicators := array.new<Objects.Indicator>()
+    candle.indicators.init(indicators)
+    candle
+//*************************************************************************************************************************************************************//
+//*************************************************************** TYPE Pivot  *********************************************************************************//
+//*************************************************************************************************************************************************************//
+
+method unshift(array<Objects.Pivot> arr, Objects.Pivot val, int maxItems)=>
+    arr.unshift(val)
+    if(arr.size() > maxItems)
+        arr.pop()
+
+method update(Objects.Pivot this, Objects.PivotCandle candle, array<string> indicatorNames)=>
+    dir = math.sign(this.dir)
+	array<float> _indicators = array.new<float>()
+	for indicator in candle.indicators
+		indicatorValue = dir > 0? indicator.indicatorHigh : indicator.indicatorLow
+		_indicators.push(indicatorValue)
+	this.indicatorNames := indicatorNames
+	this.indicatorValues := _indicators
+    this.indicatorRatios := array.new<float>()
+    this
+
+method get(Objects.Pivot this, string key)=>
+    key == "point"? this.point.tostring() :
+         key == "dir"? str.tostring(this.dir) : 
+         key == "level"? str.tostring(this.level) :
+         key == "componentIndex"? str.tostring(this.componentIndex) :
+         key == "subComponents"? str.tostring(this.subComponents) :
+         key == "ratio"? str.tostring(this.ratio) :
+         key == "indicatorNames" ? na(this.indicatorNames)? "[]" : str.tostring(this.indicatorNames) :
+         key == "indicatorValues" ? na(this.indicatorValues)? "[]" : str.tostring(this.indicatorValues) :
+         key == "indicatorRatios" ? na(this.indicatorRatios)? "[]" : str.tostring(this.indicatorRatios) :
+         na
+
+// @function Converts ZigzagTypes/Pivot object to string representation
+// @param this ZigzagTypes/Pivot
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @param includeKeys Array of string containing selective keys. Optional parmaeter. If not provided, all the keys are considered
+// @returns string representation of ZigzagTypes/Pivot
+export method tostring(Objects.Pivot this, bool sortKeys = false, int sortOrder = 1, array<string> includeKeys=na)=>
+	str = ''
+    if(not na(this))
+        keys = na(includeKeys)? array.from("point", "dir", "level", "componentIndex", "subComponents", "ratio", "indicatorNames", "indicatorValues", "indicatorRatios") : includeKeys
+        keyValues = array.new<string>()
+        if(sortKeys and not na(sortOrder) and sortOrder!=0)
+            keys.sort(sortOrder>0? order.ascending : order.descending)
+        
+        for key in keys
+            keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+        str := '{'+array.join(keyValues, ",")+'}'
+    str
+
+// @function Converts Array of Pivot objects to string representation
+// @param this Pivot object array
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @param includeKeys Array of string containing selective keys. Optional parmaeter. If not provided, all the keys are considered
+// @returns string representation of Pivot object array
+export method tostring(array<Objects.Pivot> this, bool sortKeys= false, int sortOrder = 1, array<string> includeKeys=na)=>
+    array<string> combinedStr = array.new<string>()
+    if(not na(this))
+        for pivot in this
+            combinedStr.push(pivot.tostring(sortKeys, sortOrder, includeKeys))
+    '['+array.join(combinedStr, ",")+']'
+
+//*************************************************************************************************************************************************************//
+//*************************************************************** TYPE ZigzagFlags  ***************************************************************************//
+//*************************************************************************************************************************************************************//
+
+// @function Converts ZigzagFlags object to string representation
+// @param this ZigzagFlags object
+// @returns string representation of ZigzagFlags
+export method tostring(Objects.ZigzagFlags this)=> str.tostring(array.from(this.newPivot, this.doublePivot, this.updateLastPivot))
+
+//*************************************************************************************************************************************************************//
+//*************************************************************** TYPE Zigzag  ********************************************************************************//
+//*************************************************************************************************************************************************************//
+
+method init(Objects.Zigzag this)=>
+    if(na(this.zigzagPivots))
+        this.zigzagPivots := array.new<Objects.Pivot>()
+        this.flags := Objects.ZigzagFlags.new()
+    this
+
+method addnewpivot(Objects.Zigzag this, Objects.Pivot pivot)=>
+    dir = math.sign(pivot.dir)
+    if(this.zigzagPivots.size() >=1)
+        lastPivot = this.zigzagPivots.get(0)
+        lastValue = lastPivot.point.price
+        pivot.subComponents := lastPivot.componentIndex - pivot.componentIndex
+        if(math.sign(lastPivot.dir) == math.sign(dir))
+            runtime.error('Direction mismatch')
+        if(this.zigzagPivots.size() >=2)
+            llastPivot = this.zigzagPivots.get(1)
+            value = pivot.point.price
+            llastValue = llastPivot.point.price
+            newDir =  dir * value > dir * llastValue ? dir * 2 : dir
+            pivot.dir := int(newDir)
+            pivot.ratio := math.round(math.abs(lastValue-value)/math.abs(llastValue - lastValue), 3)
+            llastIndicators = llastPivot.indicatorValues
+            indicators = pivot.indicatorValues
+            lastIndicators = lastPivot.indicatorValues
+            pivot.indicatorRatios.clear()
+            for [index, indicatorValue] in indicators
+                lastIndicatorValue = lastIndicators.get(index)
+                llastIndicatorValue = llastIndicators.get(index)
+                indicatorRatio = math.round(math.abs(lastIndicatorValue-indicatorValue)/math.abs(llastIndicatorValue - lastIndicatorValue), 3)
+                pivot.indicatorRatios.push(indicatorRatio)
+    this.zigzagPivots.unshift(pivot, this.numberOfPivots)
+    this
+
+method addnewpivot(Objects.Zigzag this, Objects.Pivot pivot, Objects.PivotCandle candle, array<string> indicatorNames)=>
+    pivot.update(candle, indicatorNames)
+    this.addnewpivot(pivot)
+
+method get(Objects.Zigzag this, string key)=>
+    key == "length"? str.tostring(this.length) :
+         key == "numberOfPivots"? str.tostring(this.numberOfPivots) : 
+         key == "offset"? str.tostring(this.offset) :
+         key == "level"? str.tostring(this.level) :
+         key == "zigzagPivots" ? na(this.zigzagPivots)? "[]" : this.zigzagPivots.tostring() :
+         key == "flags" ? na(this.flags)? "[]" : this.flags.tostring() :
+         na
+
+// @function Converts ZigzagTypes/Zigzag object to string representation
+// @param this ZigzagTypes/Zigzagobject
+// @param sortKeys If set to true, string output is sorted by keys.
+// @param sortOrder Applicable only if sortKeys is set to true. Positive number will sort them in ascending order whreas negative numer will sort them in descending order. Passing 0 will not sort the keys
+// @param includeKeys Array of string containing selective keys. Optional parmaeter. If not provided, all the keys are considered
+// @returns string representation of ZigzagTypes/Zigzag
+export method tostring(Objects.Zigzag this, bool sortKeys = false, int sortOrder = 1, array<string> includeKeys=na)=>
+	keys = na(includeKeys)? array.from("length", "numberOfPivots", "offset", "level", "zigzagPivots", "flags") : includeKeys
+    keyValues = array.new<string>()
+	if(sortKeys and not na(sortOrder) and sortOrder!=0)
+		keys.sort(sortOrder>0? order.ascending : order.descending)
+	
+	for key in keys
+		keyValues.push('"'+key+'":'+'"'+this.get(key)+'"')
+	'{'+array.join(keyValues, ",")+'}'
+    
+// @function Calculate zigzag based on input values and indicator values
+// @param this Zigzag object
+// @param ohlc Array containing OHLC values. Can also have custom values for which zigzag to be calculated
+// @param indicators Array of indicator values
+// @param indicatorNames Array of indicator names for which values are present. Size of indicators array should be equal to that of indicatorNames
+// @returns current Zigzag object
+export method calculate(Objects.Zigzag this, array<float> ohlc, matrix<float> indicators, array<string> indicatorNames) =>
+    _ohlc = na(ohlc[this.offset])? ohlc : ohlc[this.offset]
+    _indicators = na(indicators[this.offset])? indicators : indicators[this.offset]
+    this.init()
+    Objects.PivotCandle candle = Objects.PivotCandle.new(_ohlc.max(), _ohlc.min(), this.length)
+    candle.init(_indicators)
+    pDir = 1
+    Objects.Pivot lastPivot = na
+    this.flags.updateLastPivot := false
+    this.flags.newPivot := false
+    this.flags.doublePivot := false
+    newBar = bar_index-this.offset
+    newbartime = time[this.offset]
+    distanceFromLastPivot = 0
+    var counter = 0
+    var lastCounterBar = 0
+    forceDoublePivot = false
+
+    if(this.zigzagPivots.size() > 0)
+        lastPivot := this.zigzagPivots.get( 0)
+        pDir := int(math.sign(lastPivot.dir))
+        distanceFromLastPivot := newBar - lastPivot.point.bar
+
+    if(this.zigzagPivots.size() > 1)
+        llastPivot = this.zigzagPivots.get(1)
+        llastDir = int(math.sign(llastPivot.dir))
+        forceDoublePivot := pDir == 1 and candle.pLowBar == 0 ? candle.pLow < llastPivot.point.price : pDir == -1 and candle.pHighBar == 0 ? candle.pHigh > llastPivot.point.price : false
+
+    overflow = distanceFromLastPivot >= this.length
+
+    if ((pDir == 1 and candle.pHighBar == 0) or (pDir == -1 and candle.pLowBar == 0)) and this.zigzagPivots.size()>=1
+        value = pDir == 1 ? candle.pHigh : candle.pLow
+        ipivot = pDir == 1? candle.pLow : candle.pHigh
+        removeOld = value * lastPivot.dir >= lastPivot.point.price * lastPivot.dir
+        if(removeOld)
+            this.flags.updateLastPivot := true
+            this.flags.newPivot := true
+            this.zigzagPivots.shift()
+            newPivotObject = Objects.Pivot.new(dr.Point.new(value, newBar, newbartime), pDir)
+            this.addnewpivot(newPivotObject, candle, indicatorNames)
+
+    if (pDir == 1 and candle.pLowBar == 0) or (pDir == -1 and candle.pHighBar == 0) and (not this.flags.newPivot or forceDoublePivot)
+        value = pDir == 1 ? candle.pLow : candle.pHigh
+        newPivotObject = Objects.Pivot.new(dr.Point.new(value, newBar, newbartime), -pDir)
+        this.addnewpivot(newPivotObject, candle, indicatorNames)
+        this.flags.doublePivot := this.flags.newPivot
+        this.flags.newPivot := true
+
+    if(overflow and not this.flags.newPivot)
+        ipivot = pDir == 1? candle.pLow : candle.pHigh
+        ipivotbar = pDir == 1? newBar+candle.pLowBar : newBar+candle.pHighBar
+        ipivottime = time[newBar-ipivotbar+this.offset]
+        iCandle = candle[newBar-ipivotbar]
+        newPivotObject = Objects.Pivot.new(dr.Point.new(ipivot, ipivotbar, ipivottime), -pDir)
+        this.addnewpivot(newPivotObject, iCandle, indicatorNames)
+        this.flags.newPivot := true
+    this
+
+// @function Calculate zigzag based on properties embedded within Zigzag object
+// @param this Zigzag object
+// @returns current Zigzag object
+export method calculate(Objects.Zigzag this)=>
+    this.calculate(array.from(high,low), matrix.new<float>(), array.new<string>())
+
+
+// @function Calculate Next Level Zigzag based on the current calculated zigzag object
+// @param this Zigzag object
+// @returns Next Level Zigzag object
+export method nextlevel(Objects.Zigzag this)=>
+    nextLevel = Objects.Zigzag.new(this.length, this.numberOfPivots, 0)
+    nextLevel.level := this.level +1
+    nextLevel.init()
+    if(this.zigzagPivots.size() > 0)
+        Objects.Pivot tempBullishPivot = na
+        Objects.Pivot tempBearishPivot = na
+        int currentIndex = 0
+        int lastIndex = 0
+        for i=(this.zigzagPivots.size()-1) to 0
+            lPivot = Objects.Pivot.copy(this.zigzagPivots.get(i))
+            dir = lPivot.dir
+            newDir = math.sign(dir)
+            value = lPivot.point.price
+            lPivot.level := lPivot.level+1
+            lPivot.componentIndex := i
+            if(nextLevel.zigzagPivots.size() > 0)
+                lastPivot = nextLevel.zigzagPivots.get(0)
+                lastDir = math.sign(lastPivot.dir)
+                lastValue = lastPivot.point.price
+                if(math.abs(dir) == 2)
+                    if(lastDir == newDir)
+                        if(dir*lastValue < dir*value)
+                            nextLevel.zigzagPivots.shift()
+                        else
+                            tempPivot = newDir >0 ? tempBearishPivot : tempBullishPivot
+                            if(not na(tempPivot))
+                                nextLevel.addnewpivot(tempPivot)
+                            else
+                                continue
+                    else
+                        tempFirstPivot = newDir >0 ? tempBullishPivot : tempBearishPivot
+                        tempSecondPivot = newDir >0 ? tempBearishPivot : tempBullishPivot
+                        if(not na(tempFirstPivot) and not na(tempSecondPivot))
+                            tempVal = tempFirstPivot.point.price
+                            val = lPivot.point.price
+                            if(newDir*tempVal > newDir*val)
+                                nextLevel.addnewpivot(tempFirstPivot)
+                                nextLevel.addnewpivot(tempSecondPivot)
+                    nextLevel.addnewpivot(lPivot)
+                    tempBullishPivot := na
+                    tempBearishPivot := na
+                    true
+                else
+                    tempPivot = newDir > 0? tempBullishPivot : tempBearishPivot
+                    if(not na(tempPivot))
+                        tempDir = tempPivot.dir
+                        tempVal = tempPivot.point.price
+                        val = lPivot.point.price
+                        if(val*dir > tempVal*dir)
+                            if(newDir > 0)
+                                tempBullishPivot := lPivot
+                            else
+                                tempBearishPivot := lPivot
+                        true
+                    else
+                        if(newDir > 0)
+                            tempBullishPivot := lPivot
+                        else
+                            tempBearishPivot := lPivot
+                        true
+            else if(math.abs(dir) == 2)
+                nextLevel.addnewpivot(lPivot)
+                true
+    if(nextLevel.zigzagPivots.size() >= this.zigzagPivots.size())
+        nextLevel.zigzagPivots.clear()
+    nextLevel
+
+//*************************************************************************************************************************************************************//
+//*************************************************************** TYPE ZigzagObject  **************************************************************************//
+//*************************************************************************************************************************************************************//
+
+method push(array<Objects.ZigzagObject> arr, val, maxItems)=>
+    arr.push(val)
+    if(arr.size() > maxItems)
+        Objects.ZigzagObject lastObject = arr.shift()
+        lastObject.zigzagLine.delete()
+        lastObject.zigzagLabel.delete()
+
+method pop(array<Objects.ZigzagObject> arr)=>
+    Objects.ZigzagObject lastObject = arr.pop()
+    lastObject.zigzagLine.delete()
+    lastObject.zigzagLabel.delete()
+
+//*************************************************************************************************************************************************************//
+//*************************************************************** TYPE ZigzagDrawing  *************************************************************************//
+//*************************************************************************************************************************************************************//
+
+method init(Objects.ZigzagDrawing this)=>
+    if(na(this.drawings))
+        this.drawings := array.new<Objects.ZigzagObject>()
+    if(na(this.zigzag))
+        this.zigzag := Objects.Zigzag.new()
+        this.zigzag.init()
+    if(na(this.properties))
+        this.properties := Objects.ZigzagProperties.new()
+    this
+
+method clear(Objects.ZigzagDrawing this)=>
+    for zigzagObject in this.drawings
+        zigzagObject.zigzagLine.delete()
+        zigzagObject.zigzagLabel.delete()
+    this.drawings.clear()
+
+method draw_zg_line(Objects.ZigzagDrawing this, idx1) =>
+    idx2 = idx1+1
+    if this.zigzag.zigzagPivots.size() > idx2
+        Objects.Pivot lastPivot = this.zigzag.zigzagPivots.get(idx1)
+        Objects.Pivot llastPivot = this.zigzag.zigzagPivots.get(idx2)
+        
+        x1 = this.properties.xloc == xloc.bar_index ? lastPivot.point.bar : lastPivot.point.bartime
+        x2 = this.properties.xloc == xloc.bar_index ? llastPivot.point.bar : llastPivot.point.bartime
+        zline = line.new(x1=x1, y1=lastPivot.point.price , x2=x2, y2=llastPivot.point.price,
+                 xloc=this.properties.xloc, color=this.properties.lineColor, width=this.properties.lineWidth, style=this.properties.lineStyle)
+        label zlabel = na
+        if(this.properties.showLabel)
+            [hhllText, labelColor] = switch lastPivot.dir
+                1 => ["LH", color.orange]
+                2 => ["HH", color.green]
+                -1 => ["HL", color.lime]
+                -2 => ["LL", color.red]
+                => ["NA", color.silver]
+
+
+            labelStyle = lastPivot.dir > 0? label.style_label_down : label.style_label_up
+            zlabel := label.new(x=x1, y=lastPivot.point.price, yloc=yloc.price, xloc=this.properties.xloc,
+                                     color=labelColor, style=labelStyle, text=hhllText, 
+                                     textcolor=this.properties.textColor, size = size.small)
+        
+        Objects.ZigzagObject zigzagObject = Objects.ZigzagObject.new(zline, zlabel)
+        this.drawings.push(zigzagObject, this.properties.maxObjects)
+    this
+
+// @function Clears zigzag drawings array
+// @param this array<ZigzagDrawing>
+// @returns void
+export method clear(array<Objects.ZigzagDrawing> this)=>
+    for drawing in this
+        drawing.clear()
+    this.clear()
+
+// @function draws fresh zigzag based on properties embedded in ZigzagDrawing object without trying to calculate
+// @param this ZigzagDrawing object
+// @returns ZigzagDrawing object
+export method drawplain(Objects.ZigzagDrawing this)=>
+    this.init()
+    this.clear()
+    if(barstate.islast or barstate.islastconfirmedhistory)
+        for i=0 to this.zigzag.zigzagPivots.size()>1? this.zigzag.zigzagPivots.size()-2 : na
+            lastPivot = this.zigzag.zigzagPivots.get(i)
+            llastPivot = this.zigzag.zigzagPivots.get(i+1)
+            
+            y1 = lastPivot.point.price
+            y2 = llastPivot.point.price
+            x1 = this.properties.xloc == xloc.bar_index? lastPivot.point.bar : lastPivot.point.bartime
+            x2 = this.properties.xloc == xloc.bar_index? llastPivot.point.bar : llastPivot.point.bartime
+            level = lastPivot.level
+            components = llastPivot.componentIndex - lastPivot.componentIndex
+            zline = line.new(x1=int(x1), y1=y1, x2=int(x2), y2=y2, xloc=this.properties.xloc, color=this.properties.lineColor, width=this.properties.lineWidth, style=this.properties.lineStyle)
+            dir = lastPivot.dir
+            label zlabel = na
+            if(this.properties.showLabel)
+                labelStyle = dir > 0? label.style_label_down : label.style_label_up
+                _indicators = lastPivot.indicatorValues
+                _indicatorNames = lastPivot.indicatorNames
+                indicatorRatios = lastPivot.indicatorRatios
+                labelText = '(Level '+str.tostring(level)+' : '+str.tostring(lastPivot.ratio)+')' + 
+                                     (lastPivot.subComponents != 0? '\nSub Components :'+str.tostring(lastPivot.subComponents) : '')
+                for [index, indicatorName] in _indicatorNames
+                    indicatorValue = _indicators.get(index)
+                    labelText := labelText + '\n' + indicatorName + ' : ' + str.tostring(math.round(indicatorValue,2)) + ' / ' +str.tostring(indicatorRatios.get(index))
+                
+                lblColor=dir==2? color.green : dir == 1? color.orange : dir == -1? color.lime : color.red
+                zlabel := label.new(x=int(x1), y=y1, yloc=yloc.price, color=lblColor, style=labelStyle, text=labelText, 
+                                         textcolor=this.properties.textColor, size = size.small, xloc=this.properties.xloc)
+            
+            this.drawings.push(Objects.ZigzagObject.new(zline, zlabel))
+    this
+
+// @function draws fresh zigzag based on properties embedded in ZigzagDrawing object
+// @param this ZigzagDrawing object
+// @param ohlc values on which the zigzag needs to be calculated and drawn. If not set will use regular OHLC
+// @param indicators Array of indicator values
+// @param indicatorNames Array of indicator names for which values are present. Size of indicators array should be equal to that of indicatorNames
+// @returns ZigzagDrawing object
+export method drawfresh(Objects.ZigzagDrawing this, array<float> ohlc = na, matrix<float> indicators = na, array<string> indicatorNames = na)=>
+    this.init()
+    this.clear()
+    this.zigzag.calculate(na(ohlc)?array.from(high,low):ohlc, na(indicators)? matrix.new<float>(): indicators, na(indicatorNames)? array.new<string>():indicatorNames)
+    this.drawplain()
+
+// @function draws zigzag based on the zigzagmatrix input
+// @param this ZigzagDrawing object
+// @param ohlc values on which the zigzag needs to be calculated and drawn. If not set will use regular OHLC
+// @param indicators Array of indicator values
+// @param indicatorNames Array of indicator names for which values are present. Size of indicators array should be equal to that of indicatorNames
+// @returns [array<line> zigzaglines, array<label> zigzaglabels]
+export method drawcontinuous(Objects.ZigzagDrawing this, array<float> ohlc = na, matrix<float> indicators = na, array<string> indicatorNames = na)=>
+    this.init()
+    this.zigzag.calculate(na(ohlc)?array.from(high,low):ohlc, na(indicators)? matrix.new<float>(): indicators, na(indicatorNames)? array.new<string>():indicatorNames)
+    if this.drawings.size() > 0 and this.zigzag.flags.updateLastPivot
+        this.drawings.pop()
+    
+    if(this.zigzag.flags.newPivot)
+        if this.zigzag.flags.doublePivot and this.zigzag.zigzagPivots.size() >=3
+            this.draw_zg_line(1)
+
+        if this.zigzag.zigzagPivots.size() >= 2
+            this.draw_zg_line(0)
+    this
+
+// ###################################################################### Tests #############################################################
+// import HeWhoMustNotBeNamed/Logger/1 as l
+// import HeWhoMustNotBeNamed/utils/1 as ut
+
+// var logger = l.Logger.new(minimumLevel = 'DEBUG')
+// logger.init()
+
+// indicators = matrix.new<float>()
+// indicatorNames = array.new<string>()
+// themeColors = ut.getColors("dark")
+// var Objects.Zigzag zigzag = Objects.Zigzag.new(10)
+// var Objects.ZigzagDrawing drawing = Objects.ZigzagDrawing.new(zigzag = zigzag)
+// drawing.drawcontinuous()
+
