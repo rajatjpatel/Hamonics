@@ -1,0 +1,172 @@
+
+//@version=5
+// @description Library helps visualize matrix as array of arrays and enables users to use array methods such as push, pop, shift, unshift etc along with cleanup activities on drawing objects wherever required
+library("_matrix")
+import HeWhoMustNotBeNamed/arrays/1 as pa
+remove_row_from_matrix(mtx, rowNumber)=>matrix.remove_row(mtx, rowNumber)
+delete_row_from_matrix(mtx, rowNumber)=>pa.clear(remove_row_from_matrix(mtx, rowNumber))
+unshift_to_matrix(mtx, row, maxItems)=>
+    matrix.add_row(mtx, 0, row)
+    if(matrix.rows(mtx) > maxItems)
+        delete_row_from_matrix(mtx, matrix.rows(mtx)-1)
+    mtx
+    
+push_to_matrix(mtx, row, maxItems)=>
+    matrix.add_row(mtx, matrix.rows(mtx), row)
+    if(matrix.rows(mtx) > maxItems)
+        delete_row_from_matrix(mtx, 0)
+    mtx
+
+// @function deletes row from a matrix
+// @param mtx matrix of objects
+// @param rowNumber row index to be deleted
+// @returns void
+export delete(simple matrix<line> mtx, int rowNumber)=>delete_row_from_matrix(mtx, rowNumber)
+export delete(simple matrix<label> mtx, int rowNumber)=>delete_row_from_matrix(mtx, rowNumber)
+export delete(simple matrix<box> mtx, int rowNumber)=>delete_row_from_matrix(mtx, rowNumber)
+export delete(simple matrix<linefill> mtx, int rowNumber)=>delete_row_from_matrix(mtx, rowNumber)
+export delete(simple matrix<table> mtx, int rowNumber)=>delete_row_from_matrix(mtx, rowNumber)
+export delete(simple matrix<int> mtx, int rowNumber)=>delete_row_from_matrix(mtx, rowNumber)
+export delete(simple matrix<float> mtx, int rowNumber)=>delete_row_from_matrix(mtx, rowNumber)
+export delete(simple matrix<bool> mtx, int rowNumber)=>delete_row_from_matrix(mtx, rowNumber)
+export delete(simple matrix<string> mtx, int rowNumber)=>delete_row_from_matrix(mtx, rowNumber)
+export delete(simple matrix<color> mtx, int rowNumber)=>delete_row_from_matrix(mtx, rowNumber)
+
+// @function remove row from a matrix and returns them to caller
+// @param mtx matrix of objects
+// @param rowNumber row index to be deleted
+// @returns type[]
+export remove(simple matrix<line> mtx, int rowNumber)=>remove_row_from_matrix(mtx, rowNumber)
+export remove(simple matrix<label> mtx, int rowNumber)=>remove_row_from_matrix(mtx, rowNumber)
+export remove(simple matrix<box> mtx, int rowNumber)=>remove_row_from_matrix(mtx, rowNumber)
+export remove(simple matrix<linefill> mtx, int rowNumber)=>remove_row_from_matrix(mtx, rowNumber)
+export remove(simple matrix<table> mtx, int rowNumber)=>remove_row_from_matrix(mtx, rowNumber)
+export remove(simple matrix<int> mtx, int rowNumber)=>remove_row_from_matrix(mtx, rowNumber)
+export remove(simple matrix<float> mtx, int rowNumber)=>remove_row_from_matrix(mtx, rowNumber)
+export remove(simple matrix<bool> mtx, int rowNumber)=>remove_row_from_matrix(mtx, rowNumber)
+export remove(simple matrix<string> mtx, int rowNumber)=>remove_row_from_matrix(mtx, rowNumber)
+export remove(simple matrix<color> mtx, int rowNumber)=>remove_row_from_matrix(mtx, rowNumber)
+
+// @function unshift array of lines to first row of the matrix
+// @param mtx matrix of lines
+// @param row array of lines to be inserted in row 
+// @returns resulting matrix of type
+export unshift(simple matrix<line> mtx, line[] row, simple int maxItems)=>unshift_to_matrix(mtx, row, maxItems)
+export unshift(simple matrix<label> mtx, label[] row, simple int maxItems)=>unshift_to_matrix(mtx, row, maxItems)
+export unshift(simple matrix<box> mtx, box[] row, simple int maxItems)=>unshift_to_matrix(mtx, row, maxItems)
+export unshift(simple matrix<linefill> mtx, linefill[] row, simple int maxItems)=>unshift_to_matrix(mtx, row, maxItems)
+export unshift(simple matrix<table> mtx, table[] row, simple int maxItems)=>unshift_to_matrix(mtx, row, maxItems)
+export unshift(simple matrix<int> mtx, int[] row, simple int maxItems)=>unshift_to_matrix(mtx, row, maxItems)
+export unshift(simple matrix<float> mtx, float[] row, simple int maxItems)=>unshift_to_matrix(mtx, row, maxItems)
+export unshift(simple matrix<bool> mtx, bool[] row, simple int maxItems)=>unshift_to_matrix(mtx, row, maxItems)
+export unshift(simple matrix<string> mtx, string[] row, simple int maxItems)=>unshift_to_matrix(mtx, row, maxItems)
+export unshift(simple matrix<color> mtx, color[] row, simple int maxItems)=>unshift_to_matrix(mtx, row, maxItems)
+
+
+// @function push array of lines to end of the matrix row
+// @param mtx matrix of lines
+// @param row array of lines to be inserted in row 
+// @returns resulting matrix of lines
+export push(simple matrix<line> mtx, line[] row, simple int maxItems)=>push_to_matrix(mtx, row, maxItems)
+export push(simple matrix<label> mtx, label[] row, simple int maxItems)=>push_to_matrix(mtx, row, maxItems)
+export push(simple matrix<box> mtx, box[] row, simple int maxItems)=>push_to_matrix(mtx, row, maxItems)
+export push(simple matrix<linefill> mtx, linefill[] row, simple int maxItems)=>push_to_matrix(mtx, row, maxItems)
+export push(simple matrix<table> mtx, table[] row, simple int maxItems)=>push_to_matrix(mtx, row, maxItems)
+export push(simple matrix<int> mtx, int[] row, simple int maxItems)=>push_to_matrix(mtx, row, maxItems)
+export push(simple matrix<float> mtx, float[] row, simple int maxItems)=>push_to_matrix(mtx, row, maxItems)
+export push(simple matrix<bool> mtx, bool[] row, simple int maxItems)=>push_to_matrix(mtx, row, maxItems)
+export push(simple matrix<string> mtx, string[] row, simple int maxItems)=>push_to_matrix(mtx, row, maxItems)
+export push(simple matrix<color> mtx, color[] row, simple int maxItems)=>push_to_matrix(mtx, row, maxItems)
+
+// @function shift removes first row from matrix of lines
+// @param mtx matrix of lines from which the shift operation need to be performed
+// @returns void
+export shift(simple matrix<line> mtx)=>delete(mtx, 0)
+export shift(simple matrix<label> mtx)=>delete(mtx, 0)
+export shift(simple matrix<box> mtx)=>delete(mtx, 0)
+export shift(simple matrix<linefill> mtx)=>delete(mtx, 0)
+export shift(simple matrix<table> mtx)=>delete(mtx, 0)
+export shift(simple matrix<int> mtx)=>delete(mtx, 0)
+export shift(simple matrix<float> mtx)=>delete(mtx, 0)
+export shift(simple matrix<bool> mtx)=>delete(mtx, 0)
+export shift(simple matrix<string> mtx)=>delete(mtx, 0)
+export shift(simple matrix<color> mtx)=>delete(mtx, 0)
+
+// @function rshift removes first row from matrix of lines and returns them as array
+// @param mtx matrix of lines from which the rshift operation need to be performed
+// @returns type[]
+export rshift(simple matrix<line> mtx)=>remove(mtx, 0)
+export rshift(simple matrix<label> mtx)=>remove(mtx, 0)
+export rshift(simple matrix<box> mtx)=>remove(mtx, 0)
+export rshift(simple matrix<linefill> mtx)=>remove(mtx, 0)
+export rshift(simple matrix<table> mtx)=>remove(mtx, 0)
+export rshift(simple matrix<int> mtx)=>remove(mtx, 0)
+export rshift(simple matrix<float> mtx)=>remove(mtx, 0)
+export rshift(simple matrix<bool> mtx)=>remove(mtx, 0)
+export rshift(simple matrix<string> mtx)=>remove(mtx, 0)
+export rshift(simple matrix<color> mtx)=>remove(mtx, 0)
+
+// @function pop removes last row from matrix of lines
+// @param mtx matrix of lines from which the pop operation need to be performed
+// @returns void
+export pop(simple matrix<line> mtx)=>delete(mtx, matrix.rows(mtx)-1)
+export pop(simple matrix<label> mtx)=>delete(mtx, matrix.rows(mtx)-1)
+export pop(simple matrix<box> mtx)=>delete(mtx, matrix.rows(mtx)-1)
+export pop(simple matrix<linefill> mtx)=>delete(mtx, matrix.rows(mtx)-1)
+export pop(simple matrix<table> mtx)=>delete(mtx, matrix.rows(mtx)-1)
+export pop(simple matrix<int> mtx)=>delete(mtx, matrix.rows(mtx)-1)
+export pop(simple matrix<float> mtx)=>delete(mtx, matrix.rows(mtx)-1)
+export pop(simple matrix<bool> mtx)=>delete(mtx, matrix.rows(mtx)-1)
+export pop(simple matrix<string> mtx)=>delete(mtx, matrix.rows(mtx)-1)
+export pop(simple matrix<color> mtx)=>delete(mtx, matrix.rows(mtx)-1)
+
+
+// @function rpop removes last row from matrix of lines and reutnrs the array to caller
+// @param mtx matrix of lines from which the rpop operation need to be performed
+// @returns void
+export rpop(simple matrix<line> mtx)=>remove(mtx, matrix.rows(mtx)-1)
+export rpop(simple matrix<label> mtx)=>remove(mtx, matrix.rows(mtx)-1)
+export rpop(simple matrix<box> mtx)=>remove(mtx, matrix.rows(mtx)-1)
+export rpop(simple matrix<linefill> mtx)=>remove(mtx, matrix.rows(mtx)-1)
+export rpop(simple matrix<table> mtx)=>remove(mtx, matrix.rows(mtx)-1)
+export rpop(simple matrix<int> mtx)=>remove(mtx, matrix.rows(mtx)-1)
+export rpop(simple matrix<float> mtx)=>remove(mtx, matrix.rows(mtx)-1)
+export rpop(simple matrix<bool> mtx)=>remove(mtx, matrix.rows(mtx)-1)
+export rpop(simple matrix<string> mtx)=>remove(mtx, matrix.rows(mtx)-1)
+export rpop(simple matrix<color> mtx)=>remove(mtx, matrix.rows(mtx)-1)
+
+clear_matrix(mtx)=>
+    while(matrix.rows(mtx) > 0)
+        delete(mtx, 0)
+
+rclear_matrix(mtx)=>
+    while(matrix.rows(mtx) > 0)
+        remove(mtx, 0)
+        
+// @function clear clears the matrix
+// @param mtx matrix of lines which needs to be cleared
+// @returns void
+export clear(simple matrix<line> mtx)=>clear_matrix(mtx)
+export clear(simple matrix<label> mtx)=>clear_matrix(mtx)
+export clear(simple matrix<box> mtx)=>clear_matrix(mtx)
+export clear(simple matrix<linefill> mtx)=>clear_matrix(mtx)
+export clear(simple matrix<table> mtx)=>clear_matrix(mtx)
+export clear(simple matrix<int> mtx)=>clear_matrix(mtx)
+export clear(simple matrix<float> mtx)=>clear_matrix(mtx)
+export clear(simple matrix<bool> mtx)=>clear_matrix(mtx)
+export clear(simple matrix<string> mtx)=>clear_matrix(mtx)
+export clear(simple matrix<color> mtx)=>clear_matrix(mtx)
+
+// @function clear clears the matrix but retains the drawing objects
+// @param mtx matrix of lines which needs to be cleared
+// @returns void
+export rclear(simple matrix<line> mtx)=>rclear_matrix(mtx)
+export rclear(simple matrix<label> mtx)=>rclear_matrix(mtx)
+export rclear(simple matrix<box> mtx)=>rclear_matrix(mtx)
+export rclear(simple matrix<linefill> mtx)=>rclear_matrix(mtx)
+export rclear(simple matrix<table> mtx)=>rclear_matrix(mtx)
+export rclear(simple matrix<int> mtx)=>rclear_matrix(mtx)
+export rclear(simple matrix<float> mtx)=>rclear_matrix(mtx)
+export rclear(simple matrix<bool> mtx)=>rclear_matrix(mtx)
+export rclear(simple matrix<string> mtx)=>rclear_matrix(mtx)
+export rclear(simple matrix<color> mtx)=>rclear_matrix(mtx)
