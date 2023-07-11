@@ -1,0 +1,143 @@
+
+//@version=5
+// @description customcandles: Contains methods which can send custom candlesticks based on the input
+library("customcandles", overlay=false)
+import HeWhoMustNotBeNamed/enhanced_ta/10 as eta
+
+percentb(float source, float upper, float lower)=> 100*(source-lower)/(upper-lower)
+
+percentbands(simple string btype = "bb", float source, simple string maType="sma", simple int length=20, float multiplier=2.0, simple bool useTrueRange=true, simple bool sticky=false)=>
+    switch btype
+        "bb" => eta.bpercentb(source, maType, length, multiplier, sticky)
+        "kc" => eta.kpercentk(source, maType, length, multiplier, useTrueRange, sticky)
+        => eta.dpercentd(length, true, source, sticky)
+
+
+// @function macandles: Provides OHLC of moving average candles
+// @param maType - Moving average Type. Can be sma, ema, hma, rma, wma, vwma, swma, linreg, median
+// @param length - Defaulted to 20. Can chose custom length
+// @param o - Optional different open source. By default is set to open
+// @param h - Optional different high source. By default is set to high
+// @param l - Optional different low source. By default is set to low
+// @param c - Optional different close source. By default is set to close
+// @returns [maOpen, maHigh, maLow, maClose]: Custom Moving Average based OHLC values
+export macandles(simple string maType="sma", simple int length=20, float o=open, float h=high, float l=low, float c=close) =>
+	maOpen = eta.ma(o, maType, length)
+	maHigh = eta.ma(h, maType, length)
+	maLow = eta.ma(l, maType, length)
+	maClose = eta.ma(c, maType, length)
+	[maOpen, maHigh, maLow, maClose]
+
+// @function hacandles: Provides Heikin Ashi OHLC values
+// @returns [haOpen, haHigh, haLow, haClose]: Custom Heikin Ashi OHLC values
+export hacandles() =>
+    haOpen = (open[1]+close[1])/2
+    haClose = ohlc4
+    haHigh = math.max(haOpen, haClose, high)
+    haLow = math.min(haOpen, haClose, low)
+    [haOpen, haHigh, haLow, haClose]
+    
+// @function macandles: Provides OHLC of moving average candles
+// @param type - Oscillator Type. Can be cci, cmo, cog, mfi, roc, rsi, tsi, mfi
+// @param length - Defaulted to 14. Can chose custom length
+// @param shortLength - Used only for TSI. Default is 13
+// @param longLength - Used only for TSI. Default is 25
+// @param method - Valid values for method are : sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param highlowLength - length on which highlow of the oscillator is calculated
+// @param sticky - overbought, oversold levels won't change unless crossed
+// @param percentCandles - candles are generated based on percent with respect to high/low instead of actual oscillator values
+// @returns [maOpen, maHigh, maLow, maClose]: Custom Moving Average based OHLC values
+export ocandles(simple string type="rsi", simple int length=14, simple int shortLength = 13, simple int longLength = 25,
+                     simple string method="highlow", simple int highlowLength=50, simple bool sticky=false, simple bool percentCandles=false)=>
+    [oOpen, oOverbought, oOversold] = eta.oscillator(source = open, type=type, length=length, shortLength=shortLength, longLength=longLength,
+                             method=method, highlowLength=highlowLength, sticky=sticky)
+    [oHigh, hOverbought, hOversold] = eta.oscillator(source = high, type=type, length=length, shortLength=shortLength, longLength=longLength,
+                             method=method, highlowLength=highlowLength, sticky=sticky)
+    [oLow, lOverbought, lOversold] = eta.oscillator(source = low, type=type, length=length, shortLength=shortLength, longLength=longLength,
+                             method=method, highlowLength=highlowLength, sticky=sticky)
+    [oClose, cOverbought, cOversold] = eta.oscillator(source = close, type=type, length=length, shortLength=shortLength, longLength=longLength,
+                             method=method, highlowLength=highlowLength, sticky=sticky)
+    
+    if(percentCandles)
+        oOpen := percentb(oOpen, oOverbought, oOversold)
+        oHigh := percentb(oHigh, hOverbought, hOversold)
+        oLow := percentb(oLow, lOverbought, lOversold)
+        oClose := percentb(oClose, cOverbought, cOversold)
+        
+    [oOpen, oHigh, oLow, oClose]
+
+// @function bcandles returns candlestick made of percent range of bands - bollinger bands, keltner channel and donchian channel
+// @param btype Band Type. Valid options bb, kc and dc
+// @param maType Moving Average Type : Can be sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param length Moving Average Length
+// @param multiplier Standard Deviation or ATR multiplier. Not applicable for Donchian Channel
+// @param useTrueRange - if set to false, uses high-low. Only applicable for Keltener Channel
+// @param sticky - sticky boundaries which will only change when value is outside boundary.
+// @returns [bOpen, bHigh, bLow, bClose] OHLC of band percentage
+export bcandles(simple string btype = "bb", simple string maType="sma", simple int length=20, float multiplier=2.0, simple bool useTrueRange=true, simple bool sticky=false)=>
+    bOpen = percentbands(btype, open, maType, length, multiplier, useTrueRange, sticky)
+    bHigh = percentbands(btype, high, maType, length, multiplier, useTrueRange, sticky)
+    bLow = percentbands(btype, low, maType, length, multiplier, useTrueRange, sticky)
+    bClose = percentbands(btype, close, maType, length, multiplier, useTrueRange, sticky)
+    [bOpen, bHigh, bLow, bClose]
+    
+candleType = input.string("ma", "Candle Tyle", options=["ma", "ha", "osc", "bands"])
+
+matype = input.string("sma", title="Moving Average", group="MA Candles", options=["sma", "ema", "hma", "rma", "wma", "vwma", "swma", "linreg", "median"], inline="m")
+malength = input.int(20, step=5, title="", group="MA Candles", inline="m")
+
+oscType = input.string("cci", title="Oscillator Type", group="Oscillator", options=["cci", "cmo", "cog", "mfi", "roc", "rsi", "tsi"])
+oLength = input.int(14, title="Length", group="Oscillator")
+shortLength = input.int(13, title="Short Length (TSI)", group="Oscillator")
+longLength = input.int(25, title="Long Length (TSI)", group="Oscillator")
+method = input.string("highlow", title="Dynamic Overvought/Oversold Calculation method", group="Oscillator", options=["highlow", "sma", "ema", "hma", "rma", "wma", "vwma", "swma", "linreg", "median"])
+highlowlength = input.int(50, title="Length", group="Oscillator")
+osticky = input.bool(false, title="Sticky", group="Oscillator")
+percentCandles = input.bool(false, title="Percent Candles", group="Oscillator")
+
+bandType = input.string("bb", title="Type", group="Bands/Bandwidth/BandPercent", options=["bb", "kc", "dc"])
+bmatype = input.string("sma", title="Type", group="Bands/Bandwidth/BandPercent", options=["sma", "ema", "hma", "rma", "wma", "vwma", "swma", "linreg", "median"])
+bmalength = input.int(20, title="Length", group="Bands/Bandwidth/BandPercent")
+multiplier = input.float(2.0, step=0.5, title="Multiplier", group="Bands/Bandwidth/BandPercent")
+useTrueRange = input.bool(true, title="Use True Range (KC)", group="Bands/Bandwidth/BandPercent")
+bsticky = input.bool(true, title="Sticky", group="Bands/Bandwidth/BandPercent")
+
+nOpen = 0.0
+nHigh = 0.0
+nLow = 0.0
+nClose = 0.0
+
+if(candleType == "ma")
+    [maOpen, maHigh, maLow, maClose] = macandles(matype, malength)
+    nOpen := maOpen
+    nHigh := maHigh
+    nLow := maLow
+    nClose := maClose
+    
+if(candleType == "ha")
+    [haOpen, haHigh, haLow, haClose] = hacandles()
+    nOpen := haOpen
+    nHigh := haHigh
+    nLow := haLow
+    nClose := haClose
+
+if(candleType == "osc")
+    [oOpen, oHigh, oLow, oClose] = ocandles(oscType, oLength, shortLength, longLength, method, highlowlength, osticky, percentCandles)
+    nOpen := oOpen
+    nHigh := oHigh
+    nLow := oLow
+    nClose := oClose
+
+if(candleType == "bands")
+    [bOpen, bHigh, bLow, bClose] = bcandles(bandType, bmatype, bmalength, multiplier, useTrueRange, bsticky)
+    nOpen := bOpen
+    nHigh := bHigh
+    nLow := bLow
+    nClose := bClose
+    
+wickColor = nOpen < nClose ? color.green : color.red
+candleColor = nClose < nClose[1]? wickColor : color.new(wickColor, 100)
+
+plotcandle(nOpen, nHigh, nLow, nClose, "Custom Candles", candleColor, wickColor, true, bordercolor=wickColor)
+
+
