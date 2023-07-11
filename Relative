@@ -1,0 +1,61 @@
+//@version=4
+study("Relative Channel Bandwidth")
+BandType = input(title="Channel Type", defval="Bollinger Bands", options=[ "Donchian Channel", "Bollinger Bands", "Keltner Channel", "Donchian - Pivot"])
+Periods = input(20, step=5)
+StdDev = input(2, step=0.5)
+pvtLen = input(2)
+showBands = input(false)
+donchian(highSource, lowSource, rangeLength)=>
+    top = highest(highSource, rangeLength)
+    bottom = lowest(lowSource, rangeLength)
+    middle = (top+bottom)/2
+    [middle, top, bottom]
+
+f_calculatePivots(pvtLen, Shunt)=>
+    pvthi_ = pivothigh(high, pvtLen, pvtLen)
+    pvtlo_ = pivotlow(low, pvtLen, pvtLen)
+    
+    pvthi = pvthi_[Shunt]
+    pvtlo = pvtlo_[Shunt]
+    
+    pvthighline = pvthi
+    pvthighline := na(pvthighline)? nz(pvthighline[1]): pvthighline
+    
+    pvtlowline = pvtlo
+    pvtlowline := na(pvtlowline)? nz(pvtlowline[1]): pvtlowline
+    
+    higherhigh = na(pvthi) ? na : ( valuewhen(pvthi, high[pvtLen+Shunt], 1) < valuewhen(pvthi, high[pvtLen+Shunt], 0) ) ? pvthi : na
+    lowerhigh  = na(pvthi) ? na : ( valuewhen(pvthi, high[pvtLen+Shunt], 1) > valuewhen(pvthi, high[pvtLen+Shunt], 0) ) ? pvthi : na
+    higherlow  = na(pvtlo) ? na : ( valuewhen(pvtlo, low[pvtLen+Shunt], 1)  < valuewhen(pvtlo, low[pvtLen+Shunt], 0) )  ? pvtlo : na
+    lowerlow   = na(pvtlo) ? na : ( valuewhen(pvtlo, low[pvtLen+Shunt], 1)  > valuewhen(pvtlo, low[pvtLen+Shunt], 0) )  ? pvtlo : na
+    
+    [pvthighline, pvtlowline, higherhigh, lowerhigh, higherlow, lowerlow]
+
+f_getBands(BandType, Periods, StdDev, pvtLen)=>
+    [pvthighline, pvtlowline, higherhigh, lowerhigh, higherlow, lowerlow] = f_calculatePivots(pvtLen, 1)
+    [middleBB, upperBB, lowerBB] = bb(close, Periods, StdDev)
+    [middleKC, upperKC, lowerKC] = kc(close, Periods, StdDev)
+    [middleDC, upperDC, lowerDC] = donchian(high, low, Periods)
+    [middleDCP, upperDCP, lowerDCP] = donchian(pvthighline, pvtlowline, Periods)
+    middle = BandType == "Bollinger Bands"? middleBB : BandType == "Keltner Channel"? middleKC : BandType == "Donchian Channel"? middleDC : middleDCP
+    upper = BandType == "Bollinger Bands"? upperBB : BandType == "Keltner Channel"? upperKC : BandType == "Donchian Channel"? upperDC : upperDCP
+    lower = BandType == "Bollinger Bands"? lowerBB : BandType == "Keltner Channel"? lowerKC : BandType == "Donchian Channel"? lowerDC : lowerDCP
+    [middle, upper, lower]
+
+[middle, upper, lower] = f_getBands(BandType, Periods, StdDev, pvtLen)
+
+bandwidth = upper - lower
+bandwidthPercent = (upper-lower)*100/close
+
+[middleB, upperB, lowerB]= bb(bandwidthPercent, 100, 1)
+lineColor = bandwidthPercent > upperB? color.red: 
+             bandwidthPercent < lowerB ? color.green : 
+             bandwidthPercent < upperB and bandwidthPercent > middleB ? color.orange :
+             bandwidthPercent < middleB and bandwidthPercent > lowerB ? color.lime : color.blue
+plot(bandwidthPercent, title="BandwidthPercent", color=lineColor, linewidth=2, style=plot.style_linebr)
+
+BBU = plot(showBands? upperB: na, title="BBHigh", color=color.green, linewidth=1, transp=50, style=plot.style_linebr)
+BBM = plot(showBands? middleB: na, title="BBMid", color=color.maroon, linewidth=1, transp=50, style=plot.style_linebr)
+BBL = plot(showBands? lowerB: na, title="BBLow", color=color.red, linewidth=1, transp=50, style=plot.style_linebr)
+fill(BBU, BBM, title="Upper Zone", color=color.red, transp=90)
+fill(BBM, BBL, title="Lower Zone", color=color.green, transp=90)
