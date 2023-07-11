@@ -1,0 +1,75 @@
+
+//@version=5
+
+// @description Private methods used in my scripts for some basic and customized drawings.
+library("drawingutils")
+import HeWhoMustNotBeNamed/utils/1 as ut
+
+export draw_line(float y1, float y2, int x1, int x2, color lineColor, int width, string style, line[] linesArray) =>
+    targetLine = line.new(y1=y1, y2=y2, x1=x1, x2=x2, color=lineColor, width=width, style=style)
+    array.push(linesArray, targetLine)
+    targetLine
+
+export draw_label(float y, int x, string txt, color textcolor, string style, string yloc, string size, label[] labelsArray) =>
+    targetLabel = label.new(y=y, x=x, text=txt, textcolor=textcolor, style=style, yloc=yloc, size=size)
+    array.push(labelsArray, targetLabel)
+
+export draw_linefill(line ln1, line ln2, color fillColor, int transparency, linefill[] lineFillArray) =>
+    lnfl = linefill.new(ln1, ln2, color.new(fillColor, transparency))
+    array.push(lineFillArray, lnfl)
+
+export draw_labelled_line(float target, string lblText, color linecolor, color labelcolor, int index, bool highlight, line[] linesArray, label[] labelsArray,
+                                 string normalSize = size.normal, string tinySize = size.tiny, string yloc = yloc.price) =>
+    x1 = bar_index + 20*index*2
+    x2 = x1 + 20
+    xloc = xloc.bar_index
+    style = yloc == yloc.price? label.style_none : yloc == yloc.abovebar ? label.style_label_down : label.style_label_up
+    targetLine = line.new(x1=x1, y1=target, x2=x2, y2=target, color=linecolor, xloc =xloc, 
+                             extend=extend.none, style=highlight ? line.style_solid : line.style_dotted)
+    targetLabel = label.new(x=(x1+x2)/2, y=target, text=lblText + '\n' + str.tostring(math.round_to_mintick(target)), 
+                             xloc=xloc, style=style, textcolor=highlight ? labelcolor : color.new(labelcolor, 70),
+                             size=highlight ? normalSize : tinySize, color=color.new(labelcolor, 100))
+    array.push(linesArray, targetLine)
+    array.push(labelsArray, targetLabel)
+
+export draw_labelled_box(float y1, float y2, color labelColor, string labelText, int index,
+         box[] boxArray, label[] labelArray,
+         color borderColor = color.blue, string borderStyle=line.style_dotted, int borderWidth = 1, string textAlign = text.align_right,
+         bool highlight = true, bool highLightLabel = false) =>
+    x1 = bar_index + 20*index*2
+    x2 = x1 + 20
+    y = (y1 + y2) / 2
+    transp = highlight? 70 : 90
+    transpLabel = highlight? 0 : 50
+    labelSize = highLightLabel? size.normal : size.small
+    bx = box.new(x1, y1, x2, y2, borderColor, borderWidth, borderStyle, bgcolor=color.new(labelColor, transp))
+    
+    lbl = label.new(x=x2, y=y, text=labelText, yloc=yloc.price, color=labelColor, 
+                         style=label.style_none, textcolor=color.new(labelColor, transpLabel), size=labelSize, textalign=textAlign)
+    array.push(labelArray, lbl)
+    array.push(boxArray, bx)
+    
+export runTimer(simple string timerPosition = position.top_center, color backgroundColor=color.green, color textColor = color.white, string lblSize = size.small)=>
+    var startBar = bar_index
+    var startTime = time
+    barDiff = bar_index - startBar
+    [days, tHours, tMinutes, tSeconds, tmSeconds] = ut.timer(startTime)
+    if(barstate.islast)
+        var timer = table.new(position=timerPosition, columns=12, rows=1, border_width=0)
+        table.cell(table_id=timer, column=0, row=0, text=str.tostring(days, "00"), bgcolor=backgroundColor, text_color=textColor, text_size=lblSize)
+        table.cell(table_id=timer, column=1, row=0, text="/", bgcolor=backgroundColor, text_color=textColor, text_size=lblSize)
+        table.cell(table_id=timer, column=2, row=0, text=str.tostring(tHours, "00"), bgcolor=backgroundColor, text_color=textColor, text_size=lblSize)
+        table.cell(table_id=timer, column=3, row=0, text=":", bgcolor=backgroundColor, text_color=textColor, text_size=lblSize)
+        table.cell(table_id=timer, column=4, row=0, text=str.tostring(tMinutes, "00"), bgcolor=backgroundColor, text_color=textColor, text_size=lblSize)
+        table.cell(table_id=timer, column=5, row=0, text=":", bgcolor=backgroundColor, text_color=textColor, text_size=lblSize)
+        table.cell(table_id=timer, column=6, row=0, text=str.tostring(tSeconds, "00"), bgcolor=backgroundColor, text_color=textColor, text_size=lblSize)
+        table.cell(table_id=timer, column=7, row=0, text=".", bgcolor=backgroundColor, text_color=textColor, text_size=lblSize)
+        table.cell(table_id=timer, column=8, row=0, text=str.tostring(tmSeconds), bgcolor=backgroundColor, text_color=textColor, text_size=lblSize)
+        table.cell(table_id=timer, column=9, row=0, text="[", bgcolor=backgroundColor, text_color=textColor, text_size=lblSize)
+        table.cell(table_id=timer, column=10, row=0, text=str.tostring(barDiff), bgcolor=backgroundColor, text_color=textColor, text_size=lblSize)
+        table.cell(table_id=timer, column=11, row=0, text="]", bgcolor=backgroundColor, text_color=textColor, text_size=lblSize)
+    
+export watermark(string content, simple string tblPosition=position.middle_center, simple color textColor = color.aqua, simple int transparency=80, simple string textSize = size.huge)=>
+    if(barstate.islast)
+        var watermark = table.new(position=tblPosition, columns=1, rows=1, border_width=0)
+        table.cell(table_id=watermark, column=0, row=0, text=content, text_color=color.new(textColor, transparency), text_size=textSize)
