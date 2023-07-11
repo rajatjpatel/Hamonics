@@ -1,0 +1,508 @@
+//@version=5
+// @description ACPU helper library
+library("cphelper", overlay = true)
+import HeWhoMustNotBeNamed/drawingutils/8 as dr
+import HeWhoMustNotBeNamed/_matrix/5 as ma
+import HeWhoMustNotBeNamed/arrays/1 as pa
+
+getSum(matrix<int> closedStats, int row)=>
+    statArray = matrix.row(closedStats, row)
+    sum = array.sum(statArray)
+    validSum = sum - array.get(statArray, 0)
+    [statArray, sum, validSum]
+
+// @function calculates risk reward for given targets
+// @param targetArray array of targets
+// @param rrArray array of risk reward
+// @param breakevenOnTarget1 option to breakeven
+// @returns array<float> rrArray
+export calculate_rr(float[] targetArray, float[] rrArray, simple bool breakevenOnTarget1=false)=>
+    entry = array.get(targetArray, 2)
+    stop = array.get(targetArray, 1)
+    target1 = array.get(targetArray, 3)
+    target2 = array.get(targetArray, 4)
+    t1RR = math.round((target1 - entry) / (entry - stop), 2)
+    t2RR = math.round((target2 - entry) / (entry - stop), 2)
+    t2stop = breakevenOnTarget1 ? entry : stop
+    t2TRR = math.round((target2-target1) / (target1-t2stop), 2)
+    array.concat(rrArray, array.from(t1RR, t2RR, t2TRR))
+
+// @function creates trendline pairs
+// @param l1StartX startX of first line
+// @param l1StartY startY of first line
+// @param l1EndX endX of first line
+// @param l1EndY endY of first line
+// @param l2StartX startX of second line
+// @param l2StartY startY of second line
+// @param l2EndX endX of second line
+// @param l2EndY endY of second line
+// @param zgColor line color
+// @returns [line, line]
+export trendPairs(int l1StartX, float l1StartY, int l1EndX, float l1EndY, int l2StartX, float l2StartY, int l2EndX, float l2EndY, color zgColor)=>
+    l1t = line.new(l1StartX, l1StartY, l1EndX, l1EndY, color=zgColor, extend=extend.both)
+    l2t = line.new(l2StartX, l2StartY, l2EndX, l2EndY, color=zgColor, extend=extend.both)
+    
+    startBar = math.min(l2StartX, l1StartX)
+    endBar = l1EndX
+    l1Start = line.get_price(l1t, startBar)
+    l1End = line.get_price(l1t, endBar)
+    l2Start = line.get_price(l2t,startBar)
+    l2End = line.get_price(l2t, endBar)
+
+    line.set_extend(l1t, extend.none)
+    line.set_extend(l2t, extend.none)
+    line.set_x1(l1t, startBar)
+    line.set_y1(l1t, l1Start)
+    line.set_x2(l1t, endBar)
+    line.set_y2(l1t, l1End)
+    
+    line.set_x1(l2t, startBar)
+    line.set_y1(l2t, l2Start)
+    line.set_x2(l2t, endBar)
+    line.set_y2(l2t, l2End)
+    
+    [l1t, l2t]
+    
+
+// @function Finds type based on trendline pairs
+// @param l1t line1
+// @param l2t line2
+// @param channelThreshold theshold for channel identification
+// @returns [int, array<bool>] pattern type and flags
+export find_type(line l1t, line l2t, simple float channelThreshold = 2)=>
+    l1Start = line.get_y1(l1t)
+    l1End = line.get_y2(l1t)
+    l2Start = line.get_y1(l2t)
+    l2End = line.get_y2(l2t)
+    startBar = line.get_x1(l1t)
+    endBar = line.get_x2(l2t)
+    l1Angle = l1End - l1Start
+    l2Angle = l2End - l2Start
+    
+    startDiff = math.abs(l1Start-l2Start)
+    endDiff = math.abs(l1End-l2End)
+    
+    convergenceMultiplier = (math.min(startDiff, endDiff)/math.abs(startDiff-endDiff))
+    maxMinRatio = math.min(startDiff, endDiff)/math.max(startDiff, endDiff)
+    isChannel = convergenceMultiplier >= channelThreshold
+    isTriangle = not isChannel and math.sign(l1Angle)!= math.sign(l2Angle)
+    isWedge = not isChannel and math.sign(l1Angle)==math.sign(l2Angle)
+    isExpanding = startDiff < endDiff
+    isContracting = startDiff > endDiff
+    
+    flatQuotient = math.sign(l1Start-l2Start) == math.sign(l1Start-l2End) and math.sign(l1End - l2End) == math.sign(l1End - l2Start)
+    isFlat = isChannel and flatQuotient
+    
+    isRising = not isFlat and math.sign(l1Angle) > 0 and math.sign(l2Angle) > 0
+    isFalling = not isFlat and math.sign(l1Angle) < 0 and math.sign(l2Angle) < 0
+    
+    patternType = isChannel and isRising? 0:
+                 isChannel and isFalling? 1:
+                 isChannel and isFlat? 2:
+                 isTriangle and isContracting? 3:
+                 isTriangle and isExpanding? 4:
+                 isWedge and isRising? (isContracting? 5 : 6):
+                 isWedge and isFalling? (isContracting? 7 :8) : 9
+    [patternType, array.from(isChannel, isTriangle, isWedge, isExpanding, isContracting, isFlat, isRising, isFalling)]
+
+
+// @function Flatten flags
+// @param flags array of flags
+// @returns [boolean, boolean, boolean, boolean, boolean, boolean, boolean] - flattened flags isChannel, isTriangle, isWedge, isExpanding, isContracting, isFlat, isRising, isFalling
+export getFlags(bool[] flags)=>[array.get(flags, 0), array.get(flags, 1), array.get(flags, 2),
+                                 array.get(flags, 3), array.get(flags, 4), array.get(flags, 5),
+                                 array.get(flags, 6), array.get(flags, 7)]
+
+// @function Get type based on type number
+// @param typeNum number representing type
+// @returns String value of type
+export getType(int typeNum)=>
+    typeNum == 0? "Uptrend Channel":
+         typeNum == 1? "Downtrend Channel":
+         typeNum == 2? "Ranging Channel":
+         typeNum == 3? "Contracting Triangle":
+         typeNum == 4? "Expanding Triangle":
+         typeNum == 5? "Rising Wedge(Contracting)":
+         typeNum == 6? "Rising Wedge(Expanding)":
+         typeNum == 7? "Falling Wedge(Contracting)":
+         typeNum == 8? "Falling Wedge(Expanding)": "Indeterminate"
+
+// @function Get status based on integer value representations
+// @param status integer representing current status
+// @param maxStatus integer representing max status
+// @returns String status value
+export getStatus(int status, int maxStatus)=>
+    status == -1? 
+         (maxStatus == 0? 'Failed(Complete)':
+         maxStatus == 1? 'Stopped(Complete)':
+         maxStatus == 2? 'Target1(Complete)':
+         maxStatus == 3? 'Target2(Complete)': 'Unknown(Complete)'):
+         (maxStatus == 0? 'Awaiting Entry':
+         maxStatus == 1? 'Trade Active':
+         maxStatus == 2? 'Target1 Reached':
+         maxStatus == 3? 'Target2 Reached': 'Unknown')
+
+// @function Calculate targets based on trend lines
+// @param trendLines trendline pair array
+// @param settingsMatrix matrix containing settings
+// @param patternTypeMapping array containing pattern type mapping
+// @param patternType pattern type
+// @returns [array<float>, array<float>] arrays containing long and short calculated targets
+export calculate_simple_targets(line[] trendLines, matrix<float> settingsMatrix, string[] patternTypeMapping, int patternType)=>
+    ratios = matrix.row(settingsMatrix, patternType)
+    line1 = array.get(trendLines, 0)
+    line2 = array.get(trendLines, 1)
+    pivots = array.from(line.get_y1(line1), line.get_y2(line1), line.get_y1(line2), line.get_y2(line2))
+
+    patternTradeType = array.get(patternTypeMapping, patternType)
+    contractingType = patternTradeType == 'Contracting'
+    base = array.max(pivots) - array.min(pivots)
+    
+    longStart = contractingType? math.max(line.get_y2(line1), line.get_y2(line2)): line.get_y2(line1)
+    shortStart = contractingType? math.min(line.get_y2(line1), line.get_y2(line2)): line.get_y2(line1)
+    
+    longStop = longStart + base*array.get(ratios, 0)
+    longEntry = longStart + base*array.get(ratios, 1)
+    longTarget1 = longStart + base*array.get(ratios, 2)
+    longTarget2 = longStart + base*array.get(ratios, 3)
+
+    shortStop = shortStart - base*array.get(ratios, 0)
+    shortEntry = shortStart - base*array.get(ratios, 1)
+    shortTarget1 = shortStart - base*array.get(ratios, 2)
+    shortTarget2 = shortStart - base*array.get(ratios, 3)
+    [array.from(longStop, longStop, longEntry, longTarget1, longTarget2), 
+         array.from(shortStop, shortStop, shortEntry, shortTarget1, shortTarget2)]
+
+// @function Recalculate position values
+// @param patternTypeAndStatusMatrix matrix containing pattern type and status
+// @param targetMatrix matrix containing targets
+// @param index current index
+// @param pIndex pattern index
+// @param status current status
+// @param maxStatus max status reached
+// @param targetValue current target value
+// @param stopValue current stop value
+// @param dir direction
+// @param breakevenOnTarget1 flag to breakeven upon target1
+// @param patternType pattern type
+// @returns [int, int] new status and maxStatus values
+export recalculate_position(matrix<int> patternTypeAndStatusMatrix, matrix<float> targetMatrix, int index, int pIndex, int status, int maxStatus,
+                                 float targetValue, float stopValue, int dir, simple bool breakevenOnTarget1)=>
+    iStop = matrix.get(targetMatrix, index, 0)
+    tStop = matrix.get(targetMatrix, index, 1)
+    Entry = matrix.get(targetMatrix, index, 2)
+    Target1 = matrix.get(targetMatrix, index, 3)
+    Target2 = matrix.get(targetMatrix, index, 4)
+    
+    newStatus = status
+    newMaxStatus = maxStatus
+    if(status!=-1 and status != 3)
+        newStatus := targetValue*dir > Target2*dir and maxStatus <=2 ? 3 :
+                         targetValue*dir > Target1*dir and maxStatus <= 1? 2 :
+                         targetValue*dir > Entry*dir and maxStatus == 0? 1 : (maxStatus > 0 and stopValue*dir < tStop*dir)? -1 : newStatus
+        
+        increment = true
+        newMaxStatus := newStatus
+        if(newMaxStatus <= maxStatus)
+            increment := false
+            newMaxStatus := maxStatus
+        if(newStatus < status and newStatus != -1)
+            newStatus := status
+        if(increment and newMaxStatus >=2 and breakevenOnTarget1)
+            matrix.set(targetMatrix, index, 1, Entry)
+
+        retouch = matrix.get(patternTypeAndStatusMatrix, index, pIndex+2)
+        if(retouch == 0 and stopValue*dir < Entry*dir and maxStatus == 1)
+            matrix.set(patternTypeAndStatusMatrix, index, pIndex+2, 1)
+        matrix.set(patternTypeAndStatusMatrix, index, pIndex, newStatus)
+        matrix.set(patternTypeAndStatusMatrix, index, pIndex+1, newMaxStatus)
+    [newStatus, newMaxStatus]
+
+// @function Draw targets on chart
+// @param longTargets matrix containing long targets
+// @param shortTargets matrix containing short targets
+// @param index current index
+// @param labelColor color of lines and labels
+// @param patternName Pattern name
+// @param positionIndex position on the chart
+// @param longMaxStatus max status for long
+// @param longStatus long status value
+// @param shortMaxStatus max status for short
+// @param shortStatus short status value
+// @param tempBoxes temporary box array
+// @param tempLines temporary lines array
+// @param tempLabels temporary labels array
+// @returns void
+export draw_targets(matrix<float> longTargets, matrix<float> shortTargets, int index, color labelColor, string patternName,
+                     int positionIndex, int longMaxStatus, int longStatus, int shortMaxStatus, int shortStatus,
+                     box[] tempBoxes, line[] tempLines, label[] tempLabels)=>
+    longStop = matrix.get(longTargets, index, 0)
+    longEntry = matrix.get(longTargets, index, 2)
+    lTarget1 = matrix.get(longTargets, index, 3)
+    lTarget2 = matrix.get(longTargets, index, 4)
+
+    shortStop = matrix.get(shortTargets, index, 0)
+    shortEntry = matrix.get(shortTargets, index, 2)
+    sTarget1 = matrix.get(shortTargets, index, 3)
+    sTarget2 = matrix.get(shortTargets, index, 4)
+
+    if(longStatus == 0 and shortStatus == 0)
+        dr.draw_labelled_box(longEntry, shortEntry, labelColor, patternName, positionIndex, tempBoxes, tempLabels)
+    
+    if(longStatus > 0)
+        dr.draw_labelled_box(longEntry, longStop, labelColor, patternName, positionIndex, tempBoxes, tempLabels)
+        dr.draw_labelled_line(lTarget1, 'Target - 1(L)', color.green, labelColor, positionIndex, longMaxStatus <= 1 and longStatus >0, tempLines, tempLabels)
+        dr.draw_labelled_line(lTarget2, 'Target - 2(L)', color.green, labelColor, positionIndex, longMaxStatus <= 2 and longStatus >0, tempLines, tempLabels)
+    if(shortStatus > 0)
+        dr.draw_labelled_box(shortEntry, shortStop, labelColor, patternName, positionIndex, tempBoxes, tempLabels)
+        dr.draw_labelled_line(sTarget1, 'Target - 1(S)', color.red, labelColor, positionIndex, shortMaxStatus <= 1 and shortStatus > 0, tempLines, tempLabels)
+        dr.draw_labelled_line(sTarget2, 'Target - 2(S)', color.red, labelColor, positionIndex, shortMaxStatus <= 2 and shortStatus > 0, tempLines, tempLabels)
+
+// @function Populate open stats table
+// @param patternIdArray pattern Ids
+// @param barMatrix matrix containing bars
+// @param patternTypeAndStatusMatrix matrix containing pattern type and status
+// @param patternColorArray array containing current patter colors
+// @param longTargets matrix of long targets
+// @param shortTargets matrix of short targets
+// @param patternRRMatrix pattern risk reward matrix
+// @param OpenStatPosition table position
+// @param lblSizeOpenTrades text size
+// @returns void
+export populate_open_stats(int[] patternIdArray, matrix<int> barMatrix, matrix<int> patternTypeAndStatusMatrix, color[] patternColorArray,
+                         matrix<float> longTargets, matrix<float> shortTargets, matrix<float> patternRRMatrix,
+                         simple string OpenStatPosition=position.top_right, simple string lblSizeOpenTrades = size.small)=>
+    var table stats = na
+    table.delete(stats)
+    numberOfPatterns = array.size(patternColorArray)
+    stats :=  table.new(position=OpenStatPosition, columns=numberOfPatterns+1, rows=20, border_width=1)
+
+
+    if(numberOfPatterns > 0)
+        rrHeader = '\nR:R\nLive R:R'
+        rrHeaderT2 = '\nR:R\nTrailing R:R\nLive R:R'
+        tableHeaders = array.from('ID', 'Pattern', 'Size/Age', 'Status', 'Long TP2'+rrHeaderT2, 'Long TP1'+rrHeader, 'Long Entry\nShort Stop', 'Short Entry\nLongStop', 'Short TP1'+rrHeader, 'Short TP2'+rrHeaderT2)
+        for [index, tableHeader] in tableHeaders
+            table.cell(table_id=stats, column=numberOfPatterns, row=index, text=tableHeader, bgcolor=color.black, text_color=color.white, text_size=lblSizeOpenTrades)
+
+    for [index, patternColor] in patternColorArray
+        id = array.get(patternIdArray, index)
+        patternType = matrix.get(patternTypeAndStatusMatrix, index, 0)
+        longStatus = matrix.get(patternTypeAndStatusMatrix, index, 1)
+        longMaxStatus = matrix.get(patternTypeAndStatusMatrix, index, 2)
+        longRetestStatus = matrix.get(patternTypeAndStatusMatrix, index, 3)
+        
+        shortStatus = matrix.get(patternTypeAndStatusMatrix, index, 4)
+        shortMaxStatus = matrix.get(patternTypeAndStatusMatrix, index, 5)
+        shortRetestStatus = matrix.get(patternTypeAndStatusMatrix, index, 6)
+
+        patternName = getType(patternType)            
+
+        barArray = matrix.row(barMatrix, index)
+        size = array.max(barArray) - array.min(barArray)
+        
+        age = bar_index - array.max(barArray)
+        
+        sizeAndAge = str.tostring(size)+'/'+str.tostring(age)
+    
+        longStatusStr = getStatus(longStatus, longMaxStatus) + (longRetestStatus == 1? ' (Retested)' : '')
+        shortStatusStr = getStatus(shortStatus, shortMaxStatus) + (shortRetestStatus == 1? ' (Retested)' : '')
+        
+        strStatus = longStatus > 0 ? longStatusStr : shortStatusStr
+        statusColor = longStatus > 0? color.green : shortStatus >0 ? color.red : color.silver
+        
+        lTStop = math.round_to_mintick(matrix.get(longTargets, index, 1))
+        lEntry = math.round_to_mintick(matrix.get(longTargets, index, 2))
+        lTarget1 = math.round_to_mintick(matrix.get(longTargets, index, 3))
+        lTarget2 = math.round_to_mintick(matrix.get(longTargets, index, 4))
+
+        sTStop = math.round_to_mintick(matrix.get(shortTargets, index, 1))
+        sEntry = math.round_to_mintick(matrix.get(shortTargets, index, 2))
+        sTarget1 = math.round_to_mintick(matrix.get(shortTargets, index, 3))
+        sTarget2 = math.round_to_mintick(matrix.get(shortTargets, index, 4))
+        
+        lRR1 = matrix.get(patternRRMatrix, index, 0)
+        lRR2 = matrix.get(patternRRMatrix, index, 1)
+        lTRR2 = matrix.get(patternRRMatrix, index, 2)
+        
+        sRR1 = matrix.get(patternRRMatrix, index, 3)
+        sRR2 = matrix.get(patternRRMatrix, index, 4)
+        sTRR2 = matrix.get(patternRRMatrix, index, 5)
+        
+        lLongRisk =  math.abs(close-lTStop)
+        lStopRisk = math.abs(close-sTStop)
+        
+        lLongT1Reward = math.abs(lTarget1 - close)
+        lLongT2Reward = math.abs(lTarget2 - close)
+        liveLRR1 = longMaxStatus == 1 ? str.tostring(math.round(lLongT1Reward/lLongRisk, 2)) : '-'
+        liveLRR2 = longMaxStatus > 0 ? str.tostring(math.round(lLongT2Reward/lLongRisk, 2)) : '-'
+        
+        lShortT1Reward = math.abs(sTarget1 - close)
+        lShortT2Reward = math.abs(sTarget2 - close)
+        liveSRR1 = shortMaxStatus == 1 ? str.tostring(math.round(lShortT1Reward/lStopRisk, 2)) : '-'
+        liveSRR2 = shortMaxStatus > 0 ? str.tostring(math.round(lShortT2Reward/lStopRisk, 2)) : '-'
+        
+        l2Str = str.tostring(lTarget2) + '\nRR : '+str.tostring(lRR2) + '\nTRR : '+str.tostring(lTRR2) + '\n' + liveLRR2
+        l1Str = str.tostring(lTarget1) + '\nRR : '+str.tostring(lRR1) + '\n' + liveLRR1
+        s1Str = str.tostring(sTarget1) + '\nRR : '+str.tostring(sRR1) + '\n' + liveSRR1
+        s2Str = str.tostring(sTarget2) + '\nRR : '+str.tostring(sRR2) + '\nTRR : '+str.tostring(sTRR2) + '\n' + liveSRR2
+        
+        longEntryStr = str.tostring(lEntry)+'▲\n'+str.tostring(lTStop)+'■'
+        shortEntryStr = str.tostring(sEntry)+'▼\n'+str.tostring(sTStop)+'■'
+        tableColumns = array.from(str.tostring(id), patternName, sizeAndAge, strStatus, l2Str, l1Str, longEntryStr, shortEntryStr, s1Str, s2Str)
+        columnBgColors = array.from(statusColor, statusColor, statusColor, statusColor, color.green, color.green, color.lime, color.orange, color.red, color.red)
+        highlight = array.from(true, true, true, true, longMaxStatus >=2, longMaxStatus>=1, shortMaxStatus==0, longMaxStatus==0, shortMaxStatus>=1, shortMaxStatus>=2)
+        for [row, tableColumn] in tableColumns
+            table.cell(table_id=stats, column=index, row=row, text=tableColumn, bgcolor=color.new(array.get(columnBgColors, row), array.get(highlight, row)? 80 : 90),
+                         text_color=color.new(patternColor, array.get(highlight, row)? 0 : 50), text_size=lblSizeOpenTrades)
+                         
+                         
+export draw_pattern_label(line[] trendLines, matrix<bool> patternFlagMatrix, matrix<int> patternTypeAndStatusMatrix,
+                             color[] patternColorArray, bool[] patternFlags, label[] patternLabelArray,
+                             color zgColor, int patternType, simple bool drawLabel, simple bool clearOldPatterns, simple bool safeRepaint,
+                             simple int maxPatternsReference)=>
+    l1t = array.get(trendLines, 0)
+    l2t = array.get(trendLines, 1)
+    ma.push(patternFlagMatrix, patternFlags, maxPatternsReference)
+    ma.push(patternTypeAndStatusMatrix, array.from(patternType, 0, 0, 0, 0, 0, 0), maxPatternsReference)
+    pa.push(patternColorArray, zgColor, maxPatternsReference)
+    if(drawLabel)
+        bar = line.get_x2(l1t)
+        l1End = line.get_y2(l1t)
+        l2End = line.get_y2(l2t)
+        [isChannel, isTriangle, isWedge, isExpanding, isContracting, isFlat, isRising, isFalling] = getFlags(patternFlags)
+        
+        y = (isChannel or isWedge) and isRising? math.max(l1End, l2End) : math.min(l1End, l2End)
+        lblStyle = (isChannel or isWedge) and isRising? label.style_label_down : label.style_label_up
+        patternLabel = label.new(bar, y, getType(patternType), style=lblStyle, yloc=yloc.price, color=zgColor, textcolor=color.black,
+                                     tooltip=patternType==9?'Error calculating angle. Hence, flagged as indeterminate':'')
+        if(clearOldPatterns or safeRepaint)
+            pa.push(patternLabelArray, patternLabel, maxPatternsReference)
+            
+
+getClosedCellVal(matrix<int> closedStats, matrix<float> closedRRStats, matrix<int> retouchStats, matrix<int> sizeStats,
+             int rowNumber, int cIndex, int[] statsRow, int sum, int validSum, int[] retouchRow, int[] sizeRow, bool showStatsInPercentage)=>
+    currentCount = matrix.get(closedStats, rowNumber, cIndex)
+    lastCount = cIndex!=0 ? matrix.get(closedStats, rowNumber, cIndex-1) : 0
+    
+    count = cIndex > 1? array.sum(array.slice(statsRow, cIndex, matrix.columns(closedStats))) : matrix.get(closedStats, rowNumber, cIndex)
+    touchCount = cIndex > 1? array.sum(array.slice(retouchRow, cIndex, matrix.columns(retouchStats))) : matrix.get(retouchStats, rowNumber, cIndex)
+
+    countPercent = cIndex == 0? (sum > 0? (count*100/sum) : 0) : (validSum > 0 ? (count*100/validSum) : 0)
+    tcount = count+lastCount == 0 ? 0 : count*100/(count+lastCount)
+
+    rr = cIndex >1 and sum > 0? matrix.get(closedRRStats, rowNumber, cIndex-2)/sum : 0.0
+
+    trr = (cIndex > 2 and sum > 0)? matrix.get(closedRRStats, rowNumber, cIndex-1)/sum : 0.0
+    avgSize = cIndex >1 and count > 0 ? int(array.sum(array.slice(sizeRow, cIndex, matrix.columns(sizeStats)))/count)  : 0.0
+    rrStr = cIndex > 1 and sum > 0 ? '\n'+str.tostring(math.round(rr,2))+ (trr != 0 and cIndex >2 ? ' / '+str.tostring(math.round(trr, 2)):'') : ''
+    wrStr = (showStatsInPercentage? str.tostring(countPercent, format.percent) + (cIndex > 2? ' / ' + str.tostring(tcount, format.percent): ''):
+             (cIndex > 1? str.tostring(touchCount)+' / ': '') +str.tostring(count))
+    cellVal = wrStr+(showStatsInPercentage ? rrStr : '\n('+str.tostring(avgSize)+')')
+
+    cellVal
+    
+
+export populate_closed_stats(matrix<int> patternTypeAndStatusMatrix,
+                         matrix<int> bullishCounts, matrix<int> bearishCounts,
+                         matrix<int> bullishRetouchCounts, matrix<int> bearishRetouchCounts,
+                         matrix<int> bullishSizeMatrix, matrix<int> bearishSizeMatrix,
+                         matrix<float> bullishRR, matrix<float> bearishRR,
+                         simple string ClosedStatsPosition, simple string lblSizeClosedTrades,
+                         simple bool showSelectivePatternStats, simple bool showPatternStats, simple bool showStatsInPercentage)=>
+    if(barstate.islast)
+        closedStats = table.new(ClosedStatsPosition, 14, matrix.rows(bullishCounts)+3, border_color=color.black, border_width=2)
+        rowMain = array.from("Pattern/\nStatus", "", "", "Long", "", "", "", "", "Short", "", "")
+        rowHeaders = array.from("", "Failed", "Stopped", "Target1", "Target2", "Total", "Failed", "Stopped", "Target1", "Target2", "Total")
+        
+        showOpenPatternStats = showSelectivePatternStats and matrix.rows(patternTypeAndStatusMatrix) > 0
+        
+        for [index, val] in rowMain
+            if(showPatternStats or showOpenPatternStats or index > 1) and index!=1 and index!=2 and index!=6 and index!=7
+                table.cell(closedStats, index, 0, val, text_color=color.white, text_size=lblSizeClosedTrades, bgcolor=color.maroon)
+                table.cell(closedStats, index, 1, array.get(rowHeaders, index), text_color=color.white, text_size=lblSizeClosedTrades, bgcolor=color.maroon)
+        
+        longColumnStart = 3
+        longColumnEnd = longColumnStart + matrix.columns(bullishCounts)-2
+        shortColumnStart = longColumnEnd + 3
+        shortColumnEnd = shortColumnStart + matrix.columns(bearishCounts)-2
+        numberOfRows = matrix.rows(bullishCounts)
+        if(showPatternStats or showOpenPatternStats)
+            table.merge_cells(closedStats, 0,0,0,1)
+        
+        table.merge_cells(closedStats, longColumnStart,0,longColumnEnd,0)
+        table.merge_cells(closedStats, shortColumnStart,0,shortColumnEnd,0)
+
+        closedStatsTooltip = (showStatsInPercentage? 'Win Rate / Trailing Win Rate\nRisk Reward / Trailing Risk Reward':'Retest Count / Hit Count\n(Average Size of Patterns)')
+        closedStatsTooltipT1 = (showStatsInPercentage? 'Win Rate\nRisk Reward':'Retest Count / Hit Count\n(Average Size of Patterns)')
+        totalsTooltip = 'Retest Count/ Valid Count / Total Patterns\n(Average Size of Patterns)'
+        
+        if(showPatternStats or showOpenPatternStats)
+            for i=0 to numberOfRows-2
+                patternColumn = matrix.col(patternTypeAndStatusMatrix, 0)
+                patternIndex = array.indexof(patternColumn, i)
+                if(not showOpenPatternStats or showPatternStats or patternIndex >= 0)
+                    [bullishRow, lSum, lValidSum] = getSum(bullishCounts, i)
+                    [bearishRow, sSum, sValidSum] = getSum(bearishCounts, i)
+                    
+                    [bullishRowRetouch, lSumRetouch, lValidSumRetouch] = getSum(bullishRetouchCounts, i)
+                    [bearishRowRetouch, sSumRetouch, sValidSumRetouch] = getSum(bearishRetouchCounts, i)
+            
+                    [bullishRowSize, lSumSize, lValidSumSize] = getSum(bullishSizeMatrix, i)
+                    [bearishRowSize, sSumSize, sValidSumSize] = getSum(bearishSizeMatrix, i)
+                    
+                    if(lSum != 0 or sSum != 0)
+                        table.cell(closedStats, 0, i+2, getType(i), text_color=color.white, text_size=lblSizeClosedTrades, bgcolor=color.teal)
+                        for j=2 to matrix.columns(bullishCounts)-1
+                            cellVal = getClosedCellVal(bullishCounts, bullishRR, bullishRetouchCounts, bullishSizeMatrix, i, j, bullishRow,
+                                                 lSum, lValidSum, bullishRowRetouch, bullishRowSize, showStatsInPercentage)
+                            table.cell(closedStats, j+longColumnStart-2, i+2, cellVal, text_color=color.black, text_size=lblSizeClosedTrades, bgcolor=color.new(color.lime,20),
+                                                 tooltip=j==2?closedStatsTooltipT1 :closedStatsTooltip)
+                        avgSizeLongStr = str.tostring(int(lValidSumSize/math.max(lValidSum, 1)))
+                        fCellTxtLong = str.tostring(lValidSumRetouch)+'/'+str.tostring(lValidSum)+'/'+str.tostring(lSum)+'\n('+avgSizeLongStr+')'
+                        table.cell(closedStats, longColumnEnd, i+2, fCellTxtLong, text_color=color.black, text_size=lblSizeClosedTrades, bgcolor=color.aqua, tooltip=totalsTooltip)
+                        for j=2 to matrix.columns(bearishCounts)-1
+                            cellVal = getClosedCellVal(bearishCounts, bearishRR, bearishRetouchCounts, bearishSizeMatrix, i, j, bearishRow,
+                                                 sSum, sValidSum, bearishRowRetouch, bearishRowSize, showStatsInPercentage)
+                            table.cell(closedStats, j+shortColumnStart-2, i+2, cellVal, text_color=color.black, text_size=lblSizeClosedTrades, bgcolor=color.new(color.orange, 20),
+                                                 tooltip=j==2?closedStatsTooltipT1 :closedStatsTooltip)
+                        avgSizeShortStr = str.tostring(int(sValidSumSize/math.max(sValidSum, 1)))
+                        fCellTxtShort = str.tostring(sValidSumRetouch)+'/'+str.tostring(sValidSum)+'/'+str.tostring(sSum)+'\n('+avgSizeShortStr+')'
+                        table.cell(closedStats, shortColumnEnd, i+2, fCellTxtShort, text_color=color.black, text_size=lblSizeClosedTrades, bgcolor=color.aqua, tooltip=totalsTooltip)
+
+        totalColor = color.yellow
+        [bullishLRow, llSum, llValidSum] = getSum(bullishCounts, numberOfRows-1)
+        [bearishLRow, slSum, slValidSum] = getSum(bearishCounts, numberOfRows-1)
+        
+        [bullishLRowRetouch, llSumRetouch, llValidSumRetouch] = getSum(bullishRetouchCounts, numberOfRows-1)
+        [bearishLRowRetouch, slSumRetouch, slValidSumRetouch] = getSum(bearishRetouchCounts, numberOfRows-1)
+        
+        [bullishLRowSize, llSumSize, llValidSumSize] = getSum(bullishSizeMatrix, numberOfRows-1)
+        [bearishLRowSize, slSumSize, slValidSumSize] = getSum(bearishSizeMatrix, numberOfRows-1)
+        
+        if(showPatternStats or showOpenPatternStats)
+            table.cell(closedStats, 0, numberOfRows+2, 'Total', text_color=color.white, text_size=lblSizeClosedTrades, bgcolor=color.olive)
+        
+        for j=2 to matrix.columns(bullishCounts)-1
+            cellVal = getClosedCellVal(bullishCounts, bullishRR, bullishRetouchCounts, bullishSizeMatrix, numberOfRows-1, j, bullishLRow,
+                                 llSum, llValidSum, bullishLRowRetouch, bullishLRowSize, showStatsInPercentage)
+            table.cell(closedStats, j+longColumnStart-2, numberOfRows+2, cellVal, text_color=color.black, text_size=lblSizeClosedTrades,
+                                 bgcolor=color.new(showPatternStats or showOpenPatternStats?totalColor:color.lime,20),
+                                 tooltip=j==2?closedStatsTooltipT1 :closedStatsTooltip)
+        avgSizeLongStr = str.tostring(int(llValidSumSize/math.max(llValidSum, 1)))
+        fCellTxtLong = str.tostring(llValidSumRetouch)+'/'+str.tostring(llValidSum)+'/'+str.tostring(llSum)+'\n('+avgSizeLongStr+')'
+        table.cell(closedStats, longColumnEnd, numberOfRows+2, fCellTxtLong, text_color=color.black, text_size=lblSizeClosedTrades,
+                                             bgcolor=showPatternStats or showOpenPatternStats?totalColor:color.lime,
+                                             tooltip=totalsTooltip)
+
+        for j=2 to matrix.columns(bearishCounts)-1
+            cellVal = getClosedCellVal(bearishCounts, bearishRR, bearishRetouchCounts, bearishSizeMatrix, numberOfRows-1, j, bearishLRow,
+                                 slSum, slValidSum, bearishLRowRetouch, bearishLRowSize, showStatsInPercentage)
+            table.cell(closedStats, j+shortColumnStart-2, numberOfRows+2, cellVal, text_color=color.black, text_size=lblSizeClosedTrades,
+                                 bgcolor=color.new(showPatternStats or showOpenPatternStats?totalColor:color.orange, 20),
+                                 tooltip=j==2?closedStatsTooltipT1 :closedStatsTooltip)
+        avgSizeShortStr = str.tostring(int(slValidSumSize/math.max(slValidSum, 1)))
+        fCellTxtShort = str.tostring(slValidSumRetouch)+'/'+str.tostring(slValidSum)+'/'+str.tostring(slSum)+'\n('+avgSizeShortStr+')'
+        table.cell(closedStats, shortColumnEnd, numberOfRows+2,fCellTxtShort, text_color=color.black, text_size=lblSizeClosedTrades,
+                                             bgcolor=showPatternStats or showOpenPatternStats?totalColor:color.orange,
+                                             tooltip=totalsTooltip)
