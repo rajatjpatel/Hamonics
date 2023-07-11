@@ -1,0 +1,285 @@
+//@version=5
+
+// @description Collection of all custom and enhanced TA indicators
+library("ta", overlay=true)
+import HeWhoMustNotBeNamed/arrays/1 as pa
+bandwidth(float middle, float upper, float lower)=> 100*(upper-lower)/middle
+percentb(float source, float upper, float lower)=> 100*(source-lower)/(upper-lower)
+customseries(float source=close, simple string type="sma", simple int length) =>
+    switch type
+    	"ema" => ta.ema(source, length)
+    	"sma" => ta.sma(source, length)
+    	"rma" => ta.rma(source, length)
+    	"hma" => ta.hma(source, length)
+    	"wma" => ta.wma(source, length)
+    	"vwma" => ta.vwma(source, length)
+    	"swma" => ta.swma(source)
+    	"linreg" => ta.linreg(source, length, 0)
+    	"median" => ta.median(source, length)
+    	"mom" => ta.mom(source, length)
+    	"high" => ta.highest(source, length)
+    	"low" => ta.lowest(source, length)
+    	"medianHigh" => ta.median(ta.highest(source, length), length)
+    	"medianLow" => ta.median(ta.lowest(source, length), length)
+    	"percentrank" => ta.percentrank(source, length)
+    	=> (ta.highest(length) + ta.lowest(length))/2
+
+
+getStickyRange(float highsource, float lowsource, float upper, float lower, simple bool sticky=false)=>
+    newUpper = upper
+    newLower = lower
+    highBreakout = highsource[1] >= newUpper[1]
+    lowBreakout = lowsource[1] <= newLower[1]
+    newUpper := (highBreakout or lowBreakout or not sticky)? newUpper : nz(newUpper[1], newUpper)
+    newLower := (highBreakout or lowBreakout or not sticky)? newLower : nz(newLower[1], newLower)
+    [newUpper, newLower]
+
+// @function returns custom moving averages
+// @param source Moving Average Source
+// @param maType Moving Average Type : Can be sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param length Moving Average Length
+// @returns moving average for the given type and length
+export ma(float source=close, simple string maType="sma", simple int length) =>
+    customseries(source, maType, length)
+
+// @function returns ATR with custom moving average
+// @param maType Moving Average Type : Can be sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param length Moving Average Length
+// @returns ATR for the given moving average type and length
+export atr(simple string maType="sma", simple int length) =>
+    customseries(ta.tr, maType, length)
+
+// @function returns ATR as percentage of close price
+// @param maType Moving Average Type : Can be sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param length Moving Average Length
+// @returns ATR as percentage of close price for the given moving average type and length
+export atrpercent(simple string maType="sma", simple int length) =>
+    100*atr(maType, length)/close
+
+// @function returns Bollinger band for custom moving average
+// @param source Moving Average Source
+// @param maType Moving Average Type : Can be sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param length Moving Average Length
+// @param multiplier Standard Deviation multiplier
+// @param sticky - sticky boundaries which will only change when value is outside boundary.
+// @returns Bollinger band with custom moving average for given source, length and multiplier
+export bb(float source=close, simple string maType="sma", simple int length=20, float multiplier=2.0, simple bool sticky=false) =>
+    float middle = ma(source, maType, length)
+	float upper = middle + ta.stdev(source, length)*multiplier
+	float lower = middle - ta.stdev(source, length)*multiplier
+	[newUpper, newLower] = getStickyRange(high, low, upper, lower, sticky)
+	upper := newUpper
+	lower := newLower
+	[middle, upper, lower]
+
+// @function returns Bollinger bandwidth for custom moving average
+// @param source Moving Average Source
+// @param maType Moving Average Type : Can be sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param length Moving Average Length
+// @param multiplier Standard Deviation multiplier
+// @param sticky - sticky boundaries which will only change when value is outside boundary.
+// @returns Bollinger Bandwidth for custom moving average for given source, length and multiplier
+export bbw(float source=close, simple string maType="sma", simple int length=20, float multiplier=2.0, simple bool sticky=false) =>
+    [middle, upper, lower] = bb(source, maType, length, multiplier, sticky)
+    bandwidth(middle, upper, lower)
+    
+// @function returns Bollinger Percent B for custom moving average
+// @param source Moving Average Source
+// @param maType Moving Average Type : Can be sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param length Moving Average Length
+// @param multiplier Standard Deviation multiplier
+// @param sticky - sticky boundaries which will only change when value is outside boundary.
+// @returns Bollinger Percent B for custom moving average for given source, length and multiplier
+export bpercentb(float source=close, simple string maType="sma", simple int length=20, float multiplier=2.0, simple bool sticky=false) =>
+    [middle, upper, lower] = bb(source, maType, length, multiplier, sticky)
+    percentb(source, upper, lower)
+    
+
+// @function returns Keltner Channel for custom moving average
+// @param source Moving Average Source
+// @param maType Moving Average Type : Can be sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param length Moving Average Length
+// @param multiplier Standard Deviation multiplier
+// @param useTrueRange - if set to false, uses high-low.
+// @param sticky - sticky boundaries which will only change when value is outside boundary.
+// @returns Keltner Channel for custom moving average for given souce, length and multiplier
+export kc(float source=close, simple string maType="ema", simple int length=20, float multiplier=2, simple bool useTrueRange=true, simple bool sticky=false) =>
+    float middle = ma(source, maType, length)
+	float span = (useTrueRange) ? ta.tr : (high - low)
+	float rangeMa = ma(span, maType, length)
+	float upper = middle + rangeMa*multiplier
+	float lower = middle - rangeMa*multiplier
+	[newUpper, newLower] = getStickyRange(high, low, upper, lower, sticky)
+	upper := newUpper
+	lower := newLower
+	[middle, upper, lower]
+	
+	
+// @function returns Keltner Channel Width with custom moving average
+// @param source Moving Average Source
+// @param maType Moving Average Type : Can be sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param length Moving Average Length
+// @param multiplier Standard Deviation multiplier
+// @param useTrueRange - if set to false, uses high-low.
+// @param sticky - sticky boundaries which will only change when value is outside boundary.
+// @returns Keltner Channel Width for custom moving average
+export kcw(float source=close, simple string maType="ema", simple int length=20, float multiplier=2, simple bool useTrueRange=true, simple bool sticky=false) =>
+    [middle, upper, lower] = kc(source, maType, length, multiplier, useTrueRange, sticky)
+    bandwidth(middle, upper, lower)
+    
+
+// @function returns Keltner Channel Percent K Width with custom moving average
+// @param source Moving Average Source
+// @param maType Moving Average Type : Can be sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param length Moving Average Length
+// @param multiplier Standard Deviation multiplier
+// @param useTrueRange - if set to false, uses high-low.
+// @param sticky - sticky boundaries which will only change when value is outside boundary.
+// @returns Keltner Percent K for given moving average, source, length and multiplier
+export kpercentk(float source=close, simple string maType="ema", simple int length=20, float multiplier=2, simple bool useTrueRange=true, simple bool sticky=false) =>
+    [middle, upper, lower] = kc(source, maType, length, multiplier, useTrueRange, sticky)
+    percentb(source, upper, lower)
+    
+
+// @function returns Custom Donchian Channel
+// @param length - donchian channel length
+// @param useAlternateSource - Custom source is used only if useAlternateSource is set to true
+// @param alternateSource - Custom source
+// @param sticky - sticky boundaries which will only change when value is outside boundary.
+// @returns Donchian channel
+export dc(simple int length=20, simple bool useAlternateSource = false, float alternateSource = close, simple bool sticky=false) =>
+    highSource = useAlternateSource? alternateSource : high
+    lowSource = useAlternateSource? alternateSource : low
+    [upper, lower] = getStickyRange(highSource, lowSource, ta.highest(highSource, length), ta.lowest(lowSource, length), sticky)
+    middle = (upper+lower)/2
+    [middle, upper, lower]
+
+
+// @function returns Donchian Channel Width
+// @param length - donchian channel length
+// @param useAlternateSource - Custom source is used only if useAlternateSource is set to true
+// @param alternateSource - Custom source
+// @param sticky - sticky boundaries which will only change when value is outside boundary.
+// @returns Donchian channel width
+export dcw(simple int length=20, simple bool useAlternateSource = false, float alternateSource = close, simple bool sticky=false) =>
+    [middle, upper, lower] = dc(length, useAlternateSource, alternateSource, sticky)
+    bandwidth(middle, upper, lower)
+    
+
+// @function returns Donchian Channel Percent of price
+// @param useAlternateSource - Custom source is used only if useAlternateSource is set to true
+// @param alternateSource - Custom source
+// @param length - donchian channel length
+// @param sticky - sticky boundaries which will only change when value is outside boundary.
+// @returns Donchian channel Percent D
+export dpercentd(simple int length=20, simple bool useAlternateSource = false, float alternateSource = close, simple bool sticky=false) =>
+    [middle, upper, lower] = dc(length, useAlternateSource, alternateSource, sticky)
+    percentb(useAlternateSource? alternateSource : hl2, upper, lower)
+
+// @function oscillatorRange - returns Custom overbought/oversold areas for an oscillator input
+// @param source - Osillator source such as RSI, COG etc.
+// @param method - Valid values for method are : sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param highlowLength - length on which highlow of the oscillator is calculated
+// @param rangeLength - length used for calculating oversold/overbought range - usually same as oscillator length
+// @param sticky - overbought, oversold levels won't change unless crossed
+// @returns Dynamic overbought and oversold range for oscillator input
+export oscillatorRange(float source, simple string method="highlow", simple int highlowLength=50, simple int rangeLength=14, simple bool sticky=false) =>
+    oscillatorHighest = customseries(source, "high", highlowLength)
+    oscillatorLowest = customseries(source, "low", highlowLength)
+    
+    oscOverbought = customseries(oscillatorHighest, method == "highlow"? "low" : method, rangeLength)
+    oscOversold = customseries(oscillatorLowest, method == "highlow"? "high" : method, rangeLength)
+
+    getStickyRange(source, source, oscOverbought, oscOversold, sticky)
+
+// @function oscillator - returns Choice of oscillator with custom overbought/oversold range
+// @param type - oscillator type. Valid values : cci, cmo, cog, mfi, roc, rsi, stoch, tsi, wpr
+// @param length - Oscillator length - not used for TSI
+// @param shortLength - shortLength only used for TSI
+// @param longLength - longLength only used for TSI
+// @param source - custom source if required
+// @param highSource - custom high source for stochastic oscillator
+// @param lowSource - custom low source for stochastic oscillator
+// @param method - Valid values for method are : sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param highlowLength - length on which highlow of the oscillator is calculated
+// @param sticky - overbought, oversold levels won't change unless crossed
+// @returns Oscillator value along with dynamic overbought and oversold range for oscillator input
+export oscillator(simple string type="rsi", simple int length=14, simple int shortLength = 13, simple int longLength = 25,
+                     float source = close, float highSource = high, float lowSource = low,
+                     simple string method="highlow", simple int highlowLength=50, simple bool sticky=false)=>
+    oscillator =  switch type
+        "cci" => ta.cci(source, length)
+    	"cmo" => ta.cmo(source, length)
+    	"cog" => ta.cog(source, length)
+    	"mfi" => ta.mfi(source, length)
+    	"roc" => ta.roc(source, length)
+    	"rsi" => ta.rsi(source, length)
+    	"stoch" => ta.stoch(source, highSource, lowSource, length)
+    	"tsi" => ta.tsi(source, shortLength, longLength)
+    	"wpr" => ta.wpr(length)
+    	=> ta.rsi(source, length)
+
+    [overbought, oversold] = oscillatorRange(oscillator, method, highlowLength, length, sticky)
+    [oscillator, overbought, oversold]
+    
+
+// @function multibands - returns Choice of oscillator with custom overbought/oversold range
+// @param bandType - Band type - can be either bb or kc
+// @param source - custom source if required
+// @param maType Moving Average Type : Can be sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param length - Oscillator length - not used for TSI
+// @param useTrueRange - if set to false, uses high-low.
+// @param sticky - for sticky borders which only change upon source crossover/crossunder
+// @param numberOfBands - Number of bands to generate
+// @param multiplierStart - Starting ATR or Standard deviation multiplier for first band
+// @param multiplierStep - Incremental value for multiplier for each band
+// @returns array of band values sorted in ascending order
+export multibands(simple string bandType="bb", float source=close, simple string maType = "sma", simple int length = 60, 
+         simple bool useTrueRange=true, simple bool sticky=false,
+         simple int numberOfBands=7, simple float multiplierStart = 0.5, simple float multiplierStep = 0.5)=>
+    bands = array.new_float()
+    for i=0 to numberOfBands-1
+        multiplier = multiplierStart + i*multiplierStep
+        middle = 0.0
+        upper = 0.0
+        lower = 0.0
+        if(bandType == "bb")
+            [bbmiddle, bbupper, bblower] = bb(source, maType, length, multiplier, sticky)
+            middle := bbmiddle
+            upper := bbupper
+            lower := bblower
+        else
+            [kcmiddle, kcupper, kclower] = kc(source, maType, length, multiplier, useTrueRange, sticky)
+            middle := kcmiddle
+            upper := kcupper
+            lower := kclower
+        array.unshift(bands, lower)
+        array.unshift(bands, upper)
+        if(i == 0)
+            array.unshift(bands, middle)
+    array.sort(bands)
+    bands
+
+// @function mbandoscillator - Multiband oscillator created on the basis of bands
+// @param bandType - Band type - can be either bb or kc
+// @param source - custom source if required
+// @param maType Moving Average Type : Can be sma, ema, hma, rma, wma, vwma, swma, highlow, linreg, median
+// @param length - Oscillator length - not used for TSI
+// @param useTrueRange - if set to false, uses high-low.
+// @param stickyBands - for sticky borders which only change upon source crossover/crossunder for band detection
+// @param numberOfBands - Number of bands to generate
+// @param multiplierStart - Starting ATR or Standard deviation multiplier for first band
+// @param multiplierStep - Incremental value for multiplier for each band
+// @returns oscillator currentStates - Array containing states for last n bars
+export mbandoscillator(simple string bandType="kc", float source=close, simple string maType = "sma", simple int length = 60, 
+         simple bool useTrueRange=false, simple bool stickyBands=false,
+         simple int numberOfBands=100, simple float multiplierStart = 0.5, simple float multiplierStep = 0.5
+         )=>
+
+    states = multibands(bandType, source, maType, length, useTrueRange, stickyBands, numberOfBands, multiplierStart, multiplierStep)
+    currentState = array.size(states)
+    for i = 0 to array.size(states) - 1 by 1
+        if source < array.get(states, i)
+            currentState := i
+            break
+    currentState
