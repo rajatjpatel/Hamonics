@@ -1,0 +1,394 @@
+//@version=5
+// @description Library provides an alternative method to scan harmonic patterns. This is helpful in reducing iterations
+library("eHarmonicpatterns")
+import HeWhoMustNotBeNamed/arrayutils/20 as pa
+isInRange(ratio, min, max)=> ratio >= min and ratio <= max
+
+isCypherProjection(float xabRatio, float axcRatio, simple float err_min=0.92, simple float err_max=1.08, bool enable=true) =>
+    xabMin = 0.382 * err_min
+    xabMax = 0.618 * err_max
+    axcMin = 1.13 * err_min
+    axcMax = 1.414 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(axcRatio, axcMin, axcMax)
+
+
+isCypherPattern(float xabRatio, float axcRatio, float xcdRatio, simple float err_min=0.92, simple float err_max=1.08, enable=true) =>
+    xabMin = 0.382 * err_min
+    xabMax = 0.618 * err_max
+    axcMin = 1.13 * err_min
+    axcMax = 1.414 * err_max
+    xcdMin = 0.786 * err_min
+    xcdMax = 0.786 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(axcRatio, axcMin, axcMax) and
+         isInRange(xcdRatio, xcdMin, xcdMax)
+
+getNumberOfSupportedPatterns()=>16
+
+// @function Returns the list of supported patterns in order
+// @param patternLabelArray Supported Patterns
+export getSupportedPatterns()=>
+    patternLabelArray = array.new_string()
+    array.push(patternLabelArray, "Gartley")
+    array.push(patternLabelArray, "Bat")
+    array.push(patternLabelArray, "Butterfly")
+    array.push(patternLabelArray, "Crab")
+    array.push(patternLabelArray, "DeepCrab")
+    array.push(patternLabelArray, "Cypher")
+    array.push(patternLabelArray, "Shark")
+    array.push(patternLabelArray, "NenStar")
+    
+    array.push(patternLabelArray, "Anti NenStar")
+    array.push(patternLabelArray, "Anti Shark")
+    array.push(patternLabelArray, "Anti Cypher")
+    array.push(patternLabelArray, "Anti Crab")
+    array.push(patternLabelArray, "Anti Butterfly")
+    array.push(patternLabelArray, "Anti Bat")
+    array.push(patternLabelArray, "Anti Gartley")
+    array.push(patternLabelArray, "Navarro200")
+    patternLabelArray
+    
+// @function Checks if bcd ratio is in range of any harmonic pattern
+// @param bcdRatio AB/XA ratio
+// @param err_min minimum error threshold
+// @param err_max maximum error threshold
+// @param patternArray Array containing pattern check flags. Checks are made only if flags are true. Upon check flgs are overwritten.
+export scan_xab(float xabRatio, simple float err_min, simple float err_max, bool[] patternArray)=>
+    if(array.includes(patternArray, true))
+        if(xabRatio >=0.276*err_min and xabRatio <=0.886*err_max)
+            is_0_382_to_0_618 = isInRange(xabRatio, 0.382*err_min, 0.618*err_max)
+            is_0_446_to_0_618 = isInRange(xabRatio, 0.446*err_min, 0.618*err_max)
+            is_0_500_to_0_786 = isInRange(xabRatio, 0.500*err_min, 0.786*err_max)
+            is_0_618_to_0_786 = isInRange(xabRatio, 0.618*err_min, 0.786*err_max)
+            //Gartley
+            array.set(patternArray, 0, array.get(patternArray, 0) and isInRange(xabRatio, 0.618*err_min, 0.618*err_max))
+            //Bat
+            array.set(patternArray, 1, array.get(patternArray, 1) and isInRange(xabRatio, 0.382*err_min, 0.500*err_max))
+            //Butterfly
+            array.set(patternArray, 2, array.get(patternArray, 2) and isInRange(xabRatio, 0.786*err_min, 0.786*err_max))
+            //Crab
+            array.set(patternArray, 3, array.get(patternArray, 3) and is_0_382_to_0_618)
+            //DeepCrab
+            array.set(patternArray, 4, array.get(patternArray, 4) and isInRange(xabRatio, 0.886*err_min, 0.886*err_max))
+            //Cypher
+            array.set(patternArray, 5, array.get(patternArray, 5) and is_0_382_to_0_618)
+            //Shark
+            array.set(patternArray, 6, array.get(patternArray, 6) and is_0_446_to_0_618)
+            //NenStar
+            array.set(patternArray, 7, array.get(patternArray, 7) and is_0_382_to_0_618)
+            //Anti NenStar
+            array.set(patternArray, 8, array.get(patternArray, 8) and is_0_500_to_0_786)
+            //Anti Shark
+            array.set(patternArray, 9, array.get(patternArray, 9) and is_0_446_to_0_618)
+            //Anti Cypher
+            array.set(patternArray, 10, array.get(patternArray, 10) and is_0_500_to_0_786)
+            //Anti Crab
+            array.set(patternArray, 11, array.get(patternArray, 11) and isInRange(xabRatio, 0.276*err_min, 0.446*err_max))
+            //Anti Butterfly
+            array.set(patternArray, 12, array.get(patternArray, 12) and is_0_382_to_0_618)
+            //Anti Bat
+            array.set(patternArray, 13, array.get(patternArray, 13) and is_0_382_to_0_618)
+            //Anti Gartley
+            array.set(patternArray, 14, array.get(patternArray, 14) and is_0_618_to_0_786)
+            //Navarro200
+            array.set(patternArray, 15, array.get(patternArray, 15) and isInRange(xabRatio, 0.382*err_min, 0.786*err_max))
+        else
+            array.fill(patternArray, false)
+
+// @function Checks if abc or axc ratio is in range of any harmonic pattern
+// @param abcRatio BC/AB ratio
+// @param axcRatio XC/AX ratio
+// @param err_min minimum error threshold
+// @param err_max maximum error threshold
+// @param patternArray Array containing pattern check flags. Checks are made only if flags are true. Upon check flgs are overwritten.
+export scan_abc_axc(float abcRatio, float axcRatio, simple float err_min, simple float err_max, bool[] patternArray)=>
+    if(array.includes(patternArray, true))
+        is_0_382_to_0_886 = isInRange(abcRatio, 0.382*err_min, 0.886*err_max)
+        is_0_467_to_0_707 = isInRange(abcRatio, 0.467*err_min, 0.707*err_max)
+        is_1_128_to_2_618 = isInRange(abcRatio, 1.128*err_min, 2.618*err_max)
+
+        //Gartley
+        array.set(patternArray, 0, array.get(patternArray, 0) and is_0_382_to_0_886)
+        //Bat
+        array.set(patternArray, 1, array.get(patternArray, 1) and is_0_382_to_0_886)
+        //Butterfly
+        array.set(patternArray, 2, array.get(patternArray, 2) and is_0_382_to_0_886)
+        //Crab
+        array.set(patternArray, 3, array.get(patternArray, 3) and is_0_382_to_0_886)
+        //DeepCrab
+        array.set(patternArray, 4, array.get(patternArray, 4) and is_0_382_to_0_886)
+        //Cypher
+        array.set(patternArray, 5, array.get(patternArray, 5) and isInRange(axcRatio, 1.130*err_min, 1.414*err_max))
+        //Shark
+        array.set(patternArray, 6, array.get(patternArray, 6) and isInRange(abcRatio, 1.130*err_min, 1.618*err_max))
+        //NenStar
+        array.set(patternArray, 7, array.get(patternArray, 7) and isInRange(abcRatio, 1.414*err_min, 2.140*err_max))
+        //Anti NenStar
+        array.set(patternArray, 8, array.get(patternArray, 8) and is_0_467_to_0_707)
+        //Anti Shark
+        array.set(patternArray, 9, array.get(patternArray, 9) and isInRange(abcRatio, 0.618*err_min, 0.886*err_max))
+        //Anti Cypher
+        array.set(patternArray, 10, array.get(patternArray, 10) and is_0_467_to_0_707)
+        //Anti Crab
+        array.set(patternArray, 11, array.get(patternArray, 11) and is_1_128_to_2_618)
+        //Anti Butterfly
+        array.set(patternArray, 12, array.get(patternArray, 12) and is_1_128_to_2_618)
+        //Anti Bat
+        array.set(patternArray, 13, array.get(patternArray, 13) and is_1_128_to_2_618)
+        //Anti Gartley
+        array.set(patternArray, 14, array.get(patternArray, 14) and is_1_128_to_2_618)
+        //Navarro200
+        array.set(patternArray, 15, array.get(patternArray, 15) and isInRange(abcRatio, 0.886*err_min, 1.127*err_max))
+
+// @function Checks if bcd ratio is in range of any harmonic pattern
+// @param bcdRatio CD/BC ratio
+// @param err_min minimum error threshold
+// @param err_max maximum error threshold
+// @param patternArray Array containing pattern check flags. Checks are made only if flags are true. Upon check flgs are overwritten.
+export scan_bcd(float bcdRatio, simple float err_min, simple float err_max, bool[] patternArray)=>
+    if(array.includes(patternArray, true))
+        is_1_618_to_2_618 = isInRange(bcdRatio, 1.618*err_min, 2.618*err_max)
+        is_1_272_to_1_618 = isInRange(bcdRatio, 1.272*err_min, 1.618*err_max)
+        is_1_272_to_2_000 = isInRange(bcdRatio, 1.272*err_min, 2.000*err_max)
+        //Gartley
+        array.set(patternArray, 0, array.get(patternArray, 0) and is_1_272_to_1_618)
+        //Bat
+        array.set(patternArray, 1, array.get(patternArray, 1) and is_1_618_to_2_618)
+        //Butterfly
+        array.set(patternArray, 2, array.get(patternArray, 2) and is_1_618_to_2_618)
+        //Crab
+        array.set(patternArray, 3, array.get(patternArray, 3) and isInRange(bcdRatio, 2.240*err_min, 3.618*err_max))
+        //DeepCrab
+        array.set(patternArray, 4, array.get(patternArray, 4) and isInRange(bcdRatio, 2.000*err_min, 3.618*err_max))
+        //Shark
+        array.set(patternArray, 6, array.get(patternArray, 6) and isInRange(bcdRatio, 1.618*err_min, 2.236*err_max))
+        //NenStar
+        array.set(patternArray, 7, array.get(patternArray, 7) and is_1_272_to_2_000)
+        //Anti NenStar
+        array.set(patternArray, 8, array.get(patternArray, 8) and is_1_618_to_2_618)
+        //Anti Shark
+        array.set(patternArray, 9, array.get(patternArray, 9) and is_1_618_to_2_618)
+        //Anti Cypher
+        array.set(patternArray, 10, array.get(patternArray, 10) and is_1_618_to_2_618)
+        //Anti Crab
+        array.set(patternArray, 11, array.get(patternArray, 11) and is_1_618_to_2_618)
+        //Anti Butterfly
+        array.set(patternArray, 12, array.get(patternArray, 12) and isInRange(bcdRatio, 1.272*err_min, 1.272*err_max))
+        //Anti Bat
+        array.set(patternArray, 13, array.get(patternArray, 13) and isInRange(bcdRatio, 2.000*err_min, 2.618*err_max))
+        //Anti Gartley
+        array.set(patternArray, 14, array.get(patternArray, 14) and isInRange(bcdRatio, 1.618*err_min, 1.618*err_max))
+        //Navarro200
+        array.set(patternArray, 15, array.get(patternArray, 15) and isInRange(bcdRatio, 0.886*err_min, 3.618*err_max))
+
+
+// @function Checks if xad or xcd ratio is in range of any harmonic pattern
+// @param xadRatio AD/XA ratio
+// @param xcdRatio CD/XC ratio
+// @param err_min minimum error threshold
+// @param err_max maximum error threshold
+// @param patternArray Array containing pattern check flags. Checks are made only if flags are true. Upon check flgs are overwritten.
+export scan_xad_xcd(float xadRatio, float xcdRatio, simple float err_min, simple float err_max, bool[] patternArray)=>
+    if(array.includes(patternArray, true))
+        is_1_618_to_1_618 = isInRange(xadRatio, 1.618*err_min, 1.618*err_max)
+        is_0_786_to_0_786 = isInRange(xadRatio, 0.786*err_min, 0.786*err_max)
+        is_0_886_to_0_886 = isInRange(xadRatio, 0.886*err_min, 0.886*err_max)
+        is_1_272_to_1_272 = isInRange(xadRatio, 1.272*err_min, 1.272*err_max)
+        //Gartley
+        array.set(patternArray, 0, array.get(patternArray, 0) and is_0_786_to_0_786)
+        //Bat
+        array.set(patternArray, 1, array.get(patternArray, 1) and is_0_886_to_0_886)
+        //Butterfly
+        array.set(patternArray, 2, array.get(patternArray, 2) and isInRange(xadRatio, 1.272, 1.618))
+        //Crab
+        array.set(patternArray, 3, array.get(patternArray, 3) and is_1_618_to_1_618)
+        //DeepCrab
+        array.set(patternArray, 4, array.get(patternArray, 4) and is_1_618_to_1_618)
+        //Cypher
+        array.set(patternArray, 5, array.get(patternArray, 5) and isInRange(xcdRatio, 0.786*err_min, 0.786*err_max))
+        //Shark
+        array.set(patternArray, 6, array.get(patternArray, 6) and is_0_886_to_0_886)
+        //NenStar
+        array.set(patternArray, 7, array.get(patternArray, 7) and is_1_272_to_1_272)
+        //Anti NenStar
+        array.set(patternArray, 8, array.get(patternArray, 8) and is_0_786_to_0_786)
+        //Anti Shark
+        array.set(patternArray, 9, array.get(patternArray, 9) and isInRange(xadRatio, 1.13*err_min, 1.13*err_max))
+        //Anti Cypher
+        array.set(patternArray, 10, array.get(patternArray, 10) and is_1_272_to_1_272)
+        //Anti Crab
+        array.set(patternArray, 11, array.get(patternArray, 11) and isInRange(xadRatio, 0.618*err_min, 0.618*err_max))
+        //Anti Butterfly
+        array.set(patternArray, 12, array.get(patternArray, 12) and isInRange(xadRatio, 0.618, 0.786))
+        //Anti Bat
+        array.set(patternArray, 13, array.get(patternArray, 13) and isInRange(xadRatio, 1.128*err_min, 1.128*err_max))
+        //Anti Gartley
+        array.set(patternArray, 14, array.get(patternArray, 14) and isInRange(xadRatio, 1.272*err_min, 1.272*err_max))
+        //Navarro200
+        array.set(patternArray, 15, array.get(patternArray, 15) and isInRange(xadRatio, 0.886, 1.127))
+
+
+// @function Checks for harmonic patterns
+// @param x X coordinate value
+// @param a A coordinate value
+// @param b B coordinate value
+// @param c C coordinate value
+// @param d D coordinate value
+// @param flags flags to check patterns. Send empty array to enable all 
+// @param errorPercent Error threshold
+// @returns [patternArray, patternLabelArray] Array of boolean values which says whether valid pattern exist and array of corresponding pattern names
+export isHarmonicPattern(float x, float a, float b, float c, float d,
+                         simple bool[] flags, simple bool defaultEnabled = true, simple int errorPercent = 8)=>
+
+    numberOfPatterns = getNumberOfSupportedPatterns()
+    
+    err_min = (100 - errorPercent) / 100
+    err_max = (100 + errorPercent) / 100
+
+    xabRatio = (b - a) / (x - a)
+    abcRatio = (c - b) / (a - b)
+    axcRatio = (c - x) / (a - x)
+    bcdRatio = (d - c) / (b - c)
+    xadRatio = (d - a) / (x - a)
+    xcdRatio = (d - c) / (x - c)
+
+    patternArray = array.new_bool()
+    
+    for i=0 to numberOfPatterns-1
+        if(array.size(flags) > i)
+            currentFlag = defaultEnabled? array.size(flags)<=i or array.get(flags, i) :
+                             array.size(flags)>i and array.get(flags, i)
+            array.push(patternArray, currentFlag)
+        else
+            array.push(patternArray, false)
+            
+    scan_xab(xabRatio, err_min, err_max, patternArray)
+    scan_abc_axc(abcRatio, axcRatio, err_min, err_max, patternArray)
+    scan_bcd(bcdRatio, err_min, err_max, patternArray)
+    scan_xad_xcd(xadRatio, xcdRatio, err_min, err_max, patternArray)
+    patternArray
+ 
+
+// @function Checks for harmonic pattern projection
+// @param x X coordinate value
+// @param a A coordinate value
+// @param b B coordinate value
+// @param c C coordinate value
+// @param flags flags to check patterns. Send empty array to enable all 
+// @param errorPercent Error threshold
+// @returns [patternArray, patternLabelArray] Array of boolean values which says whether valid pattern exist and array of corresponding pattern names.
+export isHarmonicProjection(float x, float a, float b, float c,
+                         simple bool[] flags, simple bool defaultEnabled = true, simple int errorPercent = 8)=>
+
+    numberOfPatterns = getNumberOfSupportedPatterns()
+    
+    err_min = (100 - errorPercent) / 100
+    err_max = (100 + errorPercent) / 100
+
+    xabRatio = (b - a) / (x - a)
+    abcRatio = (c - b) / (a - b)
+    axcRatio = (c - x) / (a - x)
+
+    patternArray = array.new_bool()
+    
+    for i=0 to numberOfPatterns-1
+        if(array.size(flags) > i)
+            currentFlag = defaultEnabled? array.size(flags)<=i or array.get(flags, i) :
+                             array.size(flags)>i and array.get(flags, i)
+            array.push(patternArray, currentFlag)
+        else
+            array.push(patternArray, false)
+    
+    scan_xab(xabRatio, err_min, err_max, patternArray)
+    scan_abc_axc(abcRatio, axcRatio, err_min, err_max, patternArray)
+    patternArray
+
+
+export get_projection_range(float x, float a, float b, float c, bool[] patternArray,  simple float errorPercent=8, simple float start_adj=0, simple float end_adj=0)=>
+    startRange = array.new_float(array.size(patternArray), na)
+    endRange = array.new_float(array.size(patternArray), na)
+    if(array.includes(patternArray, true))
+        //Gartley
+        pa.getrange(x, a, 0.786, 0.786, b, c, 1.272, 1.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 0)
+        //Bat
+        pa.getrange(x, a, 0.886, 0.886, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 1)
+        //Butterfly
+        pa.getrange(x, a, 1.272, 1.618, b, c, 1.618, 2.618, 0, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 2)
+        //Crab
+        pa.getrange(x, a, 1.618, 1.618, b, c, 2.240, 3.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 3)
+        //DeepCrab
+        pa.getrange(x, a, 1.618, 1.618, b, c, 2.000, 3.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 4)
+        //Cypher
+        pa.getrange(x, c, 0.786, 0.786, x, c, 0.786, 0.786, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 5)
+        //Shark
+        pa.getrange(x, a, 0.886, 0.886, b, c, 1.618, 2.236, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 6)
+        //NenStar
+        pa.getrange(x, a, 1.272, 1.272, b, c, 1.272, 2.000, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 7)
+        //Anti NenStar
+        pa.getrange(x, a, 0.786, 0.786, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 8)
+        //Anti Shark
+        pa.getrange(x, a, 1.130, 1.130, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 9)
+        //Anti Cypher
+        pa.getrange(x, a, 1.272, 1.272, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 10)
+        //Anti Crab
+        pa.getrange(x, a, 0.618, 0.618, b, c, 1.618, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 11)
+        //Anti Butterfly
+        pa.getrange(x, a, 0.618, 0.786, b, c, 1.272, 1.272, 0, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 12)
+        //Anti Bat
+        pa.getrange(x, a, 1.128, 1.128, b, c, 2.000, 2.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 13)
+        //Anti Gartley
+        pa.getrange(x, a, 1.272, 1.272, b, c, 1.618, 1.618, errorPercent, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 14)
+        //Navarro200
+        pa.getrange(x, a, 0.886, 1.127, b, c, 0.886, 3.618, 0, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 15)
+    [startRange, endRange]
+    
+
+export get_prz_range(float x, float a, float b, float c, bool[] patternArray,  simple float errorPercent=8, simple float start_adj=0, simple float end_adj=0)=>
+    [startRange, endRange] = get_projection_range(x,a,b,c,patternArray, errorPercent, start_adj, end_adj)
+    dStart = b > c? array.min(startRange) : array.max(startRange)
+    dEnd = b > c? array.max(endRange) : array.min(endRange)
+    [dStart, dEnd]
+
+export get_prz_range_xad(float x, float a, float b, float c, bool[] patternArray, simple float errorPercent=8, simple float start_adj=0, simple float end_adj=0)=>
+    startRange = array.new_float(array.size(patternArray), na)
+    endRange = array.new_float(array.size(patternArray), na)
+    if(array.includes(patternArray, true))
+        //Gartley
+        pa.getrange(x, a, 0.786, 0.786, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 0)
+        //Bat
+        pa.getrange(x, a, 0.886, 0.886, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 1)
+        //Butterfly
+        pa.getrange(x, a, 1.272, 1.618, 0, start_adj, end_adj, patternArray, startRange, endRange, 2)
+        //Crab
+        pa.getrange(x, a, 1.618, 1.618, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 3)
+        //DeepCrab
+        pa.getrange(x, a, 1.618, 1.618, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 4)
+        //Cypher
+        pa.getrange(x, c, 0.786, 0.786, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 5)
+        //Shark
+        pa.getrange(x, a, 0.886, 0.886, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 6)
+        //NenStar
+        pa.getrange(x, a, 1.272, 1.272, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 7)
+        //Anti NenStar
+        pa.getrange(x, a, 0.786, 0.786, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 8)
+        //Anti Shark
+        pa.getrange(x, a, 1.130, 1.130, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 9)
+        //Anti Cypher
+        pa.getrange(x, a, 1.272, 1.272, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 10)
+        //Anti Crab
+        pa.getrange(x, a, 0.618, 0.618, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 11)
+        //Anti Butterfly
+        pa.getrange(x, a, 0.618, 0.786, 0, start_adj, end_adj, patternArray, startRange, endRange, 12)
+        //Anti Bat
+        pa.getrange(x, a, 1.128, 1.128, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 13)
+        //Anti Gartley
+        pa.getrange(x, a, 1.272, 1.272, errorPercent, start_adj, end_adj, patternArray, startRange, endRange, 14)
+        //Navarro200
+        pa.getrange(x, a, 0.886, 1.127, 0, start_adj, end_adj, patternArray, startRange, endRange, 15)
+    dStart = b > c? array.min(startRange) : array.max(startRange)
+    dEnd = b > c? array.max(endRange) : array.min(endRange)
+    [dStart, dEnd]
+    
