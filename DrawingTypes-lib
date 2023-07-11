@@ -1,0 +1,127 @@
+//@version=5
+
+// @description User Defined Types for basic drawing structure. Other types and methods will be built on these.
+library("DrawingTypes", overlay = true)
+
+// @type Point refers to point on chart
+// @field price pivot price
+// @field bar pivot bar
+// @field bartime pivot bar time
+export type Point
+	float price
+	int bar
+	int bartime
+
+// @type Properties of line object
+// @field xloc X Reference - can be either xloc.bar_index or xloc.bar_time. Default is xloc.bar_index
+// @field extend Property which sets line to extend towards either right or left or both. Valid values are extend.right, extend.left, extend.both, extend.none. Default is extend.none
+// @field color Line color
+// @field style Line style, valid values are line.style_solid, line.style_dashed, line.style_dotted, line.style_arrow_left, line.style_arrow_right, line.style_arrow_both. Default is line.style_solid
+// @field width Line width. Default is 1
+export type LineProperties
+	string xloc = xloc.bar_index
+	string extend = extend.none
+	color color = color.blue
+	string style = line.style_solid
+	int width = 1
+
+// @type Line object created from points
+// @field start Starting point of the line
+// @field end Ending point of the line
+// @field properties LineProperties object which defines the style of line
+// @field object Derived line object
+export type Line
+    Point start
+    Point end
+    LineProperties properties
+    line object
+
+// @type Properties of label object
+// @field xloc X Reference - can be either xloc.bar_index or xloc.bar_time. Default is xloc.bar_index
+// @field yloc Y reference - can be yloc.price, yloc.abovebar, yloc.belowbar. Default is yloc.price
+// @field color Label fill color
+// @field style Label style as defined in https://www.tradingview.com/pine-script-reference/v5/#fun_label{dot}new. Default is label.style_none
+// @field textcolor text color. Default is color.black
+// @field size Label text size. Default is size.normal. Other values are size.auto, size.tiny, size.small, size.normal, size.large, size.huge
+// @field textalign Label text alignment. Default if text.align_center. Other allowed values - text.align_right, text.align_left, text.align_top, text.align_bottom
+// @field text_font_family The font family of the text. Default value is font.family_default. Other available option is font.family_monospace
+export type LabelProperties
+	string xloc = xloc.bar_index
+	string yloc = yloc.price
+	color color = color.blue
+	string style = label.style_none
+	color textcolor = color.black
+	string size = size.normal
+	string textalign = text.align_center
+	string text_font_family = font.family_default
+
+// @type Label object
+// @field point Point where label is drawn
+// @field lblText label text
+// @field tooltip Tooltip text. Default is na
+// @field properties LabelProperties object
+// @field object Pine label object 
+export type Label
+	Point point
+	string lblText
+	string tooltip=na
+	LabelProperties properties
+	label object
+
+// @type Linefill object
+// @field line1 First line to create linefill
+// @field line2 Second line to create linefill
+// @field fillColor Fill color
+// @field transparency Fill transparency range from 0 to 100
+// @field object linefill object created from wrapper
+export type Linefill
+	Line line1
+	Line line2
+	color fillColor = color.blue
+	int transparency = 80
+	linefill object
+
+// @type BoxProperties object
+// @field border_color Box border color. Default is color.blue
+// @field bgcolor box background color
+// @field border_width Box border width. Default is 1
+// @field border_style Box border style. Default is line.style_solid
+// @field extend Extend property of box. default is extend.none
+// @field xloc defines if drawing needs to be done based on bar index or time. default is xloc.bar_index
+export type BoxProperties
+	color border_color = color.blue
+	color bgcolor = color.blue
+	int border_width = 1
+	string border_style = line.style_solid
+	string extend = extend.none
+	string xloc = xloc.bar_index
+
+// @type Box Text properties.
+// @field boxText Text to be printed on the box
+// @field text_size Text size. Default is size.auto
+// @field text_color Box text color. Default is color.yellow. 
+// @field text_halign horizontal align style - default is text.align_center
+// @field text_valign vertical align style - default is text.align_center
+// @field text_wrap text wrap style - default is text.wrap_auto
+// @field text_font_family Text font. Default is 
+export type BoxText
+	string boxText = na
+	string text_size = size.auto
+	color text_color = color.yellow
+	string text_halign = text.align_center
+	string text_valign = text.align_center
+	string text_wrap = text.wrap_auto
+	string text_font_family = font.family_default
+
+// @type Box object
+// @field p1 Diagonal point one
+// @field p2 Diagonal point two
+// @field properties Box properties
+// @field textProperties Box text properties
+// @field object Box object created
+export type Box
+	Point p1
+	Point p2
+	BoxProperties properties
+	BoxText textProperties
+	box object
