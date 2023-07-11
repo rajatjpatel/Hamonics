@@ -1,0 +1,299 @@
+//@version=5
+
+// @description Wrapper Type for Line. Useful when you want to store the line details without drawing them. Can also be used in scnearios where you collect lines to be drawn and draw together towards the end.
+library("LineWrapper", overlay=true)
+
+// @type Line Wrapper object
+// @field x1 (series int) Bar index (if xloc = xloc.bar_index) or bar UNIX time (if xloc = xloc.bar_time) of the first point of the line. Note that objects positioned using xloc.bar_index cannot be drawn further than 500 bars into the future.
+// @field y1 (series int/float) Price of the first point of the line.
+// @field x2 (series int) Bar index (if xloc = xloc.bar_index) or bar UNIX time (if xloc = xloc.bar_time) of the second point of the line. Note that objects positioned using xloc.bar_index cannot be drawn further than 500 bars into the future.
+// @field y2 (series int/float) Price of the second point of the line.
+// @field xloc (series string) See description of x1 argument. Possible values: xloc.bar_index and xloc.bar_time. Default is xloc.bar_index.
+// @field extend (series string) If extend=extend.none, draws segment starting at point (x1, y1) and ending at point (x2, y2). If extend is equal to extend.right or extend.left, draws a ray starting at point (x1, y1) or (x2, y2), respectively. If extend=extend.both, draws a straight line that goes through these points. Default value is extend.none.
+// @field color (series color) Line color.
+// @field style (series string) Line style. Possible values: line.style_solid, line.style_dotted, line.style_dashed, line.style_arrow_left, line.style_arrow_right, line.style_arrow_both.
+// @field width (series int) Line width in pixels.
+// @field obj line object
+export type Line
+	int x1
+	float y1
+	int x2
+	float y2
+	string xloc = xloc.bar_index
+	string extend = extend.none
+	color color = color.blue
+	string style = line.style_solid
+	int width = 1
+	line obj = na
+
+// @function draws line as per the wrapper object contents
+// @param this (series Line) Line object.
+// @returns current Line object
+export method draw(Line this)=>
+	if(not na(this.x1) and not na(this.x2) and not na(this.y1) and not na(this.y2))
+		this.obj.delete()
+		this.obj := line.new(this.x1, this.y1, this.x2, this.y2, this.xloc, this.extend, this.color, this.style, this.width)
+	this
+
+// @function draws lines as per the wrapper object array
+// @param this (series array<Line>) Array of Line object.
+// @returns current Array of Line objects
+export method draw(array<Line> this)=>
+	for ln in this
+		ln.draw()
+	this
+
+// @function updates or redraws line as per the wrapper object contents
+// @param this (series Line) Line object.
+// @returns current Line object
+export method update(Line this)=>
+	this.obj.delete()
+	this.draw()
+	this
+
+// @function updates or redraws lines as per the wrapper object array
+// @param this (series array<Line>) Array of Line object.
+// @returns current Array of Line objects
+export method update(array<Line> this)=>
+	for ln in this
+		ln.update()
+	this
+
+// @function get line price based on bar
+// @param this (series Line) Line object.
+// @param bar (series/int) bar at which line price need to be calculated
+// @returns line price at given bar.
+export method get_price(Line this, int bar)=>
+	stepPerBar = (this.y2 - this.y1)/(this.x2 - this.x1)
+	distance = bar - this.x1
+	this.y1 + distance*stepPerBar
+
+// @function Returns UNIX time or bar index (depending on the last xloc value set) of the first point of the line.
+// @param this (series Line) Line object.
+// @returns UNIX timestamp (in milliseconds) or bar index.
+export method get_x1(Line this)=>this.x1
+
+// @function Returns UNIX time or bar index (depending on the last xloc value set) of the second point of the line.
+// @param this (series Line) Line object.
+// @returns UNIX timestamp (in milliseconds) or bar index.
+export method get_x2(Line this)=>this.x2
+
+// @function Returns price of the first point of the line.
+// @param this (series Line) Line object.
+// @returns Price value.
+export method get_y1(Line this)=>this.y1
+
+// @function Returns price of the second point of the line.
+// @param this (series Line) Line object.
+// @returns Price value.
+export method get_y2(Line this)=>this.y2
+
+// @function Sets bar index or bar time (depending on the xloc) of the first point.
+// @param this (series Line) Line object.
+// @param x (series int) Bar index or bar time. Note that objects positioned using xloc.bar_index cannot be drawn further than 500 bars into the future.
+// @param draw (series bool) draw line after setting attribute
+// @param update (series bool) update line instead of redraw. Only valid if draw is set.
+// @returns Current Line object
+export method set_x1(Line this, int x, bool draw = true, bool update = true)=>
+	this.x1 := x
+	if(draw)
+		if(update)
+			this.obj.set_x1(x)
+			this
+		else
+			this.draw()
+			this
+	this
+
+// @function Sets bar index or bar time (depending on the xloc) of the second point.
+// @param this (series Line) Line object.
+// @param x (series int) Bar index or bar time. Note that objects positioned using xloc.bar_index cannot be drawn further than 500 bars into the future.
+// @param draw (series bool) draw line after setting attribute
+// @param update (series bool) update line instead of redraw. Only valid if draw is set.
+// @returns Current Line object
+export method set_x2(Line this, int x, bool draw = true, bool update = true)=>
+	this.x2 := x
+	if(draw)
+		if(update)
+			this.obj.set_x2(x)
+			this
+		else
+			this.draw()
+			this
+	this
+
+// @function Sets price of the first point
+// @param this (series Line) Line object.
+// @param y (series int/float) Price.
+// @param draw (series bool) draw line after setting attribute
+// @param update (series bool) update line instead of redraw. Only valid if draw is set.
+// @returns Current Line object
+export method set_y1(Line this, float y, bool draw = true, bool update = true)=>
+	this.y1 := y
+	if(draw)
+		if(update)
+			this.obj.set_y1(y)
+			this
+		else
+			this.draw()
+			this
+	this
+
+// @function Sets price of the second point
+// @param this (series Line) Line object.
+// @param y (series int/float) Price.
+// @param draw (series bool) draw line after setting attribute
+// @param update (series bool) update line instead of redraw. Only valid if draw is set.
+// @returns Current Line object
+export method set_y2(Line this, float y, bool draw = true, bool update = true)=>
+	this.y2 := y
+	if(draw)
+		if(update)
+			this.obj.set_y2(y)
+			this
+		else
+			this.draw()
+			this
+	this
+
+// @function Sets the line color
+// @param this (series Line) Line object.
+// @param color (series color) New line color
+// @param draw (series bool) draw line after setting attribute
+// @param update (series bool) update line instead of redraw. Only valid if draw is set.
+// @returns Current Line object
+export method set_color(Line this, color color, bool draw = true, bool update = true)=>
+	this.color := color
+	if(draw)
+		if(update)
+			this.obj.set_color(color)
+			this
+		else
+			this.draw()
+			this
+	this
+
+// @function Sets extending type of this line object. If extend=extend.none, draws segment starting at point (x1, y1) and ending at point (x2, y2). If extend is equal to extend.right or extend.left, draws a ray starting at point (x1, y1) or (x2, y2), respectively. If extend=extend.both, draws a straight line that goes through these points.
+// @param this (series Line) Line object.
+// @param extend (series string) New extending type.
+// @param draw (series bool) draw line after setting attribute
+// @param update (series bool) update line instead of redraw. Only valid if draw is set.
+// @returns Current Line object
+export method set_extend(Line this, string extend, bool draw = true, bool update = true)=>
+	this.extend := extend
+	if(draw)
+		if(update)
+			this.obj.set_extend(extend)
+			this
+		else
+			this.draw()
+			this
+	this
+
+// @function Sets the line style
+// @param this (series Line) Line object.
+// @param style (series string) New line style.
+// @param draw (series bool) draw line after setting attribute
+// @param update (series bool) update line instead of redraw. Only valid if draw is set.
+// @returns Current Line object
+export method set_style(Line this, string style, bool draw = true, bool update = true)=>
+	this.style := style
+	if(draw)
+		if(update)
+			this.obj.set_style(style)
+			this
+		else
+			this.draw()
+			this
+	this
+
+// @function Sets the line width.
+// @param this (series Line) Line object.
+// @param width (series int) New line width in pixels.
+// @param draw (series bool) draw line after setting attribute
+// @param update (series bool) update line instead of redraw. Only valid if draw is set.
+// @returns Current Line object
+export method set_width(Line this, int width, bool draw = true, bool update = true)=>
+	this.width := width
+	if(draw)
+		if(update)
+			this.obj.set_width(width)
+			this
+		else
+			this.draw()
+			this
+	this
+
+// @function Sets x-location and new bar index/time values.
+// @param this (series Line) Line object.
+// @param x1 (series int) Bar index or bar time of the first point.
+// @param x2 (series int) Bar index or bar time of the second point.
+// @param xloc (series string) New x-location value. 
+// @param draw (series bool) draw line after setting attribute
+// @param update (series bool) update line instead of redraw. Only valid if draw is set.
+// @returns Current Line object
+export method set_xloc(Line this, int x1, int x2, string xloc, bool draw = true, bool update = true)=>
+	this.xloc := xloc
+	this.x1 := x1
+	this.x2 := x2
+	if(draw)
+		if(update)
+			this.obj.set_xloc(x1, x2, xloc)
+			this
+		else
+			this.draw()
+			this
+	this
+
+// @function Sets bar index/time and price of the first point.
+// @param this (series Line) Line object.
+// @param x (series int) Bar index or bar time. Note that objects positioned using xloc.bar_index cannot be drawn further than 500 bars into the future.
+// @param y (series int/float) Price.
+// @param draw (series bool) draw line after setting attribute
+// @param update (series bool) update line instead of redraw. Only valid if draw is set.
+// @returns Current Line object
+export method set_xy1(Line this, int x, float y, bool draw = true, bool update = true)=>
+	this.x1 := x
+	this.y1 := y
+	if(draw)
+		if(update)
+			this.obj.set_xy1(x, y)
+			this
+		else
+			this.draw()
+			this
+	this
+
+// @function Sets bar index/time and price of the second point
+// @param this (series Line) Line object.
+// @param x (series int) Bar index or bar time. Note that objects positioned using xloc.bar_index cannot be drawn further than 500 bars into the future.
+// @param y (series int/float) Price.
+// @param draw (series bool) draw line after setting attribute
+// @param update (series bool) update line instead of redraw. Only valid if draw is set.
+// @returns Current Line object
+export method set_xy2(Line this, int x, float y, bool draw = true, bool update = true)=>
+	this.x2 := x
+	this.y2 := y
+	if(draw)
+		if(update)
+			this.obj.set_xy2(x, y)
+			this
+		else
+			this.draw()
+			this
+	this
+
+// @function Deletes the underlying line drawing object
+// @param this (series Line) Line object.
+// @returns Current Line object
+export method delete(Line this)=>
+	this.obj.delete()
+	this
+
+// @function Clones the Line object.
+// @param this (series Line) Line object.
+// @returns Cloned line object
+export method copy(Line this)=>
+	newLine = this.copy()
+	newLine.draw()
+	newLine
