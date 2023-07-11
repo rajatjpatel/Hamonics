@@ -1,0 +1,56 @@
+
+//@version=5
+
+// @description simple utility to draw different candles using box and lines. Quite useful for drawing candles such as zigzag candles or MTF candles
+library("drawcandles", overlay=true)
+import HeWhoMustNotBeNamed/arrayutils/18 as pa
+
+// @function draws candles based on ohlc values
+// @param o Open Price
+// @param h High Price
+// @param l Low Price
+// @param c Close Price
+// @param oBar Open Time
+// @param cBar Close Time
+// @returns void
+export draw(float o, float h, float l, float c, int oBar, int cBar) =>
+	var candles = array.new<box>()
+	var upperWicks = array.new<line>()
+	var lowerWicks = array.new<line>()
+	
+	bottom = math.min(o,c)
+	top = math.max(o,c)
+	if(array.size(candles)>0)
+	    lastCandle = array.get(candles, 0)
+	    lastStart = box.get_left(lastCandle)
+	    lastUpperWick = array.get(upperWicks, 0)
+	    lastLowerWick = array.get(lowerWicks, 0)
+	    
+	    if(lastStart == oBar)
+	        pa.shift(candles)
+	        pa.shift(upperWicks)
+	        pa.shift(lowerWicks)
+	    else
+	        box.set_border_style(lastCandle, line.style_solid)
+	        box.set_border_width(lastCandle, 2)
+	        line.set_width(lastUpperWick, 2)
+	        line.set_width(lastLowerWick, 2)
+	
+	candleColor = o>c? color.red: color.green
+	newCandle = box.new(oBar, top, cBar, bottom, border_color=candleColor, border_width=1,
+	                 border_style=line.style_dotted, extend=extend.none, xloc=xloc.bar_time, bgcolor=color.new(candleColor, 80))
+	midTime = (oBar + cBar)/2
+	newUpperWick = line.new(midTime, top, midTime, h, xloc=xloc.bar_time, extend=extend.none, color=candleColor, style=line.style_solid, width=1)
+	newLowerWick = line.new(midTime, bottom, midTime, l, xloc=xloc.bar_time, extend=extend.none, color=candleColor, style=line.style_solid, width=1)
+	
+	pa.unshift(candles, newCandle, 500)
+	pa.unshift(upperWicks, newUpperWick, 500)
+	pa.unshift(lowerWicks, newLowerWick, 500)
+	
+
+
+//MTF Example
+tf = input.timeframe("M")
+[o,h,l,c,v,oBar,cBar] = request.security(syminfo.tickerid, tf, [open, high, low, close, volume, time, time_close])
+if(timeframe.in_seconds(timeframe.period) < timeframe.in_seconds(tf))
+    draw(o,h,l,c,oBar,cBar)
