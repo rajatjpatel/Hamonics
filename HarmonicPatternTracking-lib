@@ -1,0 +1,297 @@
+//@version=5
+
+// @description Library contains few data structures and methods for tracking harmonic pattern trades via pinescript.
+library("HarmonicPatternTracking", overlay = true)
+
+import HeWhoMustNotBeNamed/FibRatios/1 as fibs
+// @type Drawing objects of Harmonic Pattern
+// @field xa xa line
+// @field ab ab line
+// @field bc bc line
+// @field cd cd line
+// @field xb xb line
+// @field bd bd line
+// @field ac ac line
+// @field xd xd line
+// @field x label for pivot x
+// @field a label for pivot a
+// @field b label for pivot b
+// @field c label for pivot c
+// @field d label for pivot d
+// @field xabRatio label for XAB Ratio
+// @field abcRatio label for ABC Ratio
+// @field bcdRatio label for BCD Ratio
+// @field xadRatio label for XAD Ratio
+export type HarmonicDrawing
+    line xa
+    line ab
+    line bc
+    line cd
+
+    line xb
+    line bd
+    line ac
+    line xd
+
+    label x
+    label a
+    label b
+    label c
+    label d
+    label xabRatio
+    label abcRatio
+    label bcdRatio
+    label xadRatio
+
+// @type Trade tracking parameters of Harmonic Patterns
+// @field initialEntry initial entry when pattern first formed.
+// @field entry trailed entry price.
+// @field initialStop initial stop when trade first entered.
+// @field stop current stop updated as per trailing rules.
+// @field target1 First target value
+// @field target2 Second target value
+// @field target3 Third target value
+// @field target4 Fourth target value
+// @field status Trade status referenced as integer
+// @field retouch Flag to show if the price retouched after entry
+export type HarmonicTrade
+    float initialEntry
+    float entry
+    float initialStop
+    float stop
+    float target1
+    float target2
+    float target3
+    float target4
+    int status
+    bool retouch
+
+// @type Display and trade calculation properties for Harmonic Patterns
+// @field fillMajorTriangles Display property used for using linefill for harmonic major triangles
+// @field fillMinorTriangles Display property used for using linefill for harmonic minor triangles
+// @field majorFillTransparency transparency setting for major triangles
+// @field minorFillTransparency transparency setting for minor triangles
+// @field showXABCD Display XABCD pivot labels
+// @field lblSizePivots Pivot label size
+// @field showRatios Display Ratio labels
+// @field useLogScaleForScan Use log scale to determine fib ratios for pattern scanning
+// @field useLogScaleForTargets Use log scale to determine fib ratios for target calculation
+// @field base base on which calculation of stop/targets are made.
+// @field entryRatio fib ratio to calculate entry
+// @field stopRatio fib ratio to calculate initial stop
+// @field target1Ratio fib ratio to calculate first target
+// @field target2Ratio fib ratio to calculate second target
+// @field target3Ratio fib ratio to calculate third target
+// @field target4Ratio fib ratio to calculate fourth target
+export type HarmonicProperties
+    bool fillMajorTriangles
+    bool fillMinorTriangles
+    int majorFillTransparency
+    int minorFillTransparency
+    bool showXABCD
+    string lblSizePivots
+    bool showRatios
+    bool useLogScaleForScan
+    bool useLogScaleForTargets
+    string base
+    float entryRatio
+    float stopRatio
+    float target1Ratio
+    float target2Ratio
+    float target3Ratio
+    float target4Ratio
+
+// @type Harmonic pattern object to track entire pattern trade life cycle
+// @field id Pattern Id
+// @field dir pattern direction
+// @field x X Pivot
+// @field a A Pivot
+// @field b B Pivot
+// @field c C Pivot
+// @field d D Pivot
+// @field xBar Bar index of X Pivot
+// @field aBar Bar index of A Pivot
+// @field bBar Bar index of B Pivot
+// @field cBar Bar index of C Pivot
+// @field dBar Bar index of D Pivot
+// @field przStart Start of PRZ range
+// @field przEnd End of PRZ range
+// @field patterns array representing the patterns
+// @field patternLabel string representation of list of patterns
+// @field patternColor color assigned to pattern
+// @field properties HarmonicProperties object containing display and calculation properties
+// @field trade HarmonicTrade object to track trades
+// @field drawing HarmonicDrawing object to manage drawings
+export type HarmonicPattern
+    int id
+    int dir
+    float x
+    float a
+    float b
+    float c
+    float d
+    int xBar
+    int aBar
+    int bBar
+    int cBar
+    int dBar
+    float przStart
+    float przEnd
+    array<bool> patterns
+    string patternLabel
+    color patternColor
+    HarmonicProperties properties
+    HarmonicTrade trade
+    HarmonicDrawing drawing
+
+// @function Creates and draws HarmonicDrawing object for given HarmonicPattern
+// @param this HarmonicPattern object
+// @returns current HarmonicPattern object
+export method draw(HarmonicPattern this)=>
+    HarmonicDrawing drawing = HarmonicDrawing.new()
+    this.drawing := drawing
+    drawing.xa := line.new(this.xBar, this.x, this.aBar, this.a, xloc.bar_index, extend.none, this.patternColor, line.style_solid, 1)
+    drawing.ab := line.new(this.aBar, this.a, this.bBar, this.b, xloc.bar_index, extend.none, this.patternColor, line.style_solid, 1)
+    drawing.bc := line.new(this.bBar, this.b, this.cBar, this.c, xloc.bar_index, extend.none, this.patternColor, line.style_solid, 1)
+    drawing.cd := line.new(this.cBar, this.c, this.dBar, this.d, xloc.bar_index, extend.none, this.patternColor, line.style_solid, 1)
+    
+    drawing.xb := line.new(this.xBar, this.x, this.bBar, this.b, xloc.bar_index, extend.none, this.patternColor, line.style_dashed, 1)
+    drawing.bd := line.new(this.bBar, this.b, this.dBar, this.d, xloc.bar_index, extend.none, this.patternColor, line.style_dashed, 1)
+    drawing.ac := line.new(this.aBar, this.a, this.cBar, this.c, xloc.bar_index, extend.none, this.patternColor, line.style_dashed, 1)
+    drawing.xd := line.new(this.xBar, this.x, this.dBar, this.d, xloc.bar_index, extend.none, this.patternColor, line.style_dashed, 1)
+
+    if(this.properties.fillMajorTriangles)
+        linefill.new(drawing.xa, drawing.ab, color.new(this.patternColor, this.properties.majorFillTransparency))
+        linefill.new(drawing.xb, drawing.ab, color.new(this.patternColor, this.properties.majorFillTransparency))
+        linefill.new(drawing.bc, drawing.cd, color.new(this.patternColor, this.properties.majorFillTransparency))
+        linefill.new(drawing.bd, drawing.cd, color.new(this.patternColor, this.properties.majorFillTransparency))
+        
+    if(this.properties.fillMinorTriangles)
+        linefill.new(drawing.ab, drawing.bc, color.new(this.patternColor, this.properties.minorFillTransparency))
+        linefill.new(drawing.ac, drawing.bc, color.new(this.patternColor, this.properties.minorFillTransparency))
+        linefill.new(drawing.xb, drawing.bd, color.new(this.patternColor, this.properties.minorFillTransparency))
+        linefill.new(drawing.xd, drawing.bd, color.new(this.patternColor, this.properties.minorFillTransparency))
+
+    if this.properties.showXABCD
+        drawing.x := label.new(this.xBar, this.x, 'X', textcolor = this.patternColor, style = label.style_none,
+                                         yloc = this.dir > 0 ? yloc.belowbar : yloc.abovebar, size = this.properties.lblSizePivots)
+        drawing.a := label.new(this.aBar, this.a, 'A', textcolor = this.patternColor, style = label.style_none,
+                                         yloc = this.dir < 0 ? yloc.belowbar : yloc.abovebar, size = this.properties.lblSizePivots)
+        drawing.b := label.new(this.bBar, this.b, 'B', textcolor = this.patternColor, style = label.style_none,
+                                         yloc = this.dir > 0 ? yloc.belowbar : yloc.abovebar, size = this.properties.lblSizePivots)
+        drawing.c := label.new(this.cBar, this.c, 'C', textcolor = this.patternColor, style = label.style_none,
+                                         yloc = this.dir < 0 ? yloc.belowbar : yloc.abovebar, size = this.properties.lblSizePivots)
+        drawing.d := label.new(this.dBar, this.d, 'D', textcolor = this.patternColor, style = label.style_none,
+                                         yloc = this.dir > 0 ? yloc.belowbar : yloc.abovebar, size = this.properties.lblSizePivots)
+    
+    if this.properties.showRatios
+        xabRatio = fibs.retracementRatio(this.x, this.a, this.b, this.properties.useLogScaleForScan)
+        xabRatioBar = (this.xBar + this.bBar) / 2
+        xabRatioPrice = (this.x + this.b) / 2
+
+        abcRatio = fibs.retracementRatio(this.a, this.b, this.c, this.properties.useLogScaleForScan)
+        abcRatioBar = (this.aBar + this.cBar) / 2
+        abcRatioPrice = (this.a + this.c) / 2
+
+        bcdRatio = fibs.retracementRatio(this.b, this.c, this.d, this.properties.useLogScaleForScan)
+        bcdRatioBar = (this.bBar + this.dBar) / 2
+        bcdRatioPrice = (this.b + this.d) / 2
+
+        xadRatio = fibs.retracementRatio(this.x, this.a, this.d, this.properties.useLogScaleForScan)
+        xadRatioBar = (this.xBar + this.dBar) / 2
+        xadRatioPrice = (this.x + this.d) / 2
+
+        axcRatio = fibs.retracementRatio(this.a, this.x, this.c, this.properties.useLogScaleForScan)
+        xcdRatio = fibs.retracementRatio(this.x, this.c, this.d, this.properties.useLogScaleForScan)
+
+        isCypher = this.patterns.get(6)
+        abcRatioLabelText = str.tostring(abcRatio) + '(ABC)' + (isCypher ? '\n' + str.tostring(axcRatio) + '(AXC)' : '')
+        xadRatioLabelText = str.tostring(xadRatio) + '(XAD)' + (isCypher ? '\n' + str.tostring(xcdRatio) + '(XCD)' : '')
+        drawing.xabRatio := label.new(xabRatioBar, xabRatioPrice, str.tostring(xabRatio) + '(XAB)', textcolor = this.patternColor, style=label.style_none,
+                                                                             yloc = yloc.price, size = this.properties.lblSizePivots)
+        drawing.abcRatio := label.new(abcRatioBar, abcRatioPrice, abcRatioLabelText, textcolor = this.patternColor, style=label.style_none,
+                                                                             yloc = yloc.price, size = this.properties.lblSizePivots)
+        drawing.bcdRatio := label.new(bcdRatioBar, bcdRatioPrice, str.tostring(bcdRatio) + '(BCD)', textcolor = this.patternColor, style=label.style_none,
+                                                                             yloc = yloc.price, size = this.properties.lblSizePivots)
+        drawing.xadRatio := label.new(xadRatioBar, xadRatioPrice, xadRatioLabelText, textcolor = this.patternColor, style=label.style_none,
+                                                                             yloc = yloc.price, size = this.properties.lblSizePivots)
+	this
+
+// @function calculates HarmonicTrade and sets trade object for HarmonicPattern
+// @param this HarmonicPattern object
+// @returns bool true if pattern trades are valid, false otherwise
+export method addTrade(HarmonicPattern this)=>
+    impulse = math.max(math.abs(this.x-this.a), math.abs(this.x-this.c))
+    correction = math.max(math.abs(this.c - this.d), math.abs(this.a - this.d))
+    baseVal = this.properties.base == 'max' ? math.max(impulse, correction) :
+                 this.properties.base == 'min'? math.min(impulse, correction) : 
+                 this.properties.base == 'impulse'? impulse : 
+                 this.properties.base == 'correction' ? correction : 
+                 this.properties.base == 'AD'? math.abs(this.a-this.d) : math.abs(this.c-this.d)
+
+    baseProp = this.properties.base == 'max'? (impulse > correction? 'impulse' : 'correction') :
+                 this.properties.base == 'min'? (impulse < correction? 'impulse' : 'correction') :
+                 this.properties.base
+
+    peak = this.a*this.dir > this.c*this.dir? this.a : this.c
+    target1 = baseProp == 'impulse'? fibs.extension(this.x, peak, this.d, this.properties.target1Ratio, this.properties.useLogScaleForTargets) :
+                 baseProp == 'correction'? fibs.retracement(peak, this.d, this.properties.target1Ratio, this.properties.useLogScaleForTargets):
+                 baseProp == 'AD'? fibs.retracement(this.a, this.d, this.properties.target1Ratio, this.properties.useLogScaleForTargets):
+                 fibs.retracement(this.c, this.d, this.properties.target1Ratio, this.properties.useLogScaleForTargets)
+    target2 = baseProp == 'impulse'? fibs.extension(this.x, peak, this.d, this.properties.target2Ratio, this.properties.useLogScaleForTargets) :
+                 baseProp == 'correction'? fibs.retracement(peak, this.d, this.properties.target2Ratio, this.properties.useLogScaleForTargets):
+                 baseProp == 'AD'? fibs.retracement(this.a, this.d, this.properties.target2Ratio, this.properties.useLogScaleForTargets):
+                 fibs.retracement(this.c, this.d, this.properties.target2Ratio, this.properties.useLogScaleForTargets)
+    target3 = baseProp == 'impulse'? fibs.extension(this.x, peak, this.d, this.properties.target3Ratio, this.properties.useLogScaleForTargets) :
+                 baseProp == 'correction'? fibs.retracement(peak, this.d, this.properties.target3Ratio, this.properties.useLogScaleForTargets):
+                 baseProp == 'AD'? fibs.retracement(this.a, this.d, this.properties.target3Ratio, this.properties.useLogScaleForTargets):
+                 fibs.retracement(this.c, this.d, this.properties.target3Ratio, this.properties.useLogScaleForTargets)
+    target4 = baseProp == 'impulse'? fibs.extension(this.x, peak, this.d, this.properties.target4Ratio, this.properties.useLogScaleForTargets) :
+                 baseProp == 'correction'? fibs.retracement(peak, this.d, this.properties.target4Ratio, this.properties.useLogScaleForTargets):
+                 baseProp == 'AD'? fibs.retracement(this.a, this.d, this.properties.target4Ratio, this.properties.useLogScaleForTargets):
+                 fibs.retracement(this.c, this.d, this.properties.target4Ratio, this.properties.useLogScaleForTargets)
+
+    entry = baseProp == 'impulse'? fibs.extension(this.x, peak, this.d, this.properties.entryRatio, this.properties.useLogScaleForTargets) :
+                 baseProp == 'correction'? fibs.retracement(peak, this.d, this.properties.entryRatio, this.properties.useLogScaleForTargets):
+                 baseProp == 'AD'? fibs.retracement(this.a, this.d, this.properties.entryRatio, this.properties.useLogScaleForTargets):
+                 fibs.retracement(this.c, this.d, this.properties.entryRatio, this.properties.useLogScaleForTargets)
+
+    stop = baseProp == 'impulse'? fibs.extension(this.x, peak, this.d, this.properties.stopRatio, this.properties.useLogScaleForTargets) :
+                 baseProp == 'correction'? fibs.retracement(peak, this.d, this.properties.stopRatio, this.properties.useLogScaleForTargets):
+                 baseProp == 'AD'? fibs.retracement(this.a, this.d, this.properties.stopRatio, this.properties.useLogScaleForTargets):
+                 fibs.retracement(this.c, this.d, this.properties.stopRatio, this.properties.useLogScaleForTargets)
+
+    this.trade := HarmonicTrade.new(entry, entry, stop, stop, target1, target2, target3, target4, 0, false)
+    valid = stop > 0 and target4 > 0
+
+// @function Deletes drawing objects of HarmonicDrawing
+// @param this HarmonicDrawing object
+// @returns current HarmonicDrawing object
+export method delete(HarmonicDrawing this)=>
+    this.xa.delete()
+    this.ab.delete()
+    this.bc.delete()
+    this.cd.delete()
+    this.xb.delete()
+    this.bd.delete()
+    this.ac.delete()
+    this.xd.delete()
+    this.x.delete()
+    this.a.delete()
+    this.b.delete()
+    this.c.delete()
+    this.d.delete()
+    this.xabRatio.delete()
+    this.abcRatio.delete()
+    this.bcdRatio.delete()
+    this.xadRatio.delete()
+	this
+
+// @function Deletes drawings of harmonic pattern
+// @param this HarmonicPattern object
+// @returns current HarmonicPattern object
+export method delete(HarmonicPattern this)=>
+    this.drawing.delete()
+    this
+
+
