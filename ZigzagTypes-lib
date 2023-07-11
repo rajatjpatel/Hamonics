@@ -1,0 +1,109 @@
+//@version=5
+// @description Zigzag related user defined types. Depends on DrawingTypes library for basic types
+library("ZigzagTypes", overlay = true)
+import HeWhoMustNotBeNamed/DrawingTypes/2 as dr
+
+// @type Indicator is collection of indicator values applied on high, low and close
+// @field indicatorHigh Indicator Value applied on High
+// @field indicatorLow Indicator Value applied on Low
+export type Indicator
+	float indicatorHigh
+	float indicatorLow
+
+// @type PivotCandle represents data of the candle which forms either pivot High or pivot low or both
+// @field _high High price of candle forming the pivot
+// @field _low Low price of candle forming the pivot
+// @field length Pivot length
+// @field pHighBar represents number of bar back the pivot High occurred.
+// @field pLowBar represents number of bar back the pivot Low occurred.
+// @field pHigh Pivot High Price
+// @field pLow Pivot Low Price
+// @field indicators Array of Indicators - allows to add multiple 
+export type PivotCandle
+	float _high = high
+	float _low = low
+	int length = 5
+	int pHighBar
+	int pLowBar
+	float pHigh
+	float pLow
+	array<Indicator> indicators
+
+// @type Pivot refers to zigzag pivot. Each pivot can contain various data
+// @field point pivot point coordinates
+// @field dir direction of the pivot. Valid values are 1, -1, 2, -2
+// @field level is used for multi level zigzags. For single level, it will always be 0
+// @field componentIndex is the lower level zigzag array index for given pivot. Used only in multi level Zigzag Pivots
+// @field subComponents is the number of sub waves per each zigzag wave. Only applicable for multi level zigzags
+// @field ratio Price Ratio based on previous two pivots
+// @field indicatorNames Names of the indicators applied on zigzag
+// @field indicatorValues Values of the indicators applied on zigzag
+// @field indicatorRatios Ratios of the indicators applied on zigzag based on previous 2 pivots
+export type Pivot
+	dr.Point point
+	int dir
+	int level = 0
+    int componentIndex = 0
+    int subComponents = 0
+    float ratio
+	array<string> indicatorNames
+	array<float> indicatorValues
+    array<float> indicatorRatios
+
+// @type Flags required for drawing zigzag. Only used internally in zigzag calculation. Should not set the values explicitly
+// @field newPivot true if the calculation resulted in new pivot
+// @field doublePivot true if the calculation resulted in two pivots on same bar
+// @field updateLastPivot true if new pivot calculated replaces the old one.
+export type ZigzagFlags
+    bool newPivot = false
+    bool doublePivot = false
+    bool updateLastPivot = false
+
+// @type Zigzag object which contains whole zigzag calculation parameters and pivots
+// @field length Zigzag length. Default value is 5
+// @field numberOfPivots max number of pivots to hold in the calculation. Default value is 20
+// @field offset Bar offset to be considered for calculation of zigzag. Default is 0 - which means calculation is done based on the latest bar.
+// @field level Zigzag calculation level - used in multi level recursive zigzags
+// @field zigzagPivots array<Pivot> which holds the last n pivots calculated. 
+// @field flags  ZigzagFlags object which is required for continuous drawing of zigzag lines.
+export type Zigzag
+    int length = 5
+    int numberOfPivots = 20
+    int offset = 0
+    int level = 0
+    array<Pivot> zigzagPivots
+    ZigzagFlags flags
+
+// @type Zigzag Drawing Object
+// @field zigzagLine Line joining two pivots
+// @field zigzagLabel Label which can be used for drawing the values, ratios, directions etc.
+export type ZigzagObject
+	line zigzagLine
+	label zigzagLabel
+
+// @type Object which holds properties of zigzag drawing. To be used along with ZigzagDrawing
+// @field lineColor Zigzag line color. Default is color.blue
+// @field lineWidth Zigzag line width. Default is 1
+// @field lineStyle Zigzag line style. Default is line.style_solid. 
+// @field showLabel If set, the drawing will show labels on each pivot. Default is false
+// @field textColor Text color of the labels. Only applicable if showLabel is set to true.
+// @field maxObjects Max number of zigzag lines to display. Default is 300
+// @field xloc Time/Bar reference to be used for zigzag drawing. Default is Time - xloc.bar_time.
+export type ZigzagProperties
+    color lineColor = color.blue
+    int lineWidth = 1
+    string lineStyle = line.style_solid
+    bool showLabel = false
+    color textColor = color.black
+    int maxObjects = 300
+    string xloc = xloc.bar_time
+
+// @type Object which holds complete zigzag drawing objects and properties.
+// @field zigzag Zigzag object which holds the calculations.
+// @field properties ZigzagProperties object which is used for setting the display styles of zigzag
+// @field drawings array<ZigzagObject> which contains lines and labels of zigzag drawing.
+export type ZigzagDrawing
+    Zigzag zigzag
+    ZigzagProperties properties
+    array<ZigzagObject> drawings
+
