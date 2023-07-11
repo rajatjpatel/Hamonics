@@ -1,0 +1,31 @@
+//@version=4
+study("Breakout", overlay = true)
+volumelength = input(100, minval=10, step=10)
+atrlength = input(22, minval=1)
+mult = input(1, minval=0.001, maxval=50)
+volumeMarkup = input(0, minval=0, maxval=100, step=5)
+targetMarkup = input(25, minval=0, maxval=100, step=5)
+
+vma = ema(volume,volumelength)
+atr = atr(atrlength)
+candleBreakout = false
+if(abs(close[1] - close) > atr * mult or abs(open-close) > atr * mult)
+    candleBreakout := true
+
+volumeBreakout = vma * (1+(volumeMarkup/100)) <  volume
+
+candleColor = color.silver
+
+if(candleBreakout and (volumeBreakout or na(volume) ))
+    if(close > close[1])
+        candleColor := color.lime
+    else
+        candleColor := color.orange
+
+markup = max(high-low, max(abs(high-close[1]), abs(low-close[1])))
+upTarget = (candleColor == color.lime) ? high + (targetMarkup/100)*markup : na
+downTarget = (candleColor == color.orange) ? low - (targetMarkup/100)*markup : na
+
+plotshape(upTarget, title="UpTarget", color=color.green, style=shape.triangleup, location = location.absolute)
+plotshape(downTarget, title="DownTarget", color=color.red, style=shape.triangledown, location = location.absolute)
+barcolor(candleColor)
