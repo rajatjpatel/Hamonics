@@ -1,0 +1,196 @@
+//@version=5
+// @description Helper Library for Auto Harmonic Patterns UltimateX. It is not meaningful for others. This is supposed to be private library. But, publishing it to make sure that I don't delete accidentally
+library("ahpuhelper", overlay = true)
+// @function add data to open trades table column
+// @param showOpenTrades flag to show open trades table
+// @param table_id Table Id
+// @param column refers to pattern data
+// @param colors backgroud and text color array
+// @param values cell values
+// @param intStatus status as integer
+// @param harmonicTrailingStartState trailing Start state as per configs
+// @param lblSizeOpenTrades text size
+// @returns nextColumn
+export insert_open_trades_table_column(simple bool showOpenTrades, table table_id, int column, color[] colors, string[] values,
+                                             int intStatus, simple int harmonicTrailingStartState, string lblSizeOpenTrades) =>
+    bgcolor = array.get(colors, 0)
+    text_color = array.get(colors, 1)
+    if showOpenTrades
+        highlightBgColor = color.new(bgcolor, 70)
+        table.cell(table_id=table_id, column=column, row=0, text=array.get(values, 0), bgcolor=bgcolor, text_color=text_color, text_size=lblSizeOpenTrades)
+        table.cell(table_id=table_id, column=column, row=1, text=array.get(values, 1), bgcolor=bgcolor, text_color=text_color, text_size=lblSizeOpenTrades)
+        table.cell(table_id=table_id, column=column, row=2, text=array.get(values, 2), bgcolor=bgcolor, text_color=text_color, text_size=lblSizeOpenTrades)
+        table.cell(table_id=table_id, column=column, row=3, text=array.get(values, 3), bgcolor=bgcolor, text_color=text_color, text_size=lblSizeOpenTrades)
+        
+        isHeader = harmonicTrailingStartState == -1
+        table.cell(table_id=table_id, column=column, row=4, text=array.get(values, 4), bgcolor=intStatus != 0 or isHeader? bgcolor : highlightBgColor,
+                                                                                                             text_color=text_color, text_size=lblSizeOpenTrades)
+        table.cell(table_id=table_id, column=column, row=5, text=array.get(values, 5), bgcolor=intStatus < harmonicTrailingStartState? highlightBgColor : bgcolor,
+                                                                                                             text_color=text_color, text_size=lblSizeOpenTrades)
+        table.cell(table_id=table_id, column=column, row=6, text=array.get(values, 6), bgcolor=intStatus >= harmonicTrailingStartState and not isHeader? highlightBgColor : bgcolor,
+                                                                                                             text_color=text_color, text_size=lblSizeOpenTrades)
+        if(intStatus!=0)
+            table.cell(table_id=table_id, column=column, row=7, text=array.get(values, 7), bgcolor=intStatus == 1 ? highlightBgColor : bgcolor, text_color=text_color, text_size=lblSizeOpenTrades)
+            table.cell(table_id=table_id, column=column, row=8, text=array.get(values, 8), bgcolor=intStatus == 2 ? highlightBgColor : bgcolor, text_color=text_color, text_size=lblSizeOpenTrades)
+            table.cell(table_id=table_id, column=column, row=9, text=array.get(values, 9), bgcolor=intStatus == 3 ? highlightBgColor : bgcolor, text_color=text_color, text_size=lblSizeOpenTrades)
+            table.cell(table_id=table_id, column=column, row=10, text=array.get(values, 10), bgcolor=intStatus == 4 ? highlightBgColor : bgcolor, text_color=text_color, text_size=lblSizeOpenTrades)
+    column+1
+
+getSum(matrix<int> closedStats, int row)=>
+    statArray = matrix.row(closedStats, row)
+    sum = array.sum(statArray)
+    validSum = sum - array.get(statArray, 0)
+    [statArray, sum, validSum]
+
+getClosedCellVal(closedStats, closedRRStats, retouchStats, sizeStats, rowNumber, cIndex, statsRow, sum, validSum, retouchRow, sizeRow, showStatsInPercentage)=>
+    currentCount = matrix.get(closedStats, rowNumber, cIndex)
+    lastCount = cIndex!=0 ? matrix.get(closedStats, rowNumber, cIndex-1) : 0
+    
+    count = cIndex > 1? array.sum(array.slice(statsRow, cIndex, matrix.columns(closedStats))) : matrix.get(closedStats, rowNumber, cIndex)
+    touchCount = cIndex > 1? array.sum(array.slice(retouchRow, cIndex, matrix.columns(retouchStats))) : matrix.get(retouchStats, rowNumber, cIndex)
+
+    countPercent = cIndex == 0? (sum > 0? (count*100/sum) : 0) : (validSum > 0 ? (count*100/validSum) : 0)
+    tcount = count+lastCount == 0 ? 0 : count*100/(count+lastCount)
+    
+    rr = closedRRStats.get(cIndex-2)
+    trr = closedRRStats.get(cIndex+2)
+    
+    avgSize = cIndex >1 and count > 0 ? int(array.sum(array.slice(matrix.row(sizeStats, rowNumber), cIndex, matrix.columns(sizeStats)))/count)  : 0.0
+    rrStr = cIndex > 1 and sum > 0 ? '\n'+rr+ (cIndex >2 ? ' / '+trr:'') : ''
+    wrStr = (showStatsInPercentage? str.tostring(countPercent, format.percent) + (cIndex > 2? ' / ' + str.tostring(tcount, format.percent): ''): (cIndex > 1? str.tostring(touchCount)+' / ': '') +str.tostring(count))
+    cellVal = wrStr+(showStatsInPercentage ? rrStr : '\n('+str.tostring(avgSize)+')')
+    cellVal
+
+// @function populate closed stats for harmonic patterns
+// @param ClosedStatsPosition Table position for closed stats
+// @param bullishCounts Matrix containing bullish trade stats
+// @param bearishCounts Matrix containing bearish trade stats
+// @param bullishRetouchCounts Matrix containing bullish trade stats for those which retouched entry
+// @param bearishRetouchCounts Matrix containing bearish trade stats for those which retouched entry
+// @param bullishSizeMatrix Matrix containing data about size of bullish patterns
+// @param bearishSizeMatrix Matrix containing data about size of bearish patterns
+// @param bullishRR Matrix containing Risk Reward data of bullish patterns
+// @param bearishRR Matrix containing Risk Reward data of bearish patterns
+// @param allPatternLabels array containing pattern labels
+// @param flags display flags
+// @param rowMain Pattern header data
+// @param rowHeaders header grouping data
+// @returns void
+export populate_closed_stats(string ClosedStatsPosition, matrix<bool> patternsMatrix,
+                                 matrix<int> bullishCounts, matrix<int> bearishCounts, matrix<int> bullishRetouchCounts, matrix<int> bearishRetouchCounts,
+                                 matrix<int> bullishSizeMatrix, matrix<int> bearishSizeMatrix, array<string> rr, 
+                                 array<string> allPatternLabels, string lblSizeClosedTrades, bool[] flags, string[] rowMain, string[] rowHeaders)=>
+    ShowClosedTradeStats = array.get(flags, 0)
+    showSelectivePatternStats = array.get(flags, 1)
+    showPatternStats = array.get(flags, 2)
+    showStatsInPercentage = array.get(flags, 3)
+    if(barstate.islast and ShowClosedTradeStats)
+        closedStats = table.new(ClosedStatsPosition, 2*matrix.columns(bullishCounts)+3, matrix.rows(bullishCounts)+3, border_color=color.black, border_width=2)
+
+        longColumnStart = 3
+        longColumnEnd = longColumnStart + matrix.columns(bullishCounts)-2
+        shortColumnStart = longColumnEnd + 3
+        shortColumnEnd = shortColumnStart + matrix.columns(bearishCounts)-2
+        numberOfRows = matrix.rows(bullishCounts)
+        [bullishLRow, llSum, llValidSum] = getSum(bullishCounts, numberOfRows-1)
+        [bearishLRow, slSum, slValidSum] = getSum(bearishCounts, numberOfRows-1)
+        
+        [bullishLRowRetouch, llSumRetouch, llValidSumRetouch] = getSum(bullishRetouchCounts, numberOfRows-1)
+        [bearishLRowRetouch, slSumRetouch, slValidSumRetouch] = getSum(bearishRetouchCounts, numberOfRows-1)
+        
+        [bullishLRowSize, llSumSize, llValidSumSize] = getSum(bullishSizeMatrix, numberOfRows-1)
+        [bearishLRowSize, slSumSize, slValidSumSize] = getSum(bearishSizeMatrix, numberOfRows-1)
+        
+        showOpenPatternStats = showSelectivePatternStats and matrix.rows(patternsMatrix) > 0
+
+        for [index, val] in rowMain
+            if(showPatternStats or showOpenPatternStats or index > 0) and (llSum!=0 or index < longColumnStart or index > longColumnEnd) and (slSum!=0 or index < shortColumnStart or index > shortColumnEnd)
+                     and index!=1 and index!=2 and index!=8 and index!=9
+                table.cell(closedStats, index, 0, val, text_color=color.white, text_size=lblSizeClosedTrades, bgcolor=color.maroon)
+                table.cell(closedStats, index, 1, array.get(rowHeaders, index), text_color=color.white, text_size=lblSizeClosedTrades, bgcolor=color.maroon)
+        
+        if(showPatternStats or showOpenPatternStats)
+            table.merge_cells(closedStats, 0,0,0,1)
+        
+        if(llSum!=0)
+            table.merge_cells(closedStats, longColumnStart,0,longColumnEnd,0)
+        if(slSum!=0)
+            table.merge_cells(closedStats, shortColumnStart,0,shortColumnEnd,0)
+        
+        closedStatsTooltip = (showStatsInPercentage? 'Win Rate / Trailing Win Rate\nRisk Reward / Trailing Risk Reward':'Retest Count / Hit Count\n(Average Size of Patterns)')
+        closedStatsTooltipT1 = (showStatsInPercentage? 'Win Rate\nRisk Reward':'Retest Count / Hit Count\n(Average Size of Patterns)')
+        totalsTooltip = 'Retest Count/ Valid Count / Total Patterns\n(Average Size of Patterns)'
+        if(showPatternStats or showOpenPatternStats)
+            for i=0 to numberOfRows-2
+                patternColumn = matrix.col(patternsMatrix, i)
+                patternIndex = array.indexof(patternColumn, true)
+                if(not showOpenPatternStats or showPatternStats or patternIndex >= 0)
+                    [bullishRow, lSum, lValidSum] = getSum(bullishCounts, i)
+                    [bearishRow, sSum, sValidSum] = getSum(bearishCounts, i)
+    
+                    [bullishRowRetouch, lSumRetouch, lValidSumRetouch] = getSum(bullishRetouchCounts, i)
+                    [bearishRowRetouch, sSumRetouch, sValidSumRetouch] = getSum(bearishRetouchCounts, i)
+            
+                    [bullishRowSize, lSumSize, lValidSumSize] = getSum(bullishSizeMatrix, i)
+                    [bearishRowSize, sSumSize, sValidSumSize] = getSum(bearishSizeMatrix, i)
+        
+                    if(lSum != 0 or sSum != 0)
+                        table.cell(closedStats, 0, i+2, array.get(allPatternLabels,i), text_color=color.white, text_size=lblSizeClosedTrades, bgcolor=color.teal)
+                        if(llSum!=0)
+                            for j=2 to matrix.columns(bullishCounts)-1
+                                cellVal = getClosedCellVal(bullishCounts, rr, bullishRetouchCounts, bullishSizeMatrix, i, j, bullishRow, lSum, lValidSum, bullishRowRetouch, bullishRowSize, showStatsInPercentage)
+                                table.cell(closedStats, j+longColumnStart-2, i+2, cellVal, text_color=color.black, text_size=lblSizeClosedTrades, bgcolor=color.new(color.lime,20),
+                                                                                                                                 tooltip=j==2?closedStatsTooltipT1 :closedStatsTooltip)
+                            avgSizeStr = str.tostring(int(lValidSumSize/math.max(lValidSum, 1)))
+                            fCellTxt = str.tostring(lValidSumRetouch)+'/'+str.tostring(lValidSum)+'/'+str.tostring(lSum)+'\n('+avgSizeStr+')'
+                            table.cell(closedStats, longColumnEnd, i+2, fCellTxt, text_color=color.black, text_size=lblSizeClosedTrades, bgcolor=color.aqua, tooltip=totalsTooltip)
+                        if(slSum!=0)
+                            for j=2 to matrix.columns(bearishCounts)-1
+                                cellVal = getClosedCellVal(bearishCounts, rr, bearishRetouchCounts, bearishSizeMatrix, i, j, bearishRow, sSum, sValidSum, bearishRowRetouch, bearishRowSize, showStatsInPercentage)
+                                table.cell(closedStats, j+shortColumnStart-2, i+2, cellVal, text_color=color.black, text_size=lblSizeClosedTrades, bgcolor=color.new(color.orange, 20),
+                                                                                                                                 tooltip=j==2?closedStatsTooltipT1 :closedStatsTooltip)
+                            avgSizeStr = str.tostring(int(sValidSumSize/math.max(sValidSum, 1)))
+                            fCellTxt = str.tostring(sValidSumRetouch)+'/'+str.tostring(sValidSum)+'/'+str.tostring(sSum)+'\n('+avgSizeStr+')'
+                            table.cell(closedStats, shortColumnEnd, i+2, fCellTxt, text_color=color.black, text_size=lblSizeClosedTrades, bgcolor=color.aqua, tooltip=totalsTooltip)
+
+        totalColor = color.yellow
+
+        if(showPatternStats or showOpenPatternStats)
+            table.cell(closedStats, 0, numberOfRows+2, 'Total', text_color=color.white, text_size=lblSizeClosedTrades, bgcolor=color.olive)
+        
+        if(llSum!=0)
+            for j=2 to matrix.columns(bullishCounts)-1
+                cellVal = getClosedCellVal(bullishCounts, rr, bullishRetouchCounts, bullishSizeMatrix, numberOfRows-1, j, bullishLRow, llSum, llValidSum, bullishLRowRetouch, bullishLRowSize, showStatsInPercentage)
+                table.cell(closedStats, j+longColumnStart-2, numberOfRows+2, cellVal, text_color=color.black, text_size=lblSizeClosedTrades,
+                         bgcolor=color.new(showPatternStats or showOpenPatternStats?totalColor:color.lime,20), tooltip=j==2?closedStatsTooltipT1 :closedStatsTooltip)
+            avgSizeStr = str.tostring(int(llValidSumSize/math.max(llValidSum, 1)))
+            fCellTxt = str.tostring(llValidSumRetouch)+'/'+str.tostring(llValidSum)+'/'+str.tostring(llSum)+'\n('+avgSizeStr+')'
+            table.cell(closedStats, longColumnEnd, numberOfRows+2, fCellTxt, text_color=color.black, text_size=lblSizeClosedTrades,
+                                                 bgcolor=showPatternStats or showOpenPatternStats?totalColor:color.lime,
+                                                 tooltip=totalsTooltip)
+
+
+        if(slSum!=0)
+            for j=2 to matrix.columns(bearishCounts)-1
+                cellVal = getClosedCellVal(bearishCounts, rr, bearishRetouchCounts, bearishSizeMatrix, numberOfRows-1, j, bearishLRow, slSum, slValidSum, bearishLRowRetouch, bearishLRowSize, showStatsInPercentage)
+                table.cell(closedStats, j+shortColumnStart-2, numberOfRows+2, cellVal, text_color=color.black, text_size=lblSizeClosedTrades,
+                         bgcolor=color.new(showPatternStats or showOpenPatternStats?totalColor:color.orange, 20), tooltip=j==2?closedStatsTooltipT1 :closedStatsTooltip)
+            avgSizeStr = str.tostring(int(slValidSumSize/math.max(slValidSum, 1)))
+            fCellTxt = str.tostring(slValidSumRetouch)+'/'+str.tostring(slValidSum)+'/'+str.tostring(slSum)+'\n('+avgSizeStr+')'
+            table.cell(closedStats, shortColumnEnd, numberOfRows+2,fCellTxt, text_color=color.black, text_size=lblSizeClosedTrades,
+                                                 bgcolor=showPatternStats or showOpenPatternStats?totalColor:color.orange,
+                                                 tooltip=totalsTooltip)
+
+// @function populate risk reward based on entry, stop, and targets
+// @param entry Entry price or ratio
+// @param stop Stop price or ratio
+// @param targets array of target prices or ratios
+// @returns array containing risk reward and trailing risk reward
+export getRR(float entry, float stop, array<float> targets)=>
+    var rr = array.new<string>(targets.size()*2)
+    if(na(rr.first()))
+        for [i, target] in targets
+            rr.set(i, str.tostring((target-entry)/(entry-stop), '#.##'))
+            lastTarget = i == 0? entry : targets.get(i-1)
+            rr.push(str.tostring((target-lastTarget)/(lastTarget-stop), '#.##'))
+    rr
