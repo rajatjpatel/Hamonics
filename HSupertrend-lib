@@ -1,0 +1,136 @@
+//@version=5
+import HeWhoMustNotBeNamed/rzigzag/10 as zg
+import HeWhoMustNotBeNamed/eHarmonicpatternsLogScale/2 as hp
+
+// @description Supertrend implementation based on harmonic patterns
+library("HSupertrend", overlay = true)
+
+// @type ZigzagProperties contains values required for zigzag calculation
+// @field length Zigzag length
+// @field source Array containing custom OHLC. If not set, array.from(high, low) is used
+export type ZigzagProperties
+	int length
+	array<float> source
+
+// @type PatternProperties are essential pattern parameters used for calculation of bullish and bearish zones
+// @field base Base for calculating entry and stop of pattern. Can be CD, minmax or correction. Default is CD
+// @field entryPercent Distance from D in terms of percent of Base in the direction of pattern
+// @field stopPercent Distance from D in terms of percent of Base in the opposite direction of pattern
+// @field useClosePrices When set uses close price for calculation of supertrend breakout
+export type PatternProperties
+	string base='CD'
+	int entryPercent = 30
+	int stopPercent = 5
+	bool useClosePrices = true
+	bool useLogScale = false
+
+// @function derives supertrend based on harmonic patterns
+// @param zProperties ZigzagProperties containing Zigzag length and source array
+// @param pProperties PatternProperties used for calculation
+// @param errorPercent Error threshold for scanning patterns
+// @param showPatterns Draw identified patterns structure on chart
+// @param patternColor Color of the pattern lines to be drawn
+// @returns [direction, supertrend]
+export hsupertrend(ZigzagProperties zProperties, PatternProperties pProperties, simple int errorPercent = 8,
+						 simple bool showPatterns = true, simple color patternColor = color.blue) =>
+	startIndex = 1
+	depth = 6
+	var float shortStop = na
+	var float longStop = na
+	var int dir = na
+	zigzagSource = na(zProperties.source)? array.from(high, low) : zProperties.source
+	var useLogScale = pProperties.useLogScale
+	[zigzagmatrix, zgFlags] = zg.zigzag(zProperties.length, zigzagSource, depth)
+	newPivot = array.get(zgFlags, 1)
+	if(matrix.rows(zigzagmatrix) >= startIndex+5 and newPivot and not newPivot[1])
+		x = matrix.get(zigzagmatrix, startIndex+4, 0)
+		a = matrix.get(zigzagmatrix, startIndex+3, 0)
+		b = matrix.get(zigzagmatrix, startIndex+2, 0)
+		c = matrix.get(zigzagmatrix, startIndex+1, 0)
+		d = matrix.get(zigzagmatrix, startIndex, 0)
+		patterns = hp.isHarmonicPattern(x, a, b, c, d, array.new<bool>(), true, errorPercent, useLogScale)
+
+		if(array.includes(patterns, true))
+			xBar = matrix.get(zigzagmatrix, startIndex+4, 1)
+			aBar = matrix.get(zigzagmatrix, startIndex+3, 1)
+			bBar = matrix.get(zigzagmatrix, startIndex+2, 1)
+			cBar = matrix.get(zigzagmatrix, startIndex+1, 1)
+			dBar = matrix.get(zigzagmatrix, startIndex, 1)
+			if showPatterns
+				line.new(int(xBar), x, int(aBar), a, color=patternColor, style = line.style_dotted, width = 0)
+				line.new(int(aBar), a, int(bBar), b, color=patternColor, style = line.style_dotted, width = 0)
+				line.new(int(bBar), b, int(cBar), c, color=patternColor, style = line.style_dotted, width = 0)
+				line.new(int(cBar), c, int(dBar), d, color=patternColor, style = line.style_dotted, width = 0)
+				line.new(int(bBar), b, int(dBar), d, color=patternColor, style = line.style_dotted, width = 0)
+				line.new(int(xBar), x, int(bBar), b, color=patternColor, style = line.style_dotted, width = 0)
+		
+			lastDir = matrix.get(zigzagmatrix, startIndex, 3)
+			baseValue = pProperties.base == 'minmax' ? math.max(x,a,b,c,d) - math.min(x,a,b,c,d) : pProperties.base == 'correction'? math.abs((dir > 0? math.max(a, c) : math.min(a, c)) - d) : math.abs(c-d)
+			entryRange = d - math.sign(lastDir)*baseValue*(pProperties.entryPercent/100)
+			stopRange = d + math.sign(lastDir)*baseValue*(pProperties.stopPercent/100)
+
+			newBullishRange = math.max(entryRange, stopRange)
+			newBearishRange = math.min(entryRange, stopRange)
+
+			shortStop := dir < 0? math.min(shortStop, newBullishRange) : newBullishRange
+			longStop := dir > 0? math.max(longStop, newBearishRange) : newBearishRange
+
+	highPrice = pProperties.useClosePrices? close : high
+	lowPrice = pProperties.useClosePrices ? close : low
+	dir := highPrice >= shortStop? 1 : lowPrice <=longStop? -1 : dir
+	supertrend = dir > 0? longStop : shortStop
+	[dir, supertrend]
+
+
+// @function derives supertrend based on harmonic patterns
+// @param zProperties ZigzagProperties containing Zigzag length and source array
+// @param pProperties PatternProperties used for calculation
+// @param errorPercent Error threshold for scanning patterns
+// @param showPatterns Draw identified patterns structure on chart
+// @param patternColor Color of the pattern lines to be drawn
+// @returns [direction, supertrend]
+export hsupertrendplain(int length, array<float> source = na, string base='CD', int entryPercent = 30, int stopPercent = 5, bool useClosePrices = true, simple int errorPercent = 8) =>
+	startIndex = 1
+	depth = 6
+	var float shortStop = na
+	var float longStop = na
+	var int dir = na
+	zigzagSource = na(source)? array.from(high, low) : source
+
+	[zigzagmatrix, zgFlags] = zg.zigzag(length, zigzagSource, depth)
+	newPivot = array.get(zgFlags, 1)
+	if(matrix.rows(zigzagmatrix) >= startIndex+5 and newPivot and not newPivot[1])
+		x = matrix.get(zigzagmatrix, startIndex+4, 0)
+		a = matrix.get(zigzagmatrix, startIndex+3, 0)
+		b = matrix.get(zigzagmatrix, startIndex+2, 0)
+		c = matrix.get(zigzagmatrix, startIndex+1, 0)
+		d = matrix.get(zigzagmatrix, startIndex, 0)
+		patterns = hp.isHarmonicPattern(x, a, b, c, d, array.new<bool>(), true, errorPercent)
+
+		if(array.includes(patterns, true))
+			xBar = matrix.get(zigzagmatrix, startIndex+4, 1)
+			aBar = matrix.get(zigzagmatrix, startIndex+3, 1)
+			bBar = matrix.get(zigzagmatrix, startIndex+2, 1)
+			cBar = matrix.get(zigzagmatrix, startIndex+1, 1)
+			dBar = matrix.get(zigzagmatrix, startIndex, 1)
+	
+			lastDir = matrix.get(zigzagmatrix, startIndex, 3)
+			baseValue = base == 'minmax' ? math.max(x,a,b,c,d) - math.min(x,a,b,c,d) : base == 'correction'? math.abs((dir > 0? math.max(a, c) : math.min(a, c)) - d) : math.abs(c-d)
+			entryRange = d - math.sign(lastDir)*baseValue*(entryPercent/100)
+			stopRange = d + math.sign(lastDir)*baseValue*(stopPercent/100)
+
+			newBullishRange = math.max(entryRange, stopRange)
+			newBearishRange = math.min(entryRange, stopRange)
+
+			shortStop := dir < 0? math.min(shortStop, newBullishRange) : newBullishRange
+			longStop := dir > 0? math.max(longStop, newBearishRange) : newBearishRange
+
+	highPrice = useClosePrices? close : high
+	lowPrice = useClosePrices ? close : low
+	dir := highPrice >= shortStop? 1 : lowPrice <=longStop? -1 : dir
+	supertrend = dir > 0? longStop : shortStop
+	[dir, supertrend, longStop, shortStop]
+
+// Example
+// [dir, supertrend] = hsupertrend(ZigzagProperties.new(8, na), PatternProperties.new())
+// plot(supertrend, "hSupertrend", dir>0? color.green:color.red)
