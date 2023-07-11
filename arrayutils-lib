@@ -1,0 +1,308 @@
+
+//@version=5
+// @description Library contains utility functions using arrays.
+library("arrayutils")
+
+unshift_to_array(arr, val, maxItems)=>
+    array.insert(arr, 0, val)
+    if(array.size(arr) > maxItems)
+        array.pop(arr)
+    arr
+
+push_to_array(arr, val, maxItems)=>
+    array.push(arr, val)
+    if(array.size(arr) > maxItems)
+        array.remove(arr, 0)
+    arr
+
+// @function remove an item from array at specific index. Also deletes the item
+// @param arr - array from which the item needs to be deleted
+// @param index - index of item to be deleted
+// @returns void
+export delete(simple line[] arr, int index)=>line.delete(array.remove(arr, index))
+export delete(simple label[] arr, int index)=>label.delete(array.remove(arr, index))
+export delete(simple box[] arr, int index)=>box.delete(array.remove(arr, index))
+export delete(simple table[] arr, int index)=>table.delete(array.remove(arr, index))
+export delete(simple linefill[] arr, int index)=>linefill.delete(array.remove(arr, index))
+
+export delete(simple int[] arr, int index)=>array.remove(arr, index)
+export delete(simple float[] arr, int index)=>array.remove(arr, index)
+export delete(simple bool[] arr, int index)=>array.remove(arr, index)
+export delete(simple string[] arr, int index)=>array.remove(arr, index)
+export delete(simple color[] arr, int index)=>array.remove(arr, index)
+
+// @function remove the last item from array. Also deletes the item
+// @param arr - array from which the last item needs to be removed and deleted
+// @returns void
+export pop(simple line[] arr)=>line.delete(array.pop(arr))
+export pop(simple label[] arr)=>label.delete(array.pop(arr))
+export pop(simple box[] arr)=>box.delete(array.pop(arr))
+export pop(simple table[] arr)=>table.delete(array.pop(arr))
+export pop(simple linefill[] arr)=>linefill.delete(array.pop(arr))
+
+export pop(simple int[] arr)=>array.pop(arr)
+export pop(simple float[] arr)=>array.pop(arr)
+export pop(simple bool[] arr)=>array.pop(arr)
+export pop(simple string[] arr)=>array.pop(arr)
+export pop(simple color[] arr)=>array.pop(arr)
+
+unshift_to_object_array(arr, val, maxItems)=>
+    array.insert(arr, 0, val)
+    if(array.size(arr) > maxItems)
+        pop(arr)
+    arr
+
+// @function remove an item from array at index 0. Also deletes the item
+// @param arr - array from which the first item needs to be removed and deleted
+// @returns void
+export shift(simple line[] arr)=>line.delete(array.shift(arr))
+export shift(simple label[] arr)=>label.delete(array.shift(arr))
+export shift(simple box[] arr)=>box.delete(array.shift(arr))
+export shift(simple table[] arr)=>table.delete(array.shift(arr))
+export shift(simple linefill[] arr)=>linefill.delete(array.shift(arr))
+export shift(simple int[] arr)=>array.shift(arr)
+export shift(simple float[] arr)=>array.shift(arr)
+export shift(simple bool[] arr)=>array.shift(arr)
+export shift(simple string[] arr)=>array.shift(arr)
+export shift(simple color[] arr)=>array.shift(arr)
+
+push_to_object_array(arr, val, maxItems)=>
+    array.push(arr, val)
+    if(array.size(arr) > maxItems)
+        shift(arr)
+    arr
+
+// @function add an item to the beginning of an array with max items cap
+// @param arr - array to which the item needs to be added at the beginning
+// @param val - value of item which needs to be added
+// @param maxItems - max items array can hold. After that, items are removed from the other end
+// @returns resulting array
+export unshift(simple int[] arr, int val, simple int maxItems)=>unshift_to_array(arr, val, maxItems)
+export unshift(simple float[] arr, float val, simple int maxItems)=>unshift_to_array(arr, val, maxItems)
+export unshift(simple bool[] arr, bool val, simple int maxItems)=>unshift_to_array(arr, val, maxItems)
+export unshift(simple string[] arr, string val, simple int maxItems)=>unshift_to_array(arr, val, maxItems)
+export unshift(simple color[] arr, color val, simple int maxItems)=>unshift_to_array(arr, val, maxItems)
+
+export unshift(simple line[] arr, line val, simple int maxItems)=>unshift_to_object_array(arr, val, maxItems)
+export unshift(simple label[] arr, label val, simple int maxItems)=>unshift_to_object_array(arr, val, maxItems)
+export unshift(simple box[] arr, box val, simple int maxItems)=>unshift_to_object_array(arr, val, maxItems)
+export unshift(simple table[] arr, table val, simple int maxItems)=>unshift_to_object_array(arr, val, maxItems)
+export unshift(simple linefill[] arr, linefill val, simple int maxItems)=>unshift_to_object_array(arr, val, maxItems)
+
+clear_array_objects(arr)=>
+    len = array.size(arr)-1
+    for i=0 to len >=0 ? len:na
+        pop(arr)
+
+// @function remove and delete all items in an array
+// @param arr - array which needs to be cleared
+// @returns void
+export clear(simple line[] arr)=>clear_array_objects(arr)
+export clear(simple label[] arr)=>clear_array_objects(arr)
+export clear(simple box[] arr)=>clear_array_objects(arr)
+export clear(simple table[] arr)=>clear_array_objects(arr)
+export clear(simple linefill[] arr)=>clear_array_objects(arr)
+export clear(simple int[] arr)=>array.clear(arr)
+export clear(simple float[] arr)=>array.clear(arr)
+export clear(simple bool[] arr)=>array.clear(arr)
+export clear(simple string[] arr)=>array.clear(arr)
+export clear(simple color[] arr)=>array.clear(arr)
+
+// @function add an item to the end of an array with max items cap
+// @param arr - array to which the item needs to be added at the beginning
+// @param val - value of item which needs to be added
+// @param maxItems - max items array can hold. After that, items are removed from the starting index
+// @returns resulting array
+export push(simple int[] arr, int val, simple int maxItems)=>push_to_array(arr, val, maxItems)
+export push(simple float[] arr, float val, simple int maxItems)=>push_to_array(arr, val, maxItems)
+export push(simple bool[] arr, bool val, simple int maxItems)=>push_to_array(arr, val, maxItems)
+export push(simple string[] arr, string val, simple int maxItems)=>push_to_array(arr, val, maxItems)
+export push(simple color[] arr, color val, simple int maxItems)=>push_to_array(arr, val, maxItems)
+
+
+export push(simple line[] arr, line val, simple int maxItems)=>push_to_object_array(arr, val, maxItems)
+export push(simple label[] arr, label val, simple int maxItems)=>push_to_object_array(arr, val, maxItems)
+export push(simple box[] arr, box val, simple int maxItems)=>push_to_object_array(arr, val, maxItems)
+export push(simple table[] arr, table val, simple int maxItems)=>push_to_object_array(arr, val, maxItems)
+export push(simple linefill[] arr, linefill val, simple int maxItems)=>push_to_object_array(arr, val, maxItems)
+
+// @function finds difference between two timestamps
+// @param pivots pivots array
+// @param barArray pivot bar array
+// @param dir direction for which overflow need to be checked
+// @returns bool overflow
+export check_overflow(float a, float b, float c, float[] pivots, int[] barArray)=>
+    cBar = array.get(barArray, 0)
+    aBar = array.get(barArray, array.size(barArray)-1)
+    ln = line.new(aBar, a, cBar, c)
+    overflow = false
+    dir = c > b? 1 : -1
+    for i = 1 to array.size(barArray)-2
+        currentBar = array.get(barArray, i)
+        peak = array.get(pivots, i)
+        linePrice = line.get_price(ln, currentBar)
+        if(dir*peak > dir*linePrice)
+            overflow := true
+            break
+    line.delete(ln)
+    overflow
+
+// @function finds series of pivots in particular trend
+// @param pivots pivots array
+// @param length length for which trend series need to be checked
+// @param highLow filter pivot high or low
+// @param trend Uptrend or Downtrend
+// @returns int[] trendIndexes
+export get_trend_series(float[] pivots, int length, int highLow, int trend)=>
+    startLength = 1
+    endLength = math.min(array.size(pivots), length)
+    trendIndexes = array.new_int()
+
+    if(startLength < endLength)
+        first = array.get(pivots, 0)
+        sec = array.get(pivots, 1)
+        
+        dir = first > sec? 1 : -1
+
+        while(startLength+(dir==highLow?1:0) < endLength)
+            oTrend = trend*highLow
+            min = array.slice(pivots, startLength, endLength)
+            peak = highLow == 1? array.max(min) : array.min(min)
+            
+            peakIndex = oTrend == 1? array.indexof(min, peak) : array.lastindexof(min, peak)
+            if oTrend == 1
+                array.insert(trendIndexes, 0, startLength+peakIndex)
+            else
+                array.push(trendIndexes, startLength+peakIndex)
+            if(oTrend == 1? startLength+peakIndex == endLength : peakIndex == 0)
+                break
+            if oTrend == 1
+                startLength := startLength+peakIndex+1+(dir>0?1:0)
+            else
+                endLength := peakIndex
+    trendIndexes
+
+// @function finds series of pivots in particular trend
+// @param pivots pivots array
+// @param firstIndex First index of the series
+// @param lastIndex Last index of the series
+// @returns int[] trendIndexes
+export get_trend_series(float[] pivots, int firstIndex, int lastIndex)=>
+    startIndex = firstIndex
+    endIndex = math.min(array.size(pivots), lastIndex)
+
+    trendIndexes = array.new_int()
+
+    if(startIndex+1 < endIndex)
+        first = array.get(pivots, startIndex)
+        sec = array.get(pivots, startIndex+1)
+        
+        dir = first > sec? 1 : -1
+
+        min = array.slice(pivots, startIndex, endIndex)
+        while(array.size(min) > 1)
+            peak = (dir == 1? array.min(min) : array.max(min))
+            peakIndex = array.lastindexof(min, peak)
+            min := array.slice(pivots, startIndex, startIndex+peakIndex)
+            reversePeak = (dir == 1? array.max(min) : array.min(min))
+            if(reversePeak == first)
+                array.push(trendIndexes, startIndex+peakIndex)
+    trendIndexes
+
+
+// @function calculates sma for elements in array
+// @param source source array
+// @returns float sma
+export sma(float[] source) =>
+    array.avg(source)
+
+// @function calculates ema for elements in array
+// @param source source array
+// @param length ema length
+// @returns float ema
+export ema(float[] source, simple int length) =>
+    var ma = close
+    last = nz(array.get(source, 0))
+    k = 2 / (length + 1)
+    ma := last * k + (1 - k) * ma
+    ma
+
+// @function calculates rma for elements in array
+// @param source source array
+// @param length rma length
+// @returns float rma
+export rma(float[] source, simple int length) =>
+    var ma = close
+    last = nz(array.get(source, 0))
+    ma := (ma * (length - 1) + last) / length
+    ma
+
+// @function calculates wma for elements in array
+// @param source source array
+// @param length wma length
+// @returns float wma
+export wma(float[] source, simple int length) =>
+    masum = 0.0
+    for i = 0 to length - 1 by 1
+        masum := masum + array.get(source, i) * (length - i)
+        masum
+    lenSum = length * (length + 1) / 2
+    masum / lenSum
+
+// @function calculates hma for elements in array
+// @param source source array
+// @param length hma length
+// @returns float hma
+export hma(float[] source, simple int length) =>
+    wma1 = wma(source, length / 2)
+    wma2 = wma(source, length)
+    var hmaRange = array.new_float(0)
+    push(hmaRange, 2 * wma1 - wma2, length)
+    float hma = na
+    if array.size(hmaRange) == length
+        hma := wma(hmaRange, math.round(math.sqrt(length)))
+        hma
+    hma
+
+// @function wrapper for all moving averages based on array
+// @param source source array
+// @param matype moving average type. Valud values are: sma, ema, rma, wma, hma, high, low, median, medianHigh, medianLow
+// @param length moving average length length
+// @returns float moving average
+export ma(float[] source, simple string matype, simple int length) =>
+    var float ma = ta.tr
+    if array.size(source) >= length
+        sliced = array.slice(source, 0, length)
+        ma := matype == 'sma' ? sma(sliced):
+                 matype == 'ema'? ema(sliced, length):
+                 matype == 'rma'? rma(sliced, length):
+                 matype == 'wma'? wma(sliced, length):
+                 matype == 'hma'?  hma(sliced, length):
+                 matype == 'high'? array.max(sliced):
+                 matype == 'low'? array.min(sliced):
+                 matype == 'median'? array.median(sliced):
+                 matype == 'medianHigh'? array.median(sliced):
+                 matype == 'medianLow'? array.median(sliced):
+                 na
+    if(matype == 'medianHigh')
+        ma := ta.highest(ma, length)
+    if(matype == 'medianLow')
+        ma := ta.lowest(ma, length)
+    ma
+
+// @function gets fib series in array
+// @param numberOfFibs number of fibs
+// @param start starting number
+// @returns float[] fibArray
+export getFibSeries(simple int numberOfFibs, simple int start=0)=>
+    var fibArray = array.new<int>()
+    if(array.size(fibArray) == 0)
+        next = 1
+        prev = 1
+        while(array.size(fibArray) < numberOfFibs)
+            fib = next+prev
+            prev := next
+            next := fib
+            if(fib >= start)
+                array.push(fibArray, fib)
+    fibArray
