@@ -1,0 +1,434 @@
+
+//@version=5
+// @description harmonicpatterns: methods required for calculation of harmonic patterns
+library("harmonicpatterns")
+
+isInRange(ratio, min, max)=> ratio >= min and ratio <= max
+
+
+// @function isGartleyPattern: Checks for harmonic pattern Gartley
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Gartley. False otherwise.
+export isGartleyPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.618 * err_min
+    xabMax = 0.618 * err_max
+    abcMin = 0.382 * err_min
+    abcMax = 0.886 * err_max
+    bcdMin = 1.272 * err_min
+    bcdMax = 1.618 * err_max
+    xadMin = 0.786 * err_min
+    xadMax = 0.786 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isBatPattern: Checks for harmonic pattern Bat
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Bat. False otherwise.
+export isBatPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.382 * err_min
+    xabMax = 0.50 * err_max
+    abcMin = 0.382 * err_min
+    abcMax = 0.886 * err_max
+    bcdMin = 1.618 * err_min
+    bcdMax = 2.618 * err_max
+    xadMin = 0.886 * err_min
+    xadMax = 0.886 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isButterflyPattern: Checks for harmonic pattern Butterfly
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Butterfly. False otherwise.         
+export isButterflyPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.786 * err_min
+    xabMax = 0.786 * err_max
+    abcMin = 0.382 * err_min
+    abcMax = 0.886 * err_max
+    bcdMin = 1.618 * err_min
+    bcdMax = 2.618 * err_max
+    xadMin = 1.272
+    xadMax = 1.618
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isCrabPattern: Checks for harmonic pattern Crab
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Crab. False otherwise.  
+export isCrabPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.382 * err_min
+    xabMax = 0.618 * err_max
+    abcMin = 0.382 * err_min
+    abcMax = 0.886 * err_max
+    bcdMin = 2.24 * err_min
+    bcdMax = 3.618 * err_max
+    xadMin = 1.618 * err_min
+    xadMax = 1.618 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isDeepCrabPattern: Checks for harmonic pattern DeepCrab
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is DeepCrab. False otherwise.
+export isDeepCrabPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.886 * err_min
+    xabMax = 0.886 * err_max
+    abcMin = 0.382 * err_min
+    abcMax = 0.886 * err_max
+    bcdMin = 2.00 * err_min
+    bcdMax = 3.618 * err_max
+    xadMin = 1.618 * err_min
+    xadMax = 1.618 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isCypherPattern: Checks for harmonic pattern Cypher
+// @param xabRatio AB/XA
+// @param axcRatio XC/AX
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Cypher. False otherwise.
+export isCypherPattern(float xabRatio, float axcRatio, float xcdRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.382 * err_min
+    xabMax = 0.618 * err_max
+    axcMin = 1.13 * err_min
+    axcMax = 1.414 * err_max
+    xcdMin = 0.786 * err_min
+    xcdMax = 0.786 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(axcRatio, axcMin, axcMax) and
+         isInRange(xcdRatio, xcdMin, xcdMax)
+
+// @function isSharkPattern: Checks for harmonic pattern Shark
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Shark. False otherwise.
+export isSharkPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.446 * err_min
+    xabMax = 0.618 * err_max
+    abcMin = 1.13 * err_min
+    abcMax = 1.618 * err_max
+    bcdMin = 1.618 * err_min
+    bcdMax = 2.236 * err_max
+    xadMin = 0.886 * err_min
+    xadMax = 0.886 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isNenStarPattern: Checks for harmonic pattern Nenstar
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Nenstar. False otherwise.
+export isNenStarPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.382 * err_min
+    xabMax = 0.618 * err_max
+    abcMin = 1.414 * err_min
+    abcMax = 2.140 * err_max
+    bcdMin = 1.272 * err_min
+    bcdMax = 2.0 * err_max
+    xadMin = 1.272 * err_min
+    xadMax = 1.272 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isAntiNenStarPattern: Checks for harmonic pattern Anti NenStar
+// @param xabRatio - AB/XA
+// @param abcRatio - BC/AB
+// @param bcdRatio - CD/BC
+// @param xadRatio - AD/XA
+// @param err_min - Minumum error threshold
+// @param err_max - Maximum error threshold
+// @returns True if the pattern is Anti NenStar. False otherwise.
+export isAntiNenStarPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.5 * err_min
+    xabMax = 0.786 * err_max
+    abcMin = 0.467 * err_min
+    abcMax = 0.707 * err_max
+    bcdMin = 1.618 * err_min
+    bcdMax = 2.618 * err_max
+    xadMin = 0.786 * err_min
+    xadMax = 0.786 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isAntiSharkPattern: Checks for harmonic pattern Anti Shark
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Anti Shark. False otherwise.
+export isAntiSharkPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.446 * err_min
+    xabMax = 0.618 * err_max
+    abcMin = 0.618 * err_min
+    abcMax = 0.886 * err_max
+    bcdMin = 1.618 * err_min
+    bcdMax = 2.618 * err_max
+    xadMin = 1.13 * err_min
+    xadMax = 1.13 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isAntiCypherPattern: Checks for harmonic pattern Anti Cypher
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Anti Cypher. False otherwise.
+export isAntiCypherPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.5 * err_min
+    xabMax = 0.786 * err_max
+    abcMin = 0.467 * err_min
+    abcMax = 0.707 * err_max
+    bcdMin = 1.618 * err_min
+    bcdMax = 2.618 * err_max
+    xadMin = 1.272 * err_min
+    xadMax = 1.272 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isAntiCrabPattern: Checks for harmonic pattern Anti Crab
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Anti Crab. False otherwise.
+export isAntiCrabPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.276 * err_min
+    xabMax = 0.446 * err_max
+    abcMin = 1.128 * err_min
+    abcMax = 2.618 * err_max
+    bcdMin = 1.618 * err_min
+    bcdMax = 2.618 * err_max
+    xadMin = 0.618 * err_min
+    xadMax = 0.618 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isAntiButterflyPattern: Checks for harmonic pattern Anti Butterfly
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Anti Butterfly. False otherwise.
+isAntiButterflyPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.382 * err_min
+    xabMax = 0.618 * err_max
+    abcMin = 1.127 * err_min
+    abcMax = 2.618 * err_max
+    bcdMin = 1.272 * err_min
+    bcdMax = 1.272 * err_max
+    xadMin = 0.618
+    xadMax = 0.786
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isAntiBatPattern: Checks for harmonic pattern Anti Bat
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Anti Bat. False otherwise.
+export isAntiBatPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.382 * err_min
+    xabMax = 0.618 * err_max
+    abcMin = 1.128 * err_min
+    abcMax = 2.618 * err_max
+    bcdMin = 2.0 * err_min
+    bcdMax = 2.618 * err_max
+    xadMin = 1.128 * err_min
+    xadMax = 1.128 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isAntiGartleyPattern: Checks for harmonic pattern Anti Gartley
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Anti Gartley. False otherwise.
+export isAntiGartleyPattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.618 * err_min
+    xabMax = 0.786 * err_max
+    abcMin = 1.127 * err_min
+    abcMax = 2.618 * err_max
+    bcdMin = 1.618 * err_min
+    bcdMax = 1.618 * err_max
+    xadMin = 1.272 * err_min
+    xadMax = 1.272 * err_max
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+// @function isNavarro200Pattern: Checks for harmonic pattern Navarro200
+// @param xabRatio AB/XA
+// @param abcRatio BC/AB
+// @param bcdRatio CD/BC
+// @param xadRatio AD/XA
+// @param err_min Minumum error threshold
+// @param err_max Maximum error threshold
+// @returns True if the pattern is Navarro200. False otherwise.
+export isNavarro200Pattern(float xabRatio, float abcRatio, float bcdRatio, float xadRatio, float err_min=0.92, float err_max=1.08, bool enable=true) =>
+    xabMin = 0.382 * err_min
+    xabMax = 0.786 * err_max
+    abcMin = 0.886 * err_min
+    abcMax = 1.127 * err_max
+    bcdMin = 0.886 * err_min
+    bcdMax = 3.618 * err_max
+    xadMin = 0.886
+    xadMax = 1.127
+    enable and 
+         isInRange(xabRatio, xabMin, xabMax) and
+         isInRange(abcRatio, abcMin, abcMax) and
+         isInRange(bcdRatio, bcdMin, bcdMax) and
+         isInRange(xadRatio, xadMin, xadMax)
+
+
+// @function isHarmonicPattern: Checks for harmonic patterns
+// @param x X coordinate value
+// @param a A coordinate value
+// @param c B coordinate value
+// @param c C coordinate value
+// @param d D coordinate value
+// @param flags flags to check patterns. Send empty array to enable all 
+// @param errorPercent Error threshold
+// @returns [patternArray, patternLabelArray] Array of boolean values which says whether valid pattern exist and array of corresponding pattern names
+export isHarmonicPattern(float x, float a, float b, float c, float d,
+                         simple bool[] flags, simple int errorPercent = 8)=>
+
+    ignoreFlags = array.size(flags) == 0
+    err_min = (100 - errorPercent) / 100
+    err_max = (100 + errorPercent) / 100
+
+    xabRatio = math.abs(b - a) / math.abs(x - a)
+    abcRatio = math.abs(c - b) / math.abs(a - b)
+    bcdRatio = math.abs(d - c) / math.abs(b - c)
+    xadRatio = math.abs(d - a) / math.abs(x - a)
+    axcRatio = math.abs(c - x) / math.abs(a - x)
+    xcdRatio = math.abs(c - d) / math.abs(x - c)
+
+    patternArray = array.new_bool()
+    patternLabelArray = array.new_string()
+    array.push(patternArray, isGartleyPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 0)))
+    array.push(patternArray, isCrabPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 1)))
+    array.push(patternArray, isDeepCrabPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 2)))
+    array.push(patternArray, isBatPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 3)))
+    array.push(patternArray, isButterflyPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 4)))
+    array.push(patternArray, isSharkPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 5)))
+    array.push(patternArray, isCypherPattern(xabRatio, axcRatio, xcdRatio, err_min, err_max, ignoreFlags or array.get(flags, 6)))
+    array.push(patternArray, isNenStarPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 7)))
+
+    array.push(patternArray, isAntiNenStarPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 8)))
+    array.push(patternArray, isAntiSharkPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 9)))
+    array.push(patternArray, isAntiCypherPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 10)))
+    array.push(patternArray, isAntiCrabPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 11)))
+    array.push(patternArray, isAntiButterflyPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 12)))
+    array.push(patternArray, isAntiBatPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 13)))
+    array.push(patternArray, isAntiGartleyPattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 14)))
+    array.push(patternArray, isNavarro200Pattern(xabRatio, abcRatio, bcdRatio, xadRatio, err_min, err_max, ignoreFlags or array.get(flags, 15)))
+    
+    array.push(patternLabelArray, "Gartley")
+    array.push(patternLabelArray, "Crab")
+    array.push(patternLabelArray, "DeepCrab")
+    array.push(patternLabelArray, "Bat")
+    array.push(patternLabelArray, "Butterfly")
+    array.push(patternLabelArray, "Shark")
+    array.push(patternLabelArray, "Cypher")
+    array.push(patternLabelArray, "NenStar")
+    
+    array.push(patternLabelArray, "Anti NenStar")
+    array.push(patternLabelArray, "Anti Shark")
+    array.push(patternLabelArray, "Anti Cypher")
+    array.push(patternLabelArray, "Anti Crab")
+    array.push(patternLabelArray, "Anti Butterfly")
+    array.push(patternLabelArray, "Anti Bat")
+    array.push(patternLabelArray, "Anti Gartley")
+    array.push(patternLabelArray, "Navarro200")
+    [patternArray, patternLabelArray]
