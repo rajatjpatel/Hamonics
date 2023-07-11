@@ -1,0 +1,101 @@
+//@version=5
+// @description Library contains utility functions using arrays. These are mostly customized for personal use. Hence, will not add documentation to it.
+library("arrays")
+
+unshift_to_array(arr, val, maxItems)=>
+    array.insert(arr, 0, val)
+    if(array.size(arr) > maxItems)
+        array.pop(arr)
+    arr
+
+push_to_array(arr, val, maxItems)=>
+    array.push(arr, val)
+    if(array.size(arr) > maxItems)
+        array.remove(arr, 0)
+    arr
+
+export delete(simple line[] arr, int index)=>line.delete(array.remove(arr, index))
+export delete(simple label[] arr, int index)=>label.delete(array.remove(arr, index))
+export delete(simple box[] arr, int index)=>box.delete(array.remove(arr, index))
+export delete(simple table[] arr, int index)=>table.delete(array.remove(arr, index))
+export delete(simple linefill[] arr, int index)=>linefill.delete(array.remove(arr, index))
+export delete(simple int[] arr, int index)=>array.remove(arr, index)
+export delete(simple float[] arr, int index)=>array.remove(arr, index)
+export delete(simple bool[] arr, int index)=>array.remove(arr, index)
+export delete(simple string[] arr, int index)=>array.remove(arr, index)
+export delete(simple color[] arr, int index)=>array.remove(arr, index)
+
+export pop(simple line[] arr)=>line.delete(array.pop(arr))
+export pop(simple label[] arr)=>label.delete(array.pop(arr))
+export pop(simple box[] arr)=>box.delete(array.pop(arr))
+export pop(simple table[] arr)=>table.delete(array.pop(arr))
+export pop(simple linefill[] arr)=>linefill.delete(array.pop(arr))
+
+export pop(simple int[] arr)=>array.pop(arr)
+export pop(simple float[] arr)=>array.pop(arr)
+export pop(simple bool[] arr)=>array.pop(arr)
+export pop(simple string[] arr)=>array.pop(arr)
+export pop(simple color[] arr)=>array.pop(arr)
+
+unshift_to_object_array(arr, val, maxItems)=>
+    array.insert(arr, 0, val)
+    if(array.size(arr) > maxItems)
+        pop(arr)
+    arr
+    
+export shift(simple line[] arr)=>line.delete(array.shift(arr))
+export shift(simple label[] arr)=>label.delete(array.shift(arr))
+export shift(simple box[] arr)=>box.delete(array.shift(arr))
+export shift(simple table[] arr)=>table.delete(array.shift(arr))
+export shift(simple linefill[] arr)=>linefill.delete(array.shift(arr))
+export shift(simple int[] arr)=>array.shift(arr)
+export shift(simple float[] arr)=>array.shift(arr)
+export shift(simple bool[] arr)=>array.shift(arr)
+export shift(simple string[] arr)=>array.shift(arr)
+export shift(simple color[] arr)=>array.shift(arr)
+
+push_to_object_array(arr, val, maxItems)=>
+    array.push(arr, val)
+    if(array.size(arr) > maxItems)
+        shift(arr)
+    arr
+    
+export unshift(simple int[] arr, int val, simple int maxItems)=>unshift_to_array(arr, val, maxItems)
+export unshift(simple float[] arr, float val, simple int maxItems)=>unshift_to_array(arr, val, maxItems)
+export unshift(simple bool[] arr, bool val, simple int maxItems)=>unshift_to_array(arr, val, maxItems)
+export unshift(simple string[] arr, string val, simple int maxItems)=>unshift_to_array(arr, val, maxItems)
+export unshift(simple color[] arr, color val, simple int maxItems)=>unshift_to_array(arr, val, maxItems)
+
+export unshift(simple line[] arr, line val, simple int maxItems)=>unshift_to_object_array(arr, val, maxItems)
+export unshift(simple label[] arr, label val, simple int maxItems)=>unshift_to_object_array(arr, val, maxItems)
+export unshift(simple box[] arr, box val, simple int maxItems)=>unshift_to_object_array(arr, val, maxItems)
+export unshift(simple table[] arr, table val, simple int maxItems)=>unshift_to_object_array(arr, val, maxItems)
+export unshift(simple linefill[] arr, linefill val, simple int maxItems)=>unshift_to_object_array(arr, val, maxItems)
+
+clear_array_objects(arr)=>
+    len = array.size(arr)-1
+    for i=0 to len >=0 ? len:na
+        pop(arr)
+        
+export clear(simple line[] arr)=>clear_array_objects(arr)
+export clear(simple label[] arr)=>clear_array_objects(arr)
+export clear(simple box[] arr)=>clear_array_objects(arr)
+export clear(simple table[] arr)=>clear_array_objects(arr)
+export clear(simple linefill[] arr)=>clear_array_objects(arr)
+export clear(simple int[] arr)=>array.clear(arr)
+export clear(simple float[] arr)=>array.clear(arr)
+export clear(simple bool[] arr)=>array.clear(arr)
+export clear(simple string[] arr)=>array.clear(arr)
+export clear(simple color[] arr)=>array.clear(arr)
+
+export push(simple int[] arr, int val, simple int maxItems)=>push_to_array(arr, val, maxItems)
+export push(simple float[] arr, float val, simple int maxItems)=>push_to_array(arr, val, maxItems)
+export push(simple bool[] arr, bool val, simple int maxItems)=>push_to_array(arr, val, maxItems)
+export push(simple string[] arr, string val, simple int maxItems)=>push_to_array(arr, val, maxItems)
+export push(simple color[] arr, color val, simple int maxItems)=>push_to_array(arr, val, maxItems)
+
+export push(simple line[] arr, line val, simple int maxItems)=>push_to_object_array(arr, val, maxItems)
+export push(simple label[] arr, label val, simple int maxItems)=>push_to_object_array(arr, val, maxItems)
+export push(simple box[] arr, box val, simple int maxItems)=>push_to_object_array(arr, val, maxItems)
+export push(simple table[] arr, table val, simple int maxItems)=>push_to_object_array(arr, val, maxItems)
+export push(simple linefill[] arr, linefill val, simple int maxItems)=>push_to_object_array(arr, val, maxItems)
