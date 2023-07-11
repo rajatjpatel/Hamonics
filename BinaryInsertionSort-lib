@@ -1,0 +1,69 @@
+
+//@version=5
+
+// @description Library containing functions which can help create sorted array based on binary insertion sort.
+//		This sorting will be quicker than array.sort function if the sorting needs to be done on every bar and the size of the array is comparatively big.
+library("BinaryInsertionSort")
+
+binary_sort(sortedArray, item, order)=>
+    startIndex = 0
+    endIndex = array.size(sortedArray)
+
+    while(startIndex < endIndex)
+        midIndex = int((startIndex+endIndex)/2)
+        if(item*order > array.get(sortedArray, midIndex)*order)
+            startIndex := midIndex+1
+        else
+            endIndex := midIndex
+    array.insert(sortedArray, startIndex, item)
+    startIndex
+
+// @function binary insertion sort - inserts item into sorted array while maintaining sort order
+// @param sortedArray array<float|int> which is assumed to be sorted in the requested order
+// @param item float|int item which needs to be inserted into sorted array
+// @param order Sort order - positive number means ascending order whereas negative number represents descending order
+// @returns int index at which the item is inserted into sorted array
+export binary_insertion_sort(array<float> sortedArray, float item, int order = 1)=>binary_sort(sortedArray, item, order)
+export binary_insertion_sort(array<int> sortedArray, int item, int order = 1)=>binary_sort(sortedArray, item, order)
+
+// @function adds the sort index of new item added to sorted array and also updates existing sort indices.
+// @param sortIndices array<int> containing sort indices of an array.
+// @param newItemIndex sort index of new item added to sorted array
+// @returns void
+export update_sort_indices(array<int> sortIndices, int newItemIndex)=>
+    for [index, sortItem] in sortIndices
+        if(sortItem >= newItemIndex)
+            array.set(sortIndices, index, sortItem+1)
+    array.push(sortIndices, newItemIndex)
+
+array_of_series(sortedArray, valueArray, item, order)=>
+    array.push(valueArray, item)
+    sortIndex = binary_insertion_sort(sortedArray, item, order)
+	[valueArray, sortedArray, sortIndex]
+
+// @function Converts series into array and sorted array.
+// @param item float|int series
+// @param order Sort order - positive number means ascending order whereas negative number represents descending order
+// @returns [valueArray, sortedArray, sortIndex of last item]
+export get_array_of_series(float item, int order = 1)=>
+    var array<float> sortedArray = array.new<float>()
+    var array<float> valueArray = array.new<float>()
+	array_of_series(sortedArray, valueArray, item, order)
+
+export get_array_of_series(int item, int order = 1)=>
+    var array<int> sortedArray = array.new<int>()
+    var array<int> valueArray = array.new<int>()
+	array_of_series(sortedArray, valueArray, item, order)
+
+sorted_arrays(item, order)=>
+	var array<int> sortIndices = array.new<int>()
+	[valueArray, sortedArray, sortIndex] = get_array_of_series(item, order)
+	update_sort_indices(sortIndices, sortIndex)
+	[valueArray, sortedArray, sortIndices]
+
+// @function Converts series into array and sorted array. Also calculates the sort order of the value array
+// @param item float|int series
+// @param order Sort order - positive number means ascending order whereas negative number represents descending order
+// @returns [valueArray, sortedArray, sortIndices]
+export get_sorted_arrays(float item, int order = 1)=>sorted_arrays(item, order)
+export get_sorted_arrays(int item, int order = 1)=>sorted_arrays(item, order)
