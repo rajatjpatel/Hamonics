@@ -1,0 +1,39 @@
+
+//@version=5
+
+indicator("ST Heiken Ashi",     "STHA",       true)
+
+// Optional Mathmatical Calcualtion to avoid the security function 
+
+hkClose         = (open + high + low + close) / 4
+hkOpen          = float(na)
+hkOpen          := na(hkOpen[1]) ? (open + close) / 2 : (nz(hkOpen[1]) + nz(hkClose[1])) / 2
+hkHigh          = math.max(high, math.max(hkOpen, hkClose))
+hkLow           = math.min(low,  math.min(hkOpen, hkClose))
+
+//[hkOpen, hkHigh, hkLow, hkClose] = security(heikinashi(syminfo.tickerid), timeframe.period, [open, high, low, close])
+
+candletype      = input.string  ("Hollow",      "Candle Type",  options=["Hollow", "Bars", "Candles"],      group="Heiken Ashi Candle Overlay", tooltip="Candle Type to be dispalyed. User will have to 'Mute' the main series bar using the 👁 symbol next to ticker id.")
+
+BodyBull        = input.color   (#26a69a,       "",             inline="a",         group="Candle Body")
+BodyBear        = input.color   (#ef5350,       "",             inline="a",         group="Candle Body")
+BorderBull      = input.color   (#26a69a,       "",             inline="b",         group="Candle Borders")
+BorderBear      = input.color   (#ef5350,       "",             inline="b",         group="Candle Borders")
+WickBull        = input.color   (#26a69a,       "",             inline="c",         group="Candle Wick")
+WickBear        = input.color   (#ef5350,       "",             inline="c",         group="Candle Wick")
+
+hollow          = candletype == "Hollow" 
+bars            = candletype == "Bars"
+candle          = candletype == "Candles"
+
+plotcandle(
+  hkOpen, hkHigh, hkLow, hkClose, 
+  "Hollow Candles",
+  hollow ?      hkClose <   hkOpen  ?   BodyBear :  na :        candle ?        hkClose < hkOpen ?  BodyBear : BodyBull : na,
+  hollow or     candle ?    hkClose <    hkOpen  ?  WickBear :  WickBull :      na,
+  bordercolor = hollow or   candle ?    hkClose  <  hkOpen   ?  BorderBear :    BorderBull : na)
+
+plotbar(
+  hkOpen, hkHigh, hkLow, hkClose,
+  "Bars",
+  bars ? hkClose < hkOpen ? BodyBear : BodyBull : na)
