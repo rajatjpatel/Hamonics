@@ -1,0 +1,54 @@
+https://quantnomad.com/new-tradingview-feature-pine-script-tables/
+https://quantnomad.com/an-easy-way-to-sort-a-screener-in-pine-script-how-to-sort-a-few-arrays-at-the-same-time/
+rsi = rsi(close, 14)
+cci = cci(close, 14)
+[diplus, diminus, adx] = dmi(17, 14)
+ 
+var table t = table.new(position.top_right, 2, 3, border_width = 1)
+ 
+if (barstate.islast)          
+     
+    table.cell(t, 0, 0, "RSI", width = 5, bgcolor = #aaaaaa)
+    table.cell(t, 0, 1, "CCI", width = 5, bgcolor = #aaaaaa)
+    table.cell(t, 0, 2, "DMI", width = 5, bgcolor = #aaaaaa)
+     
+    table.cell(t, 1, 0, tostring(round(rsi, 2)), width = 5, bgcolor = rsi > 40 ? color.red : color.green)
+    table.cell(t, 1, 1, tostring(round(cci, 2)), width = 5, bgcolor = color.green)
+    table.cell(t, 1, 2, tostring(round(adx, 2)), width = 5, bgcolor = color.green)
+///
+//@version=5
+indicator("2 arrays", overlay = true)
+ 
+rsi1 = request.security('AAPL', timeframe.period, ta.rsi(close, 14))
+rsi2 = request.security('DIS',  timeframe.period, ta.rsi(close, 14))
+rsi3 = request.security('MSFT', timeframe.period, ta.rsi(close, 14))
+rsi4 = request.security('V',    timeframe.period, ta.rsi(close, 14))
+rsi5 = request.security('TSLA', timeframe.period, ta.rsi(close, 14))
+ 
+tsi1 = request.security('AAPL', timeframe.period, ta.tsi(close, 13, 25))
+tsi2 = request.security('DIS',  timeframe.period, ta.tsi(close, 13, 25))
+tsi3 = request.security('MSFT', timeframe.period, ta.tsi(close, 13, 25))
+tsi4 = request.security('V',    timeframe.period, ta.tsi(close, 13, 25))
+tsi5 = request.security('TSLA', timeframe.period, ta.tsi(close, 13, 25))
+ 
+symbols = array.from('AAPL', 'DIS', 'MSFT', 'V', 'TSLA')
+ 
+rsi_arr = array.from(rsi1, rsi2, rsi3, rsi4, rsi5)
+tsi_arr = array.from(tsi1, tsi2, tsi3, tsi4, tsi5)
+ 
+sorted_index = array.sort_indices(rsi_arr)
+ 
+var tbl = table.new(position.top_right, 3, 6, frame_width  = 1, border_width = 1, border_color = #696969)
+ 
+if barstate.islast
+    table.clear(tbl, 0, 0, 2, 5)
+ 
+    table.cell(tbl, 0, 0, text = 'Symbol', text_color = color.white, bgcolor = #696969)
+    table.cell(tbl, 1, 0, text = 'RSI',    text_color = color.white, bgcolor = #696969)
+    table.cell(tbl, 2, 0, text = 'TSI',    text_color = color.white, bgcolor = #696969)
+ 
+    for i = 0 to array.size(symbols) - 1
+        si = array.get(sorted_index, i)
+        table.cell(tbl, 0, i + 1, text = str.tostring(array.get(symbols, si)), text_color = color.white, bgcolor = #696969)
+        table.cell(tbl, 1, i + 1, text = str.tostring(math.round(array.get(rsi_arr, si), 2)), text_color = color.white, bgcolor = #aaaaaa)
+        table.cell(tbl, 2, i + 1, text = str.tostring(math.round(array.get(tsi_arr, si), 2)), text_color = color.white, bgcolor = #aaaaaa)
