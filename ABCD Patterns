@@ -1,0 +1,37 @@
+
+//@version=4
+study("ABCD Patterns",overlay=true,max_bars_back=5000)
+length = input(5)
+up1 = pivothigh(high,length,length)
+dn1 = pivotlow(low,length,length)
+upcount = barssince(not na(up1))
+dncount = barssince(not na(dn1))
+ppp = (not na(dn1) and dncount[1]>upcount[1]) ? dn1 : (not na(up1) and dncount[1]<upcount[1]) ? up1 : na
+up = (not na(up1) and dncount[1]<upcount[1]) ? up1 : na
+dn = (not na(dn1) and dncount[1]>upcount[1]) ? dn1 : na
+
+plot(up,title="pivot high",offset=-length)
+plot(dn,title="pivot low",offset=-length)
+plot(ppp,title="pivot line",offset=-length)
+
+n = bar_index
+a = valuewhen(not na(ppp),n,2)
+b = valuewhen(not na(ppp),n,1)
+c = valuewhen(not na(ppp),n,0)
+
+av = valuewhen(not na(ppp),ppp,2)
+bv = valuewhen(not na(ppp),ppp,1)
+cv = valuewhen(not na(ppp),ppp,0)
+
+//bullish AB=CD pattern
+ABCD_bear = av<bv and (bv-cv)<=(0.89*(bv-av)) and (bv-cv)>=(0.38*(bv-av))
+ABCD_bear1 = (high-cv)>=(bv-av) and ABCD_bear
+label1 = ABCD_bear1 and not(ABCD_bear1[1]) ? label.new(bar_index,high,text="Bearish AB=CD",color=color.red,style=label.style_arrowdown,yloc=yloc.abovebar,
+     textcolor=color.red,size=size.normal) : na
+     
+//buearish AB=CD pattern
+ABCD_bull = av>bv and (cv-bv)<=(0.89*(av-bv)) and (cv-bv)>=(0.38*(av-bv))
+ABCD_bull1 = (cv-low)>=(av-bv) and ABCD_bull
+label2 = ABCD_bull1 and not(ABCD_bull1[1]) ? label.new(bar_index,low,text="Bullish AB=CD",color=color.green,style=label.style_arrowup,yloc=yloc.belowbar,
+     textcolor=color.green,size=size.normal) : na
+     
