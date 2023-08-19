@@ -1,0 +1,30 @@
+
+//@version=5
+indicator('Donchain Signal', overlay=true)
+
+range_1 = input.int(title='period', defval=11, minval=1, maxval=100)
+h = ta.highest(range_1)
+l = ta.lowest(range_1)
+m = (h + l) / 2
+lw = 1
+plot(m, title='middle', color=color.new(color.blue, 0), linewidth=lw, style=plot.style_line)
+up = plot(h, title='up', color=color.new(color.green, 0), linewidth=lw, style=plot.style_line)
+down = plot(l, title='down', color=color.new(color.red, 0), linewidth=lw, style=plot.style_line)
+fill(up, down, color=color.new(color.gray, 90))
+
+ups = 0.0
+dns = 0.0
+ups := high == h ? low : nz(ups[1])
+dns := low == l ? high : nz(dns[1])
+
+buy = ta.crossover(close,dns) and close < m
+sell = ta.crossunder(close,ups) and close > m
+
+bc = 0
+bc := ups == nz(ups[1]) and buy ? nz(bc[1]) + 1 : dns == high ? 0 : nz(bc[1])
+
+sc = 0
+sc := dns == nz(dns[1]) and sell ? nz(sc[1]) + 1 : ups == low ? 0 : nz(sc[1])
+
+plotshape(buy and bc==1, title='Buy', style=shape.labelup, location=location.belowbar, size=size.auto, text='Buy', textcolor=color.new(color.white, 0), color=color.new(#025d06, 0))
+plotshape(sell and sc==1, title='Sell', style=shape.labeldown, location=location.abovebar, size=size.auto, text='Sell', textcolor=color.new(color.white, 0), color=color.new(#ed0015, 0))
