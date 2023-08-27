@@ -1,0 +1,185 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © RozaniGhani-RG
+// Credits to Scott M Carney, author of Harmonic Trading: Volume One and Harmonic Trading: Volume Three
+// Bullish Harmonic Trade Management Model - Harmonic Trading: Volume One   - Page 209
+// Bearish Harmonic Trade Management Model - Harmonic Trading: Volume One   - Page 220
+// The Harmonic Trading Process            - Harmonic Trading: Volume Three - Page 42 to 44
+// Bullish Phases of Trading               - Harmonic Trading: Volume Three - Page 48
+// Bearish Phases of Trading               - Harmonic Trading: Volume Three - Page 50
+
+//@version=5
+indicator("Harmonic Trading System Educational (Source Code)", shorttitle = "HTSE_SC", precision = 4)
+
+// 0. Input
+// 1. Variables and arrays
+// 2. Switch
+// 3. Custom function
+// 4. array.from arr_table
+// 5. for statement
+// 6. function set
+// 7. if barstate.islast
+
+// 0. Input
+T0       = "Small font size recommended for mobile app or multiple layout"
+i_s_dir  = input.string('Bullish', 'Direction', options=['Bullish', 'Bearish'])
+i_s_font = input.string('normal',  'Font Size', options=['tiny', 'small', 'normal', 'large', 'huge'], tooltip = T0)
+
+// 1. Variables and arrays
+// labels and lines
+var       label_xabcd = array.new_label(5), var label_value = array.new_label(4), var label_sys = array.new_label(3)
+var        line_solid = array.new_line(4),  var    line_dot = array.new_line(4)
+var table[] arr_table = array.new_table()
+var   box[]   box_sys = array.new_box(3)
+
+// XABCD values
+str_xabcd = array.from(  "X",   "A",   "B",   "C",   "D")
+int_xabcd = array.from(   50,    40,    30,    20,    10)
+flo_xabcd = array.from(0.618, 0.000, 0.382, 0.236, 0.886)
+
+// label values
+str_label = array.from("B = XA", "C = AB", "D = BC", "D = XA")
+val_label = array.from(   0.382,    0.886,      2.0,    0.618)
+flo_label = array.from(     0.5,    0.752,    0.693,    0.118)
+int_label = array.from(      40,       30,       20,       30)
+
+// system values
+str_sys   = array.from("Identification", "Execution", "Management")
+int_sys   = array.from(25,  7, 3)
+int_box   = array.from(40, 10, 5, 0)
+
+// title values
+str_title = array.from("Harmonic", "Trading",      "System")
+str_sub   = array.from(        "",   i_s_dir, "Perfect Bat")
+
+// ref values
+str_ref   = array.from(  "Reference", "Volume 1", "Volume 3")
+str_bull  = array.from("Bullish (M)", "Page 209",  "Page 48")
+str_bear  = array.from("Bearish (W)", "Page 220",  "Page 50")
+
+box_col   = array.from(color.purple, color.yellow, color.green)
+
+// 2. Switch
+// Dependency : i_s_dir
+[dir, col, label_style0, label_style1, table_pos0, table_pos1, box_top, box_bot, str_trade] = switch i_s_dir
+    //            dir,        col,           label_style0,           label_style1,            table_pos0,           table_pos1, box_top, box_bot, str_trade
+	'Bullish' => [ -1, color.teal, label.style_label_down,   label.style_label_up,    position.top_right, position.bottom_left,  -0.886,    -1.3,     -1.15]
+	=>           [  1,  color.red,   label.style_label_up, label.style_label_down, position.bottom_right,    position.top_left,     1.3,   0.886,      1.15]
+
+// 3. Custom function
+// Dependencies : int_xabcd, flo_xabcd and col
+f_line_dot(_val1, _val2) =>
+    line.new(
+     bar_index[array.get(int_xabcd, _val1)], dir * array.get(flo_xabcd, _val1),
+     bar_index[array.get(int_xabcd, _val2)], dir * array.get(flo_xabcd, _val2),
+     style = line.style_dotted,
+     color = col)
+
+f_table_top()   => table.new(position = position.top_center, columns = 4, rows = 2, bgcolor = na)
+f_table_right() => table.new(position = table_pos0,          columns = 2, rows = 4, bgcolor = na, border_color = na, border_width = 1)
+f_table_left()  => table.new(position = table_pos1,          columns = 4, rows = 4, bgcolor = na, border_color = na, border_width = 1)
+
+// 4. array.from arr_table
+arr_table := array.from(f_table_top(), f_table_right(), f_table_left())
+
+// 5. for statement
+// label_xabcd
+for x = 0 to 4
+    // Dependencies : label_xabcd, int_xabcd, flo_xabcd, str_xabcd, col and i_s_font
+    label.delete(array.get(label_xabcd, x))
+    array.set(label_xabcd, x,
+         label.new(
+         bar_index[array.get(int_xabcd, x    )], dir * array.get(flo_xabcd, x),
+         array.get(str_xabcd, x),
+         color     = color.new(color.blue, 100),
+         textcolor = col,
+         size      = i_s_font))
+
+// line solid, line_dot, label_value
+for x = 0 to 3
+    // line_solid
+    // Dependencies : line_solid, int_xabcd, flo_xabcd, str_xabcd and col
+    line.delete(array.get(line_solid, x))
+    array.set(line_solid, x,
+         line.new(
+         bar_index[array.get(int_xabcd, x    )], dir * array.get(flo_xabcd, x    ),
+         bar_index[array.get(int_xabcd, x + 1)], dir * array.get(flo_xabcd, x + 1),
+         color = col,
+         width = 4))
+
+    // line_dot
+    line.delete(array.get(line_dot, x))
+
+    // label_value
+    // Dependencies : label_value, int_label, flo_label, var_label, col and i_s_font
+    label.delete(array.get(label_value, x))
+    array.set(label_value, x,
+         label.new(
+         bar_index[array.get(int_label, x    )], dir * array.get(flo_label, x),
+         str.tostring(array.get(val_label, x),"0.000"),
+         color = color.red,
+         style = label.style_label_center,
+         size  = i_s_font))
+
+// label_xabcd
+// Dependencies : label_xabcd and label_style0
+for x = 1 to 3 by 2
+    label.set_style(array.get(label_xabcd, x), label_style0)
+// Dependencies : label_xabcd and label_style1
+for x = 0 to 4 by 2
+    label.set_style(array.get(label_xabcd, x), label_style1)
+
+for x = 0 to 2
+    // box_sys
+    // Dependencies : box_sys, box_top and box_top
+    box.delete(array.get(box_sys, x))
+    array.set(box_sys, x,
+         box.new(
+         bar_index[array.get(int_box, x    )], box_top,
+         bar_index[array.get(int_box, x + 1)], box_bot,
+         border_color = na))
+    // label_sys
+    // Dependencies : label_sys, int_sys, str_trade, str_sys and i_s_font
+    label.delete(array.get(label_sys, x))
+    array.set(label_sys, x,
+         label.new(
+         bar_index[array.get(int_sys, x    )], str_trade,
+         "Trade\n" + array.get(str_sys, x),
+         color     = color.new(color.blue, 100),
+         textcolor = color.red,
+         style     = label.style_label_center,
+         size      = i_s_font))
+    // box_col
+    // Dependencies : box_col and box_sys
+    box.set_bgcolor(array.get(box_sys, x), color.new(array.get(box_col, x), 75))
+
+// 6. function set
+// Dependencies : line_dot and f_line_dot()
+array.set(line_dot, 0,f_line_dot(0, 2))
+array.set(line_dot, 1,f_line_dot(2, 4))
+array.set(line_dot, 2,f_line_dot(1, 3))
+array.set(line_dot, 3,f_line_dot(0, 4))
+
+// Dependency : label_value
+label.set_color(array.get(label_value, 2), color.blue)
+
+// 7. if barstate.islast
+if barstate.islast
+    for x = 0 to 2
+        // arr_table 0
+        // Dependencies : arr_table 0, str_title, str_sub, i_s_font and col
+        table.cell(array.get(arr_table, 0), x, 0, array.get(str_title, x), text_color = color.yellow, text_size = i_s_font, bgcolor = color.black)
+        table.cell(array.get(arr_table, 0), x, 1, array.get(str_sub,   x), text_color = color.blue,   text_size = i_s_font, bgcolor = color.black)
+        table.cell_set_text_color(array.get(arr_table, 0), 1, 1, col)
+
+        // arr_table 2
+        // Dependencies : arr_table 2, str_ref, str_bull, str_bear and i_s_font
+        table.cell(array.get(arr_table, 2), 0, x, array.get(str_ref,   x), text_color = color.white,  text_size = i_s_font, bgcolor = color.black)
+        table.cell(array.get(arr_table, 2), 1, x, array.get(str_bull,  x), text_color = color.black,  text_size = i_s_font, bgcolor = color.teal)
+        table.cell(array.get(arr_table, 2), 2, x, array.get(str_bear,  x), text_color = color.black,  text_size = i_s_font, bgcolor = color.red)
+
+    for x = 0 to 3
+        // arr_table 1
+        // Dependencies : arr_table 2, str_label, val_label and i_s_font
+        table.cell(array.get(arr_table, 1), 0, x, array.get(str_label, x),                            text_size = i_s_font, bgcolor = color.yellow)
+        table.cell(array.get(arr_table, 1), 1, x, str.tostring(array.get(val_label, x),"0.000"),      text_size = i_s_font, bgcolor = color.red)
+        table.cell_set_bgcolor(array.get(arr_table, 1), 1, 2, color.blue)
