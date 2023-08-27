@@ -1,0 +1,279 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © RozaniGhani-RG
+// Credits to Scott M Carney, author of Harmonic Trading : Volume One
+// Harmonic Trading Ratios - Page 18
+
+//@version=5
+indicator('ABC 123 Harmonic Ratio Custom Range Interactive', shorttitle = 'AHR_CRI', overlay = true, precision = 3)
+// —— Import {
+import RozaniGhani-RG/PriceTimeInteractive/2 as pti
+import RozaniGhani-RG/DeleteArrayObject/1    as obj
+import RozaniGhani-RG/HarmonicCalculation/1  as calc
+import RozaniGhani-RG/HarmonicSwitches/1     as sw
+// }
+// —— Content {
+// 0. Input
+// 1. Initialization
+// 2. TRADE IDENTIFICATION - Harmonic Trading System Part 1
+// 3. Draw XABCD Pattern (Trade Identification)
+// 4. Table 
+// 5. Construct
+// }
+// —— 0. Input {
+// ———— 1) TIME POINTS {
+int point_A  = timestamp('2022-07')
+int point_B  = timestamp('2022-08')
+int point_C  = timestamp('2022-09')
+int time_A   = input.time(point_A, 'Point A', group = '1) TIME POINTS', inline = 'A', confirm = true, tooltip = 'Point A must BEFORE Point A')
+int time_B   = input.time(point_B, 'Point B', group = '1) TIME POINTS', inline = 'B', confirm = true, tooltip = 'Point B must BEFORE Point C')
+int time_C   = input.time(point_C, 'Point C', group = '1) TIME POINTS', inline = 'C', confirm = true, tooltip = 'Point C must AFTER Point B')
+    // }
+// ———— 2) TABLE DISPLAY {
+T8           = '1) Tick to show table\n2) Small font size recommended for mobile app or multiple layout'
+T9           = 'Table must be tick before change table position'
+i_b_table    = input.bool(true,         'Show Table |', group = '2) TABLE DISPLAY', inline = 'Table1')
+i_s_font     = input.string('normal',      'Font size', group = '2) TABLE DISPLAY', inline = 'Table1', options = ['tiny', 'small',  'normal', 'large', 'huge'], tooltip = T8)
+i_s_Y        = input.string('bottom', 'Table Position', group = '2) TABLE DISPLAY', inline = 'Table2', options = ['top',  'middle', 'bottom'])
+i_s_X        = input.string('left',                 '', group = '2) TABLE DISPLAY', inline = 'Table2', options = ['left', 'center', 'right'],                   tooltip = T9)
+    // }
+// ———— 3) OTHERS {
+i_f_pro      = input.float( 2.240, 'Last Projection', group = '3) OTHERS', options = [2.24, 2.618, 3.140, 3.618], tooltip = 'Only applicable')
+i_s_label    = input.string('ABC',           'Label', group = '3) OTHERS', options = ['ABC', '123'], tooltip = 'Use number or alphabet for label')
+i_s_helper   = input.string('All',     'Show Helper', group = '3) OTHERS', options = ['All', 'Direction label', 'Range', 'None'])
+i_b_col      = input.bool(   true, 'Use trend color', group = '3) OTHERS', tooltip = 'Show Trend color if true\nTrue : Lime (Bullish), Red (Bearish)\n False : Blue')
+i_b_currency = input.bool(   true,   'Show Currency', group = '3) OTHERS')
+    // }
+// }
+// —— 1.   Initialization {
+P  = 'PRIMARY', PD = 'PRIMARY DERIVED', SD = 'SECONDARY DERIVED', SE = 'SECONDARY DERIVED EXTREME'
+SW = switch i_f_pro
+    2.240 => SD
+    2.618 => SE
+    3.140 => SE
+    3.618 => SE
+// }
+// —— 2.   TRADE IDENTIFICATION - Harmonic Trading System Part 1 {
+// ———— 2.1  Get Price from Point A to Point C {
+[high_A, low_A, close_A] = pti.hlc_time(time_A)
+[high_B, low_B, close_B] = pti.hlc_time(time_B)
+[high_C, low_C,      _ ] = pti.hlc_time(time_C)
+    // }
+// ———— 2.2  Determine Point A is lower or higher than Point B {
+bool A_lower_B     = close_A < close_B
+[pr_A, pr_B, pr_C] = switch A_lower_B
+// Output :    pr_A,   pr_B,   pr_C
+    true => [ low_A, high_B,  low_C]
+    =>      [high_A,  low_B, high_C]
+[ style0, style1, col_dir]     = sw.TupleSwitchStyleColor(A_lower_B)
+[str_dir,  str_A,   str_B]     = sw.TupleSwitchString(    A_lower_B)
+    // }
+// ———— 2.3  Get ratio and difference for price and time {
+y_AB = calc.PriceDiff(   pr_B, pr_A), time_AB = calc.TimeDiff(   time_B, time_A)
+y_BC = calc.PriceDiff(   pr_C, pr_B), time_BC = calc.TimeDiff(   time_C, time_B), y_ABC = y_BC / y_AB, time_ABC = calc.TimeDiff(time_C, time_A)
+    // }
+// ———— 2.4  Variables for Point C {
+bool bool_ret   = math.abs(y_ABC) >= 0.382 and math.abs(y_ABC) <=  0.930
+bool bool_pro   = math.abs(y_ABC) >= 1.073 and math.abs(y_ABC) <=  i_f_pro
+var  bool_ratio = array.new_bool(2)
+bool_ratio.set(0, bool_ret)
+bool_ratio.set(1, bool_pro)
+    // }
+// ———— 2.5  Verify ratio {
+//                             0      1      2      3      4      5      6
+float_ret      = array.from(0.382, 0.500, 0.618, 0.707, 0.786, 0.886, 0.930)
+float_pro      = array.from(1.073, 1.130, 1.270, 1.410, 1.618, 2.000, i_f_pro)
+str_ret        = array.from(   SD,    SD,     P,    SD,    PD,    PD)
+str_pro        = array.from(          PD,    PD,    SD,     P,    SD,    SW)
+ret_min        = float_ret.copy(), ret_min.remove(0)
+ret_max        = float_ret.copy(), ret_max.remove(6)
+pro_min        = float_pro.copy(), pro_min.pop()
+pro_max        = float_pro.copy(), pro_max.shift()
+int int_index  = na
+if bool_ratio.includes(true)
+    int_index := bool_ratio.indexof(bool_ratio.includes(true))
+str_BB         = switch int_index
+    0 => 'RETRACEMENT'
+    1 => 'PROJECTION'
+float_ratio    = switch bool_ratio.indexof(bool_ratio.includes(true))
+    0 => float_ret
+    1 => float_pro
+float_min      = switch bool_ratio.indexof(bool_ratio.includes(true))
+    0 => ret_min
+    1 => pro_min    
+float_max      = switch bool_ratio.indexof(bool_ratio.includes(true))
+    0 => ret_max
+    1 => pro_max    
+str_ratio      = switch bool_ratio.indexof(bool_ratio.includes(true))
+    0 => str_ret
+    1 => str_pro
+f_bool(int _index) => math.abs(y_ABC) >= float_ratio.get(_index) and math.abs(y_ABC) < float_ratio.get(_index + 1)
+f_rng(int _index)  => str.tostring(float_ratio.get(_index), '0.000') + '; ' + str.tostring(float_ratio.get(_index + 1), '0.000')
+var bool_rng    = array.new_bool(6)
+var str_rng     = array.new_string(6)
+for i = 0 to 5
+    bool_rng.set(i, f_bool(i))
+    str_rng.set(i, f_rng(i))
+    // }
+float ratio_min = na
+float ratio_max = na
+float price_min = na
+float price_max = na
+if bool_ratio.includes(true)
+    ratio_min  := float_ratio.get(bool_rng.indexof(bool_rng.includes(true)))
+    ratio_max  := float_ratio.get(bool_rng.indexof(bool_rng.includes(true)) + 1)
+    price_min  := calc.AbsoluteRange(pr_B, y_AB, ratio_min)
+    price_max  := calc.AbsoluteRange(pr_B, y_AB, ratio_max)
+harmonic        = switch str_BB
+    'RETRACEMENT' => math.min(ratio_min, ratio_max)
+    'PROJECTION'  => math.max(ratio_min, ratio_max)
+// ———— 2.6  Overall pattern average for price and time {
+y_AC = calc.PriceAverage(pr_C, pr_A),    x_AC = calc.TimeAverage(time_A, time_C)
+    // }
+// }
+// —— 3.   Draw ABC Pattern (Trade Identification) {
+// ———— 3.1  Initialize arrays {
+str_123           = array.from(   '1',    '2',    '3')
+str_ABC           = array.from(   'A',    'B',    'C')
+arr_pr            = array.from(  pr_A,   pr_B,   pr_C) 
+arr_time          = array.from(time_A, time_B, time_C)
+y_ratio           = array.from(  y_AC)
+x_ratio           = array.from(  x_AC)
+str_arr           = switch i_s_label
+    'ABC' => str_ABC
+    '123' => str_123
+arr_ratio         = array.from(str.tostring(math.abs(y_ABC), '0.000'))
+var label_ABC     = array.new_label(3),    obj.delete(label_ABC)
+var ratio_ABC     = array.new_label(1),    obj.delete(ratio_ABC)
+var solid_ABC     = array.new_line(2),     obj.delete(solid_ABC)
+var dot_ABC       = array.new_line(1),     obj.delete(  dot_ABC)
+var fill_ABC      = array.new_linefill(1), obj.delete( fill_ABC) 
+var label_rng     = array.new_label(1),    obj.delete(label_rng)
+var hlabel_AC     = array.new_label(2),    obj.delete(hlabel_AC)
+var hline_AC      = array.new_line(2),     obj.delete( hline_AC)
+string txt        = na
+string str_C      = na
+if bool_ratio.includes(true)
+    txt   := str_dir + ' '  + str_BB + '\n' +
+     str_ratio.get(bool_rng.indexof(bool_rng.includes(true))) + ' (' + str.tostring(harmonic, '0.000') + ')'
+    str_C := str_rng.get(bool_rng.indexof(bool_rng.includes(true)))
+else
+    txt   := str_dir + ' '  + str_BB + '\n' + arr_ratio.get(0)
+    // }
+// ———— 3.2  ABC custom functions {
+f_label_ABC(int _x, color _col = color.blue) =>
+    label.new(
+     x         = arr_time.get(_x),
+     y         =   arr_pr.get(_x),
+     text      =  str_arr.get(_x), 
+     xloc      = xloc.bar_time,
+     color     = color.new(color.blue, 100),
+     style     = _x % 2 ? style1 : style0,
+     textcolor = i_b_col ? col_dir : _col)
+f_ratio_ABC(int _x, color _col = color.blue) =>
+    label.new(
+     x         =   x_ratio.get(_x),
+     y         =   y_ratio.get(_x),
+     text      = arr_ratio.get(_x),
+     xloc      = xloc.bar_time,
+     style     = label.style_label_center,
+     textcolor = i_b_col ? color.black : color.white,
+     color     = i_b_col ? col_dir : _col)
+f_hlabel(float _ratio, float _y, int _int, color _col = color.blue) =>
+    label.new(
+     x         =  time_A,
+     y         = _y,
+     text      = str.tostring(_ratio, '0.000') + ' (' + str.tostring(_y, '#.000') + ')',
+     xloc      = xloc.bar_time,
+     style     = _int % 2 ? label.style_label_upper_right : label.style_label_lower_right,
+     color     = color.new(_col, 100),
+     textcolor = i_b_col ? col_dir : _col)
+f_line(int _x1, int _y1, int _x2, int _y2, bool _bool = true, int _width = 1, int _transp = 0) =>
+    _style = switch _bool
+        true  => line.style_solid
+        false => line.style_dotted
+    line.new(
+     x1    = arr_time.get(_x1),
+     y1    =   arr_pr.get(_y1),
+     x2    = arr_time.get(_x2),
+     y2    =   arr_pr.get(_y2),
+     xloc  = xloc.bar_time,
+     color =  i_b_col ? color.new(col_dir, _transp) : color.new(color.blue, _transp), 
+     style = _style,
+     width = _width)
+f_hline(float _y, int _width = 1, int _transp = 0) =>
+    line.new(
+     x1    = time_A,
+     y1    = _y,
+     x2    = time_C,
+     y2    = _y,
+     xloc  = xloc.bar_time,
+     color =  i_b_col ? color.new(col_dir, _transp) : color.new(color.blue, _transp), 
+     style = line.style_solid,
+     width = _width)
+f_fill_ABC(int _x1 = 0, int _x2 = 0, color _col = color.blue) =>
+    linefill.new(solid_ABC.get(_x1), dot_ABC.get(_x2), i_b_col ? color.new(col_dir, 80) : color.new(_col, 80))
+f_label_rng(string _txt, color _col = color.blue) =>
+    label.new(
+     x         = time_A, 
+     y         = pr_B,
+     text      = _txt, 
+     xloc      = xloc.bar_time,
+     style     = label.style_label_right,
+     color     = color.new(_col, 100),
+     textcolor = i_b_col ? col_dir : _col)
+    // }
+// }
+// —— 4.   Table {
+// ———— 4.1  Table variable {
+var table_ABC = table.new(position = i_s_Y + '_' + i_s_X, columns =7, rows = 6, border_color = color.new(color.blue, 100), border_width = 1)
+row_0         = array.from('POINT',   'RATIO',   'SPEC',   'PRICE')
+column_1      = array.from(  str_A,     str_B,    str_C)
+column_3      = array.from(   pr_A,      pr_B,     pr_C)
+//                               0,         1,        2,         3
+    // }
+// ———— 4.2  Table custom functions {
+f_cell(int _column, int _row, string _text, color _col1 = color.black, color _col2 = color.white, bool halign = true) =>
+    table_ABC.cell(_column, _row, _text, text_color = _col1, text_size = i_s_font, 
+     text_halign = halign ? text.align_right : text.align_center, bgcolor = _col2)
+    // }
+// }
+// —— 5. Construct {
+if barstate.islast
+    for x = 0 to 2
+        label_ABC.set(x, f_label_ABC(x))
+    for x = 0 to 1
+        solid_ABC.set(x, f_line(x, x, x + 1, x + 1, true, 4))
+    ratio_ABC.set(0, f_ratio_ABC(0))
+    dot_ABC.set(  0, f_line(0, 0, 0 + 2, 0 + 2, false))
+    fill_ABC.set( 0, f_fill_ABC())
+    if array.includes(bool_ratio, true)
+        if i_s_helper == 'All' or i_s_helper == 'Direction label'
+            label_rng.set(0, f_label_rng(txt))
+        if i_s_helper == 'All' or i_s_helper == 'Range'
+            hline_AC.set( 0, f_hline(price_min))
+            hline_AC.set( 1, f_hline(price_max))
+            hlabel_AC.set(0, f_hlabel(ratio_min, price_min, 0))
+            hlabel_AC.set(1, f_hlabel(ratio_max, price_max, 1))
+    if i_b_table
+        if bool_ratio.includes(true)
+            f_cell(0, 0, txt, color.black, col_dir)
+            table_ABC.merge_cells(0, 0, 3, 0)
+        for i = 0 to 3
+            f_cell(i,     1, array.get(row_0, i), color.white, color.blue, false)
+        for i = 0 to 2
+            f_cell(0, i + 2,                                   str_arr.get(i),  (i + 1) % 3 ? col_dir : color.black, (i + 1) % 3 ? color.black : col_dir, false)
+            f_cell(1, i + 2,                                  column_1.get(i),  (i + 1) % 3 ? col_dir : color.black, (i + 1) % 3 ? color.black : col_dir, false)
+            f_cell(3, i + 2, calc.PriceCurrency(i_b_currency, column_3.get(i)), (i + 1) % 3 ? col_dir : color.black, (i + 1) % 3 ? color.black : col_dir, false)
+        f_cell(2, 2,   '', color.white, color.black)
+        table_ABC.merge_cells(2, 2, 2, 3)
+        f_cell(2, 4, arr_ratio.get(0),  color.black, col_dir, false)
+
+plot(i_s_label == 'ABC' ? pr_A : na, 'A', color.new(col_dir, 100))
+plot(i_s_label == 'ABC' ? pr_B : na, 'B', color.new(col_dir, 100))
+plot(i_s_label == 'ABC' ? pr_C : na, 'C', color.new(col_dir, 100))
+plot(i_s_label ==   '1' ? pr_A : na, '1', color.new(col_dir, 100))
+plot(i_s_label ==   '2' ? pr_B : na, '2', color.new(col_dir, 100))
+plot(i_s_label ==   '3' ? pr_C : na, '3', color.new(col_dir, 100))
+plot(                     price_min, 'Min', color.new(color.blue, 100))
+plot(                     price_max, 'Max', color.new(color.blue, 100))
+// }
