@@ -1,0 +1,1599 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © JohnBartlesAccount
+
+//@version=5
+indicator("Realtime Divergence for Any Indicator - By John Bartle", overlay=true, max_lines_count=500, max_labels_count = 500, max_bars_back = 300)
+
+
+
+
+
+
+prc_AllBulls =              input.source(low,                      "Price Chart Bulls Source", group = "Sources", tooltip = "The data source for both hidden bull and regular bull")
+prc_AllBears =              input.source(high,                     "Price Chart Bears Source", group = "Sources", tooltip = "The data source for both hidden bear and regular bear")
+osc_AllBulls =              input.source(low,                      "Oscillator Chart Bulls Source", group = "Sources", tooltip = "The data source for both hidden bull and regular bull")
+osc_AllBears =              input.source(high,                     "Oscillator Chart Bears Source", group = "Sources", tooltip = "The data source for both hidden bear and regular bear")
+
+
+
+applyToPriceChart = input(false, "Apply To Price Chart",  tooltip="You must choose whether price chart(or substitute) lines or oscillator lines are diplayed. Only one can be displayed at a time.  FYI, A price chart can be substituted with an oscillator. Also you must still set the \'Oscillator Chart Source\' Input to the desired source", group = "General Display Settings")
+visibleDivsPosAdjustment = input.int(      0,                           "Beginning of Visible Range of Divergences", step = 100, maxval = 0, tooltip="This setting shifts the range of visible divergences along the chart. The purpose for this is that the number of visible lines and labels possible in Pinescript is limited. So this is useful if the chart is longer than the visible range. Also, as the quantity of drawn lines increase your chart's performance slows", group = "General Display Settings")
+
+plotBull =         input(      true,                        title = "Bull Lines",              group="General Display Settings")
+plotHiddenBull =   input(      true,                        title = "Hidden Bull Lines",       group="General Display Settings")
+plotBear =         input(      true,                        title = "Bear Lines",              group="General Display Settings")
+plotHiddenBear =   input(      true,                        title = "Hidden Bear Lines",       group="General Display Settings")
+plotBullLabels =    input(      true,                        title = "Bull Label",              group="General Display Settings")
+plotHidBullLabels = input(      true,                        title = "Hidden Bull Label",       group="General Display Settings")
+plotBearLabels=    input(      true,                        title = "Bear Label",              group="General Display Settings")
+plotHidBearLabels = input(      true,                        title = "Hidden Bear Label",       group="General Display Settings")
+bearColor =        input.color(color.rgb(255, 0, 0, 0),     title = "Bearish Color",         group="General Display Settings")
+bullColor =        input.color(color.rgb(0, 255, 0, 0),     title = "Bullish Color",         group="General Display Settings") 
+hiddenBullColor =  input.color(color.rgb(0, 255, 0, 80),    title = "Hidden Bullish Color",  group="General Display Settings")
+hiddenBearColor =  input.color(color.rgb(255, 0, 0, 80),    title = "Hidden Bearish Color",  group="General Display Settings")
+textColor =        input.color(color.rgb(255, 255, 255, 0), title = "Text Color",            group="General Display Settings")
+useLabelText =         input(      false,                      title = "Use Label Text",       group="General Display Settings")
+divAngleColor = input.color(color.rgb(0, 255, 0, 0),      title = "Divergence Angle Color",                group="General Display Settings") 
+divIntersectColor = input.color(color.rgb(136, 159, 232),  title = "Divergence Intersection Color",         group="General Display Settings") 
+
+
+
+YAdditive = input.float(defval = 0.0000, title = "Alerts: Alert Label Y Location", step = 0.5000, tooltip = "The vertical distance above or below the current close price", group="Alert Display Settings")
+XAdditive = input.int(defval = 2, title = "Alerts: Alert Label X Location", tooltip = "The horizontal distance from the current bar location", group="Alert Display Settings")
+YSpacing = input.float(defval = 1.0000, title = "Alerts: Alert Label Y Spacing", step = 0.5000, tooltip = "The vertical distance between each Alert Label", group="Alert Display Settings")
+
+
+
+
+pivotPattern =              input.string(      "Type 2", title = "Pivot Pattern", options = ["Type 1", "Type 2"], tooltip = "\'Type 1\' is either a pyramid or upside-down pyramid pattern depending on the type of divergence. Beginning from the pivot bar, each set of it's side bars is required to be either higher or lower than the bars nearer the pivot bar. \'Type 2\' permits all the side bars to be as high or as low as the pivot bar, depending on the type of divergence. This will produce more divergences",group = "Pivots") 
+rsDeviationAllowance = input.int(title="Rightside Misalignment Allowance", defval=0, minval=0, step=1, tooltip="The number of bars allowed for price and oscillator rightside pivots to misalign from one another. Note that only one of the two pivots are permitted to be deviated from the current evaluated bar. Rightside pivots between price and oscillator are sometimes slightly misaligned, but SOME should still possibly be considered a valid divergence", group = "Pivots")
+
+RSPivRBars =              input.int(      3, title = "Right Side Bars of Rightside Pivots", minval = 0, group = "Pivots")     
+RSPivLBars =              input.int(      3, title = "Left Side Bars of Rightside Pivots", minval = 0, group = "Pivots")
+rsPivErrAllowance = input.int(     0, title = "Rightside Pivot Error Allowance", minval = 0, tooltip = "The number of bars within a pivot that are allowed to deviate from a pivot pattern. This script offers two possible pivot patterns to choose from", group = "Pivots")
+
+LSPivRBars =              input.int(      3, title = "Right Side Bars of Leftside Pivots", minval = 0, group = "Pivots")     
+LSPivLBars =              input.int(      3, title = "Left Side Bars of Leftside Pivots", minval = 0, group = "Pivots")
+lsPivErrAllowance = input.int(     0,        title = "Leftside Pivot Error Allowance", minval = 0, tooltip = "The number of bars within a pivot that are allowed to deviate from a pivot pattern. This script offers two possible pivot patterns to choose from", group = "Pivots")
+
+
+doHistorical = input.bool(defval=true, title = "Historical Divergences", tooltip="Show historical divergences", group = "Divergences")
+divMax =       input.int(      60,            title = "Max Length", minval = 2, tooltip="The maximum allowed length of the oscillator and price divergence lines", group = "Divergences")
+divMin =       input.int(      5,             title = "Min Length", minval = 2, tooltip="The minimum allowed length of the oscillator and price divergence lines", group = "Divergences")
+divergenceMax = divMax
+divergenceMin = divMin
+fullDivLenMax = divMax + RSPivRBars + LSPivLBars
+fullDivLenMin = divMin + RSPivRBars + LSPivLBars
+//The divLength* represents the total number of bars from the rightmost rightside side bar to the leftmost leftside side bar. The divMax and divMin represent only the number of bars from the leftside pivot bar to the rightside pivot bar.
+if divMin > divMax
+    fullDivLenMin := fullDivLenMax
+    divergenceMin := divergenceMax
+
+minDivLength = input.float(title = "Min Length Ratio Allowance", defval=0.00, minval=0.0, step=1.00, tooltip="The minimum percentage of the length of bars that the smaller line must compare to the larger line of the price chart or the oscillator. The formula is ((smaller_line / larger_line) * 100)", group = "Divergences")
+useBestSlope = input(defval=true, title = "Use Only the Best Slope", tooltip="Depending on the type of divergence line, only the slope closest to 0 or the slope farthest from 0 will be used", group = "Divergences")
+doAlerts = input.bool(defval=true, title = "Alerts: Divergences",  tooltip="Recieve alerts to divergences that have right side bars for the rightside pivots. These alerts occur while the rightmost pivot is still developing", group = "Divergences")
+alertTiming = input.bool(defval = true, title = "Alert Before Bar Close", tooltip = "If set, the alerts will execute immediately when a divergence occurs at any point of the bar formation and this would actually make the divergence only a potential. If unset, the alerts will execute at the close of the rightmost bar if a divergence occurs. WARNING, you must create a new alert and delete your current alert if you change this setting", group = "Divergences") ? alert.freq_once_per_bar : alert.freq_once_per_bar_close
+
+
+interAllowancePrice = input.float(title = "Price: Allowance", defval=0.00, minval=0.0, step=1.00, tooltip="The relative percentage or absolute amount that the price is allowed to intersect the divergence line. If \'Relative Percentage\' is your \'Measurement Type\' then 1.0 equals 1% of the Y value of the divergence line at bar X. Sometimes bars may slightly intersect the divergence line but still be valid. Extremely different allowances MAY be best for different volatilities, timeframes and prices", group = "Divergences: Intersection Allowance")
+interAllowanceOsc = input.float(title = "Oscillator: Allowance", defval=0.00, minval=0.0, step=1.00, tooltip="The relative percentage or absolute amount that the oscillator is allowed to intersect the divergence line. If \'Relative Percentage\' is your \'Measurement Type\' then 1.0 equals 1% of the Y value of the divergence line AT bar X. Sometimes bars may slightly intersect the divergence line but still be valid. Extremely different allowances MAY be best for different volatilities, timeframes and prices", group = "Divergences: Intersection Allowance")
+
+intersectExclusion = input.int(defval = 1, title = "Bar Exclusions", minval = 0, tooltip = "Beginning from within a divergence line, the right side and left side set of inner bars excluded from evaluation for the settings:  \'*: Intersection Allowance\'. The purpose of this setting is that too often a divergence line will have one or two inner bars directly next to the pivot bars that intersect the divergence line, and some people may want to ignore them", group = "Divergences: Intersection Allowance")
+measureType =              input.string(      "Absolute Difference", title= "Measurement Type", options = ["Relative Percentage", "Absolute Difference"], tooltip = "Choose the measurment type for the settings \'*: Allowance\'. ",group = "Divergences: Intersection Allowance") 
+showDivIntersection = input.bool(defval=false, title="Show Intersection Allowance", tooltip="This displays the percentage or the absolute difference of the intersection. This can be used to help establish a visual idea of percentages or differences ", group = "Divergences: Intersection Allowance")
+
+
+
+
+useSlopeAngExc = input.bool(defval = false, title = "Slope Angle Exclusion", group = "Divergences: Slope Angle Exclusion")
+slopeMaxOsc = input.float(defval=0.0, title = "Oscillator: Upper Range ", minval = -1.0000, maxval = 90.0, step = 1.0000, tooltip="The upper limit of the excluded angle range for slopes within the oscillator. The values are in degrees of angles and in absolute values. Any divergence line between this range is excluded. -1 is always outside range", group = "Divergences: Slope Angle Exclusion")
+slopeMinOsc = input.float(defval=0.0, title = "Oscillator: Lower Range", minval = -1.0000, maxval = 90.0, step = 1.0000, tooltip="The lower limit of the excluded angle range for slopes within the oscillator. The values are in degrees of angles and in absolute values. -1 is always outside range", group = "Divergences: Slope Angle Exclusion")
+normFacOsc = input.string(defval="0.01", title = "Oscillator: Normalization Factor", tooltip="The factor by which the time scale is adjusted relative to the oscillator scale.  You must decide what slope equals what degree.  The time scale compared to oscillator scale can be drastically different and subsequently their slopes can be extremely and undesirably small or large. Normalization is necessary in order to reasonably represent slopes as angle degrees. I recommend using +/- powers of 10, but experiment and use whatever gives you the best dispersion of slope angles", group = "Divergences: Slope Angle Exclusion")
+normalFactorOsc = str.tonumber(normFacOsc)
+slopeMaxPrice = input.float(defval=0.0, title = "Price: Upper Range", minval = -1.0000, maxval = 90.0, step = 1.0000, tooltip="The upper limit of the excluded angle range for slopes within the price chart. The values are in degrees of angles and in absolute values. Any divergence line between this range is excluded. -1 is always outside range", group = "Divergences: Slope Angle Exclusion")
+slopeMinPrice = input.float(defval=0.0, title = "Price: Lower Range", minval = -1.0000, maxval = 90.0, step = 1.0000, tooltip="The lower limit of the excluded angle range for slopes within the price chart. The values are in degrees of angles and in absolute values. -1 is always outside range", group = "Divergences: Slope Angle Exclusion")
+normFacPrice = input.string(defval="0.01", title = "Price: Normalization Factor", tooltip="The factor by which the time scale is adjusted relative to the price scale. You must decide what slope equals what degree. The time scale compared to price scale can be drastically different and subsequently their slopes can be extremely and undesirably small or large. Normalization is necessary in order to reasonably represent slopes as angle degrees. I recommend using +/- powers of 10, but experiment and use whatever gives you the best dispersion of slope angles", group = "Divergences: Slope Angle Exclusion")
+normalFactorPrice = str.tonumber(normFacPrice)
+showAngles = input.bool(defval = false, title = "Show Divergence Line Angles", tooltip="View the angles of the divergence lines. This gives you a better idea of which divergences you'd like removed", group = "Divergences: Slope Angle Exclusion")
+
+
+
+
+doRealtime = input.bool(defval=true, title = "Realtime Potential Divergences", tooltip="Show potential divergences as pivots are forming", group = "Divergences: REALTIME")
+rtDivDisplayQuantity = input.int(defval=2, title = "Display Quantity", minval = 1, tooltip="The quantity of previous potential divergences to be displayed", group = "Divergences: REALTIME")
+rtDivDisplayBarQuantity = input.int(defval=5, title = "Display Range", minval = 1, tooltip="The quantity of bars allowed to display previous potential divergences. Note that only the rightside pivots are required to be within this range in order for their entire realtime divergence lines to made visible. Note that there's a small bug in this feature, just increase the value to manage it if necessary", group = "Divergences: REALTIME")
+doRTPotentialAlerts = input.bool(defval=true, title = "Alerts: Potential Divergences",  tooltip="Recieve alerts to potential divergences that have zero right side bars for rightside pivots", group = "Divergences: REALTIME")
+rtAlertTiming = input.bool(defval = true, title = "Alerts: Alert Before Bar Close", tooltip = "If set, the alerts will execute immediately when a divergence occurs at any point of the bar formation. If unset, the alerts will execute at the close of the bar if a divergence has occured. WARNING, you must create a new alert and delete your current alert if you change this setting") ? alert.freq_once_per_bar : alert.freq_once_per_bar_close
+
+
+hack_addElements = input.float(defval=0.0, title = "Add More Array Elements", minval = 0, tooltip="To temporarily fix an ERROR that reads \'Error on bar xxx: in array.get() function. Index xxx is out of bounds\'.   The purpose for this setting is that my code has a bug that I don\'t feel like fixing", group = "DEBUG and HACK")
+
+//positionTEST = input.int(defval=1, title="Position TEST", tooltip="Show potential divergences as pivots are forming", group = "DEBUG and HACK")
+
+
+
+
+
+
+
+divergenceCanceled  = false
+
+
+
+
+
+
+
+
+type ChartCoordinates
+    int x1
+    float y1
+    int x2
+    float y2
+
+
+
+
+
+
+
+
+
+
+
+//This function returns 0, for the number of the current bar, when useCurrentBar is true and occurrence = 1 and the condition for the current bar is true.
+barssince_custom(condition, occurrence, useCurrentBar) =>
+    count = 1
+    occurCount = 0
+
+    if useCurrentBar
+        count := 0
+    
+    for i = count to bar_index
+        if condition[i]
+            occurCount := occurCount + 1
+            if occurCount == occurrence
+               // count := count + 1
+                break
+        count := count + 1
+
+    count
+
+
+
+isPivotLow(src, lsLen, rsLen, errAllowance) =>
+    pivotLow = true
+    numErrOutToIn = 0
+    numErrInToOut = 0
+    type2Errors   = 0
+    mostErrors    = 0
+
+
+
+    if pivotPattern == "Type 1"
+//Outward to Inward
+        if rsLen > 0
+            for i = 0 to (rsLen - 1)
+                for j = (i+1) to (rsLen)
+                    if src[i] <= src[j]
+                        numErrOutToIn := numErrOutToIn + 1
+                        break
+
+
+        if lsLen > 0
+            for i = (rsLen + lsLen) to (rsLen + 1)
+                for j = (i-1) to rsLen
+                    if src[i] <= src[j]
+                        numErrOutToIn := numErrOutToIn + 1
+                        break
+
+//Inward to Outward THIS ONE removes label
+        if rsLen > 0
+            for i = rsLen to 1
+                for j = (i-1) to 0
+                    if src[i] >= src[j]
+                        numErrInToOut := numErrInToOut + 1
+                        break
+
+        if lsLen > 0
+            for i = rsLen  to (rsLen + lsLen - 1)
+                for j = (i+1) to (rsLen + lsLen)
+                    if src[i] >= src[j]
+                        numErrInToOut := numErrInToOut + 1
+                        break
+
+
+        mostErrors := numErrOutToIn > numErrInToOut ? numErrOutToIn : numErrInToOut
+
+        if mostErrors > errAllowance
+            pivotLow := false
+
+    if pivotPattern == "Type 2"
+        if rsLen > 0
+            for i = 0 to (rsLen - 1)
+                if src[i] < src[rsLen]
+                    type2Errors := type2Errors + 1
+
+        if lsLen > 0
+            for i = (rsLen + 1) to (rsLen + lsLen)
+                if src[i] < src[rsLen]
+                    type2Errors := type2Errors + 1
+        
+        if type2Errors > errAllowance
+            pivotLow := false
+
+    pivotLow
+
+
+
+
+
+isPivotHigh(src, lsLen, rsLen, errAllowance) =>
+    pivotLow = true
+    numErrOutToIn = 0
+    numErrInToOut = 0
+    type2Errors   = 0
+    mostErrors    = 0
+
+    if pivotPattern == "Type 1"
+//Outward to Inward
+        if rsLen > 0
+            for i = 0 to (rsLen - 1)
+                for j = (i+1) to (rsLen)
+                    if src[i] >= src[j]
+                        numErrOutToIn := numErrOutToIn + 1
+                        break
+
+        if lsLen > 0
+            for i = (rsLen + lsLen) to (rsLen + 1)
+                for j = (i-1) to rsLen
+                    if src[i] >= src[j]
+                        numErrOutToIn := numErrOutToIn + 1
+                        break
+
+//Inward to Outward
+        if rsLen > 0
+            for i = rsLen to 1
+                for j = (i-1) to 0
+                    if src[i] <= src[j]
+                        numErrInToOut := numErrInToOut + 1
+                        break
+
+        if lsLen > 0
+            for i = rsLen  to (rsLen + lsLen - 1)
+                for j = (i+1) to (rsLen + lsLen)
+                    if src[i] <= src[j]
+                        numErrInToOut := numErrInToOut + 1
+                        break
+
+        mostErrors := numErrOutToIn > numErrInToOut ? numErrOutToIn : numErrInToOut
+
+        if mostErrors > errAllowance
+            pivotLow := false
+
+    if pivotPattern == "Type 2"
+        if rsLen > 0
+            for i = 0 to (rsLen - 1)
+                if src[i] > src[rsLen]
+                    type2Errors := type2Errors + 1
+
+        if lsLen > 0
+            for i = (rsLen + 1) to (rsLen + lsLen)
+                if src[i] > src[rsLen]
+                    type2Errors := type2Errors + 1
+        
+        if type2Errors > errAllowance
+            pivotLow := false
+
+
+    pivotLow
+
+
+
+
+
+
+
+findPivots(rsPivLeftBars, rsPivRightBars, lsPivLeftBars, lsPivRightBars) =>
+    rsLows_Osc = isPivotLow(osc_AllBulls, rsPivLeftBars, rsPivRightBars, rsPivErrAllowance)
+    rsLows_Price = isPivotLow(prc_AllBulls, rsPivLeftBars, rsPivRightBars, rsPivErrAllowance)        
+    rsHighs_Osc = isPivotHigh(osc_AllBears, rsPivLeftBars, rsPivRightBars, rsPivErrAllowance)
+    rsHighs_Price = isPivotHigh(prc_AllBears, rsPivLeftBars, rsPivRightBars, rsPivErrAllowance)
+
+    lsLows_Osc = isPivotLow(osc_AllBulls, lsPivLeftBars, lsPivRightBars, lsPivErrAllowance)
+    lsLows_Price = isPivotLow(prc_AllBulls, lsPivLeftBars, lsPivRightBars, lsPivErrAllowance)            
+    lsHighs_Osc = isPivotHigh(osc_AllBears, lsPivLeftBars, lsPivRightBars, lsPivErrAllowance)
+    lsHighs_Price = isPivotHigh(prc_AllBears, lsPivLeftBars, lsPivRightBars, lsPivErrAllowance)
+
+    [rsLows_Osc, rsLows_Price, rsHighs_Osc, rsHighs_Price,   lsLows_Osc, lsLows_Price, lsHighs_Osc, lsHighs_Price]
+
+
+
+
+
+
+
+//Right side pivot deviations from the current bar
+type PivotDeviations
+    int oscPLBar
+    int pricePLBar
+    int oscPHBar
+    int pricePHBar
+
+
+findDeviatedRSPivots(rsPivLows_Osc, rsPivLows_Price, rsPivHighs_Osc, rsPivHighs_Price, rsBars) =>
+    PivotDeviations pd = PivotDeviations.new()
+    // The bar elements start at 0 not 1 for found pivots
+    pd.oscPLBar := barssince_custom(rsPivLows_Osc, 1, true) + rsBars
+    pd.pricePLBar := barssince_custom(rsPivLows_Price, 1, true) + rsBars
+    pd.oscPHBar := barssince_custom(rsPivHighs_Osc, 1, true) + rsBars
+    pd.pricePHBar := barssince_custom(rsPivHighs_Price, 1, true) + rsBars
+
+    pd
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//chartType
+PRICE_CHART = 1
+OSC_CHART   = 2
+
+
+shouldDivergenceBeDisplayed(chartType, isDivergence, isRealtime) =>
+    display = true
+
+    //This controls the visible range of bars displayed on the chart
+    visibleDivsPos = (last_bar_index + visibleDivsPosAdjustment)
+    if (bar_index > (visibleDivsPos)) 
+        display := false
+
+    if (divergenceCanceled  == true)
+        display := false
+
+    if chartType == PRICE_CHART and applyToPriceChart == false
+        display := false
+
+    if chartType == OSC_CHART and applyToPriceChart == true
+        display := false
+
+    if isDivergence == false
+        display := false
+
+
+    display
+
+
+
+
+
+shouldPotentialDivBeAlerted(isDivergence) =>
+    isRtAlert = true
+
+    if rtAlertTiming == alert.freq_once_per_bar_close and isDivergence[1] == false
+        isRtAlert := false
+
+    if rtAlertTiming == alert.freq_once_per_bar and isDivergence == false
+        isRtAlert := false
+
+    // if (divergenceCanceled  == true) and rtAlertTiming == alert.freq_once_per_bar
+    //     isRtAlert := false
+
+    if doRTPotentialAlerts == false
+        isRtAlert := false
+
+    if bar_index != last_bar_index
+        isRtAlert := false
+
+
+    isRtAlert
+
+
+
+
+
+
+
+shouldDivBeAlerted(isDivergence) =>
+    isAlert = true
+
+    if alertTiming == alert.freq_once_per_bar_close and isDivergence[1] == false
+        isAlert := false
+
+    if alertTiming == alert.freq_once_per_bar and isDivergence == false
+        isAlert := false
+
+    // if (divergenceCanceled  == true) and rtAlertTiming == alert.freq_once_per_bar
+    //     isRtAlert := false
+
+    if doAlerts == false
+        isAlert := false
+
+    if bar_index != last_bar_index
+        isAlert := false
+
+
+    isAlert
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//equalityType
+GREATER_THAN = 1
+LESS_THAN    = 2
+
+compareBars(bar1, equalityType, bar2 ) =>
+    comparison = false
+   
+    if equalityType == GREATER_THAN
+        comparison := bar1 > bar2
+
+    if equalityType == LESS_THAN
+        comparison := bar1 < bar2
+
+    comparison
+
+
+
+
+
+
+PivotDeviations rsDevPivs = PivotDeviations.new()
+PivotDeviations rt_rsDevPivs = PivotDeviations.new()//Realtime
+
+
+
+
+
+
+
+
+
+
+
+//divType
+REG_BULL = 1
+HID_BULL = 2
+REG_BEAR = 3
+HID_BEAR = 4
+
+ALL_BULLS = 5 //Represents both REG_BULL and HID_BULL
+ALL_BEARS = 6 //Represents both REG_BEAR and HID_BEAR
+
+
+
+areRSDivergencePreconditionsOK(divType, devPivs, isRealtime) =>
+    isCancelled = false
+
+    rsBars = 0
+    if isRealtime == false
+        rsBars := RSPivRBars
+
+    if divType == ALL_BULLS
+        if na(devPivs.pricePLBar) or na(devPivs.oscPLBar)
+            isCancelled := true
+
+        //If both the price and oscillator right side pivots are deviated from the current evaluated bar then cancel
+        if ((devPivs.pricePLBar - rsBars) > 0 and (devPivs.oscPLBar - rsBars) > 0)
+            isCancelled := true
+
+        if math.abs(devPivs.oscPLBar - devPivs.pricePLBar) > rsDeviationAllowance
+            isCancelled := true
+
+
+        if ((devPivs.pricePLBar + RSPivLBars) > (fullDivLenMax - 1)) or ((devPivs.oscPLBar + RSPivLBars) > (fullDivLenMax - 1)) 
+            isCancelled := true
+
+    if divType == ALL_BEARS
+        if na(devPivs.pricePHBar) or na(devPivs.oscPHBar)
+            isCancelled := true
+        //If both the price and oscillator right side pivots are deviated from the current evaluated bar then cancel
+        if ((devPivs.pricePHBar - rsBars) > 0 and (devPivs.oscPHBar - rsBars) > 0)
+            isCancelled := true
+
+        if math.abs(devPivs.oscPHBar - devPivs.pricePHBar) > rsDeviationAllowance
+            isCancelled := true
+
+        //If the left side most bar of the rightside pivot exceeds fullDivLenMax. "- 1" is necessary because pricePHBar and oscPHBar start at 0
+        if ((devPivs.pricePHBar + RSPivLBars)  > (fullDivLenMax - 1)) or ((devPivs.oscPHBar + RSPivLBars)  > (fullDivLenMax - 1)) 
+            isCancelled := true
+
+    isCancelled
+
+
+
+
+
+
+
+
+
+//Within the function isDivIntersectedByXAmount() I get a warning "Warning at 1152:17 The function 'displayIntersectionAmount' should be called on each calculation for consistency. It is recommended to extract the call from this scope"
+//The following section of code removes that warning
+var priceAllBullsArray = array.new_float()
+var priceAllBearsArray = array.new_float()
+var osc_AllBullsArray = array.new_float()
+var osc_AllBearsArray = array.new_float()
+
+
+
+array.unshift(priceAllBullsArray, prc_AllBulls)
+array.unshift(priceAllBearsArray, prc_AllBears)
+array.unshift(osc_AllBullsArray, osc_AllBulls)
+array.unshift(osc_AllBearsArray, osc_AllBears)
+
+if bar_index > (fullDivLenMax + 1) + hack_addElements//FIX:  This hack is absolutely arbitrary but a big extra number prevents an error.
+    array.pop(priceAllBullsArray)
+    array.pop(priceAllBearsArray)
+    array.pop(osc_AllBullsArray)
+    array.pop(osc_AllBearsArray)
+
+
+
+
+
+
+
+
+
+
+
+isDivIntersectedByXAmount(chartType, divType, x1,  y1, x2, y2) =>
+    isIntersecting = false
+    //Note that positive bar indexes refer to past left bars which is the opposite direction of the numbering of a typical line graph.
+    rise = y1 - y2
+    run =  x1 - x2
+
+    x_point = 0
+    y_point = 0.0
+
+    riseOfPoint = 0.0
+    runOfPoint = 0.0
+
+    array<float> barsArray = na
+    if chartType == PRICE_CHART
+        if (divType == REG_BULL) or (divType == HID_BULL)
+            barsArray := priceAllBullsArray
+        if (divType == REG_BEAR) or (divType == HID_BEAR) 
+            barsArray := priceAllBearsArray
+ 
+    else if chartType == OSC_CHART
+        if (divType == REG_BULL) or (divType == HID_BULL)
+            barsArray := osc_AllBullsArray
+        if (divType == REG_BEAR) or (divType == HID_BEAR) 
+            barsArray := osc_AllBearsArray
+
+
+    numOfBars = (x1) - (x2) + 1 //This includes the bars beginning from the right side pivot bar to the left side pivot par 
+    firstBar = (1 + intersectExclusion) //Begin evaluation at the very first inner bars + intersectEx
+    lastBar = numOfBars - 2 - intersectExclusion
+
+//TODO:  Test if RSPivRBars + 1 is the first bar after the left bars of the right side pivot bar
+    if firstBar <= lastBar
+        for i = firstBar to lastBar
+            riseOfPoint := ((rise * i)/numOfBars)
+            runOfPoint := ((run * i)/numOfBars)
+
+            y_point := y2 + riseOfPoint
+            x_point := x2 + math.floor(runOfPoint)
+
+            difference = (array.get(barsArray, x2 + i) - y_point)
+            intersectionAmount = 0.0
+
+
+            if measureType == "Relative Percentage"
+                intersectionAmount := (difference / y_point) * 100
+            else
+                intersectionAmount := difference
+
+            if difference < 0.0 and (divType == REG_BULL or divType == HID_BULL)
+                if math.abs(intersectionAmount) > (interAllowancePrice) and chartType == PRICE_CHART 
+                    isIntersecting := true
+
+                if math.abs(intersectionAmount) > (interAllowanceOsc) and chartType == OSC_CHART 
+                    isIntersecting := true
+                
+            if difference > 0.0 and (divType == REG_BEAR or divType == HID_BEAR) 
+                if math.abs(intersectionAmount) > (interAllowancePrice) and chartType == PRICE_CHART 
+                    isIntersecting := true
+
+                if math.abs(intersectionAmount) > (interAllowanceOsc) and chartType == OSC_CHART 
+                    isIntersecting := true                
+
+    isIntersecting
+
+
+
+
+
+
+
+
+
+type BiggestIntersection
+    int x
+    float y
+    float diff
+    float percent
+
+
+
+
+displayIntersectionAmount(chartType, divType, x1,  y1, x2, y2) =>
+    labelStyle = label.style_label_up
+    isIntersecting = false
+    formattedText = "$%"
+    //Note that positive bar indexes refer to past left bars which is the opposite direction of the numbering of a typical line graph.
+    rise = y1 - y2
+    run =  x1 - x2
+
+    x_point = 0
+    y_point = 0.0
+
+    riseOfPoint = 0.0
+    runOfPoint = 0.0
+
+    array<float> barsArray = na
+    if chartType == PRICE_CHART
+        if (divType == REG_BULL) or (divType == HID_BULL)
+            barsArray := priceAllBullsArray
+        if (divType == REG_BEAR) or (divType == HID_BEAR) 
+            barsArray := priceAllBearsArray
+ 
+    else if chartType == OSC_CHART
+        if (divType == REG_BULL) or (divType == HID_BULL)
+            barsArray := osc_AllBullsArray
+        if (divType == REG_BEAR) or (divType == HID_BEAR) 
+            barsArray := osc_AllBearsArray
+
+
+    numOfBars = (x1) - (x2) //+ 1 //This includes the bars beginning from the right side pivot bar to the left side pivot par 
+    firstBar = (1 ) //Begin evaluation at the very first inner bars + intersectExclusion
+    lastBar = numOfBars - 2 
+ 
+    BiggestIntersection bi = BiggestIntersection.new()
+    bi.diff := 0.0
+    bi.x := 0
+    bi.y := 0.0
+    bi.percent := 0.0
+
+    if firstBar <= lastBar
+        for i = firstBar to lastBar
+            riseOfPoint := ((rise * i)/numOfBars)
+            runOfPoint := ((run * i)/numOfBars)
+
+            y_point := y2 + riseOfPoint
+            x_point := x2 + math.floor(runOfPoint)
+
+            difference = (array.get(barsArray, x2 + i) - y_point)
+            intersectionAmount = 0.0
+
+            if measureType == "Relative Percentage"
+                intersectionAmount := (difference / y_point) * 100
+                formattedText := "$%"
+            else
+                intersectionAmount := difference
+                formattedText := "$"
+
+            if difference < 0.0 and (divType == REG_BULL or divType == HID_BULL) //and difference < 0.0 
+                if math.abs(bi.diff) < math.abs(difference)
+                    bi.diff := difference
+                    bi.x  := i
+                    bi.y  := y_point
+                    bi.percent := intersectionAmount
+
+                    isIntersecting := true
+
+            if difference > 0.0 and (divType == REG_BEAR or divType == HID_BEAR) 
+                if math.abs(bi.diff) < math.abs(difference)
+                    bi.diff := difference
+                    bi.x  := i
+                    bi.y  := y_point
+                    bi.percent := intersectionAmount
+
+                    isIntersecting := true
+
+    if divType == REG_BULL or divType == HID_BULL
+        labelStyle := label.style_label_up
+    else if divType == REG_BEAR or divType == HID_BEAR
+        labelStyle := label.style_label_down  
+
+
+    if isIntersecting and ((chartType == OSC_CHART and applyToPriceChart == false)  or  (chartType == PRICE_CHART and applyToPriceChart == true))
+        formattedText2 = str.replace(formattedText, "$", str.tostring(math.abs(bi.percent)), 0)
+        line.new(bar_index - bi.x - x2, array.get(barsArray, x2 + bi.x), bar_index - bi.x - x2, bi.y, color = divIntersectColor, width =3)
+        label.new(bar_index - bi.x - x2, array.get(barsArray, x2 + bi.x), color = divIntersectColor, text = formattedText2, style = labelStyle, textcolor = textColor)
+
+    isIntersecting
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//DEBUG function - this needs updating too
+// getPointOnLine(chartType, divType, x1,  y1, x2, y2) =>
+//     isIntersecting = false
+//     //Note that increasingly positive bar indexes refer to past bars which is the opposite of the numbering of a typical line graph.
+
+//     rise = y1 - y2
+//     run =  x1 - x2
+
+//     x_point = 0
+//     y_point = 0.0
+
+//     riseOfPoint = 0.0
+//     runOfPoint = 0.0
+
+//     barsArray = (chartType == PRICE_CHART) ? priceBarsArray : oscBarsArray
+
+//     numOfBars = (x1) - (x2) //+ 1 //This includes the bars beginning from the right side pivot bar to the left side pivot par 
+//     firstBar = (1 ) //Begin evaluation at the very first inner bars + intersectEx
+//     lastBar = numOfBars - 2 
+ 
+
+//     if firstBar <= lastBar
+//         for i = firstBar to lastBar
+//             riseOfPoint := ((rise * i)/numOfBars)
+//             runOfPoint := ((run * i)/numOfBars)
+
+//             y_point := y2 + riseOfPoint
+//             x_point := x2 + math.floor(runOfPoint)
+
+//             difference = (array.get(barsArray, x2 + i) - y_point)
+
+//             if applyToPriceChart == false and chartType == OSC_CHART and i == positionTEST
+//                 label.new(bar_index - i - x2 , y_point, text = str.tostring(y_point), color = color.yellow)
+//                 label.new(bar_index - i - x2 , array.get(barsArray, x2 + i), text =  str.tostring(array.get(barsArray, x2 + i))) // str.tostring(     ((array.get(barsArray, x2 + i) - y_point)  / y_point ) * 100           )     )  
+
+
+//     isIntersecting
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+isSlopeAngleInRange(x1, y1, x2, y2, chartType) =>
+    isInRange = false
+
+    rise = math.abs(y2 - y1)
+    run  = math.abs(x2 - x1)
+    angle = 0.0
+    if chartType == OSC_CHART
+        angle := math.atan(rise/(run * normalFactorOsc)) * (180 / math.pi)
+        isInRange := (angle >= slopeMinOsc) and (angle <= slopeMaxOsc) and not (slopeMinOsc == -1 and slopeMaxOsc == -1)
+    else
+        angle := math.atan(rise/(run * normalFactorPrice)) * (180 / math.pi)
+        isInRange := (angle >= slopeMinPrice) and (angle <= slopeMaxPrice) and not (slopeMinPrice == -1 and slopeMaxPrice == -1)
+
+    isInRange
+
+
+
+
+
+
+
+displayDivLineAngles(x1,  y1, x2, y2, chartType, divType) =>
+    labelStyle = label.style_label_up
+    isInRange = false
+    angle = 0.0
+
+    rise = math.abs(y2 - y1)
+    run  = math.abs(x2 - x1)
+    if chartType == OSC_CHART
+        angle := math.atan(rise/(run * normalFactorOsc)) * (180 / math.pi)
+    else
+        angle := math.atan(rise/(run * normalFactorPrice)) * (180 / math.pi)
+
+    if divType == REG_BULL or divType == HID_BULL
+        labelStyle := label.style_label_up
+    else if divType == REG_BEAR or divType == HID_BEAR
+        labelStyle := label.style_label_down        
+
+
+
+    if showAngles and ((chartType == OSC_CHART and applyToPriceChart == false)  or  (chartType == PRICE_CHART and applyToPriceChart == true))
+        formattedAngle = str.replace("$°", "$", str.tostring(angle), 0)
+        label.new(bar_index - x1, y1, size =size.small,  text = formattedAngle, style = labelStyle, textcolor = textColor, color = divAngleColor)
+
+    angle
+
+
+
+
+
+
+
+
+
+
+
+//I've assumed the best slopes are best described with the following:
+// Reg Bear PRICE
+// as close to 0 as possible
+
+// Reg Bear OSC
+// as farthest from 0 as possible
+
+// Hidden Bear PRICE
+// as farthest from 0 as possible
+
+// Hidden Bear OSC
+// as close to 0 as possible
+
+// Reg Bull PRICE
+// as close to 0 as possible
+
+// Reg Bull OSC
+// as farthest from 0 as possible
+
+// Hidden Bull PRICE
+// as farthest from 0 as possible
+
+// Hidden Bull OSC
+// as close to 0 as possible
+isCurrentSlopeBetter(past_x1, past_y1, past_x2, past_y2, x1,  y1, x2, y2, chartType, divType) =>
+    isSlopeBest = false
+
+    rise = past_y2 - past_y1
+    run =  past_x2 - past_x1
+    pastSlope = math.abs(rise / run)
+
+    rise := y2 - y1
+    run :=  x2 - x1
+    currentSlope = math.abs(rise / run)
+
+    if chartType == PRICE_CHART
+        if divType == REG_BEAR
+            isSlopeBest := currentSlope < pastSlope
+        if divType == HID_BEAR
+            isSlopeBest := currentSlope > pastSlope
+        if divType == REG_BULL
+            isSlopeBest := currentSlope < pastSlope
+        if divType == HID_BULL
+            isSlopeBest := currentSlope > pastSlope
+
+    if chartType == OSC_CHART
+        if divType == REG_BEAR
+            isSlopeBest := currentSlope > pastSlope
+        if divType == HID_BEAR
+            isSlopeBest := currentSlope < pastSlope
+        if divType == REG_BULL
+            isSlopeBest := currentSlope > pastSlope
+        if divType == HID_BULL
+            isSlopeBest := currentSlope < pastSlope
+
+    isSlopeBest
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+findDivergenceLines(rsPivBar, pivotsFound, chartType, divType, cancelDiv, bars, equalityType) =>
+
+    ChartCoordinates chartCoord = ChartCoordinates.new()
+    array<ChartCoordinates> chartCoords = array.new<ChartCoordinates>()
+
+
+    numberOfBars = 0
+    //The left side pivot analysis is SUPPOSED to begin in as little as just one bar left from the rightside pivot. The rsPivBar inherently already includes the first bar so (divergenceMin - 1) is necessary.
+    i_lsPivBar = (rsPivBar + (divergenceMin - 1)) 
+
+
+    //This construct prevents the error from series variables looking back further than the 1st bar. pivSearchLimit represents bar indexes which start at 0 and fullDivLenMax starts at 1
+    pivSearchLimit = (((fullDivLenMax - 1) - LSPivLBars) > bar_index) ? bar_index : ((fullDivLenMax - 1) - LSPivLBars) 
+
+    // Price:  Test for Lower low
+    while i_lsPivBar <= pivSearchLimit
+        if cancelDiv == true
+            break
+//FIX:  pivotsFound[i_lsPivBar - LSPivRBars]    is the array problem.  You have to work out the correct starting position for i_lsPivBar and also the correct minimum for LSPivRBars at the top
+        if pivotsFound[i_lsPivBar - LSPivRBars] == true
+            cancelLine = false
+            if compareBars(bars[i_lsPivBar], equalityType, bars[rsPivBar])
+                cancelLine := true
+
+            if cancelLine == false
+                chartCoord.x1 := i_lsPivBar
+                chartCoord.y1 := bars[i_lsPivBar]
+                chartCoord.x2 := rsPivBar
+                chartCoord.y2 := bars[rsPivBar]
+                array.push(chartCoords, ChartCoordinates.copy(chartCoord))//array.push() and also the assignment operator passes by reference or a pointer apparently. copy() is necessary.
+
+        i_lsPivBar := i_lsPivBar + 1
+
+    chartCoords
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+filterDivergenceLines(rsPivBar, cancelDiv, bars, divType, chartType, chartCoords) =>
+    chartCoordsTemp = array.copy(chartCoords)
+
+    for i = (array.size(chartCoordsTemp) - 1) to 0
+        if cancelDiv == true or array.size(chartCoordsTemp) == 0
+            break
+
+        chartCoordCur = array.get(chartCoordsTemp, i)
+        x1 = chartCoordCur.x1
+        y1 = chartCoordCur.y1
+        x2 = chartCoordCur.x2
+        y2 = chartCoordCur.y2
+
+        cancelLine = false
+
+        if isDivIntersectedByXAmount(chartType, divType, x1, y1, x2, y2)  ==  true and (cancelLine == false)
+            array.remove(chartCoordsTemp, i)
+            cancelLine := true
+
+        if useBestSlope and ((i - 1) >= 0 ) and (array.size(chartCoordsTemp) > 1) and (cancelLine == false)
+            chartCoordPrev= array.get(chartCoordsTemp, i - 1)
+            x1_prev = chartCoordPrev.x1
+            y1_prev = chartCoordPrev.y1
+            x2_prev = chartCoordPrev.x2
+            y2_prev = chartCoordPrev.y2
+
+            if isCurrentSlopeBetter(x1_prev, y1_prev, x2_prev, y2_prev, x1,  y1, x2, y2, chartType, divType)  == true
+                array.remove(chartCoordsTemp, i - 1)
+                cancelLine := true
+            else
+                array.remove(chartCoordsTemp, i)
+                cancelLine := true
+
+        if useSlopeAngExc and isSlopeAngleInRange(x1,  y1, x2, y2, chartType) and (cancelLine == false)
+            array.remove(chartCoordsTemp, i)
+            cancelLine := true
+
+    chartCoordsTemp
+
+
+
+
+
+
+
+
+filterDivergenceLinesByLen(cancelDiv, chartCoords_Price, chartCoords_Osc) =>
+    chartCoordsPrice_Ret = array.copy(chartCoords_Price)
+    chartCoordsOsc_Ret = array.copy(chartCoords_Osc)
+
+    var ACCEPT = true
+    var REJECT = false
+
+    prc_score = array.new_bool()
+    osc_score = array.new_bool()
+
+    if (array.size(chartCoordsPrice_Ret) > 0) and (array.size(chartCoordsOsc_Ret) > 0) and cancelDiv == false
+        for i = 0 to (array.size(chartCoordsPrice_Ret) - 1)
+            array.push(prc_score, REJECT)
+
+        for i = 0 to (array.size(chartCoordsOsc_Ret) - 1)
+            array.push(osc_score, REJECT)
+
+        for i = 0 to (array.size(chartCoordsPrice_Ret) - 1)
+            for j = 0 to (array.size(chartCoordsOsc_Ret) - 1)
+                chartCoord_prc = array.get(chartCoordsPrice_Ret, i)
+                chartCoord_osc = array.get(chartCoordsOsc_Ret, j)
+                x1_prc = chartCoord_prc.x1
+                x2_prc = chartCoord_prc.x2
+                x1_osc = chartCoord_osc.x1
+                x2_osc = chartCoord_osc.x2
+                
+                lenPrice = x1_prc - x2_prc
+                lenOsc =  x1_osc - x2_osc
+                biggerLine = 0.0
+                smallerLine = 0.0
+                if (lenPrice > lenOsc)
+                    biggerLine := lenPrice
+                    smallerLine := lenOsc
+                else
+                    biggerLine := lenOsc
+                    smallerLine := lenPrice
+                if ((smallerLine / biggerLine) * 100) >= minDivLength
+                    array.set(prc_score, i, ACCEPT)
+                    array.set(osc_score, j, ACCEPT)
+
+        for i = (array.size(chartCoords_Price) - 1) to 0
+            if array.get(prc_score, i) == REJECT
+                array.remove(chartCoordsPrice_Ret, i)
+
+        for i = (array.size(chartCoords_Osc) - 1) to 0
+            if array.get(osc_score, i) == REJECT
+                array.remove(chartCoordsOsc_Ret, i)
+
+    [chartCoordsPrice_Ret,   chartCoordsOsc_Ret]  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+display(divType, chartType, chartCoords, isDivergence, isRealtime) =>
+    lineAndLabelColor = bullColor
+    labelStyle = label.style_label_down
+    displayDivLines = false
+    displayDivLabels = false
+    labelText = ""
+    var array<line> rt_DivLines_Bull = array.new<line>()
+    var array<line> rt_DivLines_HidBull = array.new<line>()
+    var array<line> rt_DivLines_Bear = array.new<line>()
+    var array<line> rt_DivLines_HidBear = array.new<line>()
+
+    var array<label> rt_DivLabels_Bull = array.new<label>()
+    var array<label> rt_DivLabels_HidBull = array.new<label>()
+    var array<label> rt_DivLabels_Bear = array.new<label>()
+    var array<label> rt_DivLabels_HidBear = array.new<label>()
+
+
+
+ 
+    if shouldDivergenceBeDisplayed(chartType, isDivergence, isRealtime)
+        for chartCoord in chartCoords
+            x1 = chartCoord.x1
+            y1 = chartCoord.y1
+            x2 = chartCoord.x2
+            y2 = chartCoord.y2
+
+            array<line> rt_DivLines = na
+            array<label> rt_DivLabels = na
+            
+            //Prepare the lines and labels for display
+            if divType == REG_BULL
+                rt_DivLines := rt_DivLines_Bull
+                rt_DivLabels := rt_DivLabels_Bull
+                labelText := "B"
+                lineAndLabelColor := bullColor
+                labelStyle := ((isRealtime and plotBull) or (isRealtime == false)) ? label.style_label_up : label.style_diamond//If lines are disabled then change label.style_ of realtime labels to distinguish them from historical labels
+                displayDivLines := plotBull
+                displayDivLabels := plotBullLabels
+            else if divType == HID_BULL
+                rt_DivLines := rt_DivLines_HidBull
+                rt_DivLabels := rt_DivLabels_HidBull
+                labelText := "HB"
+                lineAndLabelColor := hiddenBullColor
+                labelStyle := ((isRealtime and  plotHiddenBull) or (isRealtime == false)) ?  label.style_label_up : label.style_diamond 
+                displayDivLines := plotHiddenBull
+                displayDivLabels := plotHidBullLabels
+            else if divType == REG_BEAR
+                rt_DivLines := rt_DivLines_Bear
+                rt_DivLabels := rt_DivLabels_Bear
+                labelText := "Br"
+                lineAndLabelColor := bearColor
+                labelStyle := ((isRealtime and plotBear) or (isRealtime == false)) ?  label.style_label_down : label.style_diamond
+                displayDivLines := plotBear
+                displayDivLabels := plotBearLabels
+            else
+                rt_DivLines := rt_DivLines_HidBear
+                rt_DivLabels := rt_DivLabels_HidBear
+                labelText := "HBr"
+                lineAndLabelColor := hiddenBearColor
+                labelStyle := ((isRealtime and plotHiddenBear) or (isRealtime == false))?  label.style_label_down : label.style_diamond
+                displayDivLines := plotHiddenBear
+                displayDivLabels := plotHidBearLabels
+
+            if useLabelText == false
+                labelText := ""
+
+
+
+//FIX:  This section of code is buggy. The quantity of lines displayed do not always match what they ought to be according to the settings.
+//Also, I'm pretty sure there is some issue that probably has something to do with the line and label deletion. Something was left undone I think but I forget what
+            if isRealtime and (last_bar_index - bar_index) < rtDivDisplayBarQuantity  
+               // array.push(rt_DivLines_Bull, line.new(bar_index - x1_, y1_, bar_index - x2_, y2_,  color = lineAndLabelColor, width = 2, style = isRealtime ? line.style_dashed : line.style_solid))
+
+                if displayDivLines
+                    array.push(rt_DivLines,      line.new(bar_index - x1, y1, bar_index - x2, y2,  color = lineAndLabelColor, width = 2, style = line.style_dashed))
+                    if showAngles
+                        displayDivLineAngles(x1, y1, x2, y2, chartType, divType)
+                    if showDivIntersection
+                        displayIntersectionAmount(chartType, divType, x1, y1, x2, y2)
+
+                //Delete unwanted past divergence lines
+                if array.size(rt_DivLines) > rtDivDisplayQuantity
+                    length = array.size(rt_DivLines)  - rtDivDisplayQuantity - 1
+                    for i = 0 to length
+                        line.delete(array.get(rt_DivLines, i))
+
+                if array.size(rt_DivLines) > rtDivDisplayQuantity
+                    length = array.size(rt_DivLines)  - rtDivDisplayQuantity - 1
+                    for i = 0 to length
+                        array.remove(rt_DivLines, 0)
+
+
+
+
+                if displayDivLabels
+                    array.push(rt_DivLabels,      label.new(bar_index - x2, y2,  color = lineAndLabelColor, size = size.small, style = labelStyle, text = labelText, textcolor = textColor))
+
+                //Delete unwanted past divergence labels
+                if array.size(rt_DivLabels) > rtDivDisplayQuantity
+                    length = array.size(rt_DivLabels)  - rtDivDisplayQuantity - 1
+                    for i = 0 to length
+                        label.delete(array.get(rt_DivLabels, i))
+
+                if array.size(rt_DivLabels) > rtDivDisplayQuantity
+                    length = array.size(rt_DivLabels)  - rtDivDisplayQuantity - 1
+                    for i = 0 to length
+                        array.shift(rt_DivLabels)
+
+
+            else if isRealtime == false
+                if displayDivLines
+                    line.new(bar_index - x1, y1, bar_index - x2, y2,  color = lineAndLabelColor, width = 2)
+                    if showAngles
+                        displayDivLineAngles(x1, y1, x2, y2, chartType, divType)
+                    if showDivIntersection
+                        displayIntersectionAmount(chartType, divType, x1, y1, x2, y2)
+
+                if displayDivLabels
+                    label.new(bar_index - x2, y2,  color = lineAndLabelColor, size = size.small, style = labelStyle, text = labelText, textcolor = textColor)
+
+
+
+
+
+
+
+
+
+
+
+
+
+isPotentialBullDiv = false
+isPotentialHidBullDiv = false
+isPotentialBearDiv = false
+isPotentialHidBearDiv = false
+
+
+
+
+realtimePotentialDivAlerts(divType, isDivergence) =>
+    labelText = ""
+    selectedColor = color.red
+
+    float YDeviation = 0.0000
+
+    var array<label> rt_AlertLabels_Bull = array.new<label>()
+    var array<label> rt_AlertLabels_HidBull = array.new<label>()
+    var array<label> rt_AlertLabels_Bear = array.new<label>()
+    var array<label> rt_AlertLabels_HidBear = array.new<label>()
+
+    array<label> rt_AlertLabels = array.new<label>()
+ 
+
+    if divType == REG_BULL
+        labelText := "Potential Regular Bull"
+        selectedColor := bullColor
+        YDeviation :=  YSpacing + YAdditive
+        rt_AlertLabels := rt_AlertLabels_Bull
+    else if divType == HID_BULL
+        labelText := "Potential Hidden Bull"
+        selectedColor := hiddenBullColor
+        YDeviation := (YSpacing * 2.0) + YAdditive
+        rt_AlertLabels := rt_AlertLabels_HidBull
+    else if divType == REG_BEAR
+        labelText := "Potential Regular Bear"
+        selectedColor := bearColor
+        YDeviation := (YSpacing * 3.0) + YAdditive
+        rt_AlertLabels := rt_AlertLabels_Bear
+    else
+        labelText := "Potential Hidden Bear"
+        selectedColor := hiddenBearColor
+        YDeviation := (YSpacing * 4.0) + YAdditive
+        rt_AlertLabels := rt_AlertLabels_HidBear
+
+
+
+    if shouldPotentialDivBeAlerted(isDivergence)
+        array.push(rt_AlertLabels,  label.new(last_bar_index + XAdditive, close + YDeviation, labelText, color = selectedColor, style = label.style_label_lower_left, textcolor = textColor) )
+        alert(labelText, alert.freq_once_per_bar)
+    else
+        array.push(rt_AlertLabels, na) 
+
+
+    while array.size(rt_AlertLabels) >= 2
+        label.delete(array.first(rt_AlertLabels))
+        array.shift(rt_AlertLabels)
+
+
+  
+
+
+
+
+
+
+
+
+
+isBullDiv = false
+isHidBullDiv = false
+isBearDiv = false
+isHidBearDiv = false
+
+
+
+
+divAlerts(divType, isDivergence) =>
+    labelText = ""
+    selectedColor = color.red
+
+    float YDeviation = 0.0000
+
+    var array<label> rt_AlertLabels_Bull = array.new<label>()
+    var array<label> rt_AlertLabels_HidBull = array.new<label>()
+    var array<label> rt_AlertLabels_Bear = array.new<label>()
+    var array<label> rt_AlertLabels_HidBear = array.new<label>()
+
+    array<label> rt_AlertLabels = array.new<label>()
+ 
+
+    if divType == REG_BULL
+        labelText := "Regular Bull"
+        selectedColor := bullColor
+        YDeviation :=  YSpacing + YAdditive
+        rt_AlertLabels := rt_AlertLabels_Bull
+
+    else if divType == HID_BULL
+        labelText := "Hidden Bull"
+        selectedColor := hiddenBullColor
+        YDeviation := (YSpacing * 2) + YAdditive
+        rt_AlertLabels := rt_AlertLabels_HidBull
+
+    else if divType == REG_BEAR
+        labelText := "Regular Bear"
+        selectedColor := bearColor
+        YDeviation := (YSpacing * 3) + YAdditive
+        rt_AlertLabels := rt_AlertLabels_Bear
+
+    else
+        labelText := "Hidden Bear"
+        selectedColor := hiddenBearColor
+        YDeviation := (YSpacing * 4) + YAdditive
+        rt_AlertLabels := rt_AlertLabels_HidBear
+
+
+    if shouldDivBeAlerted(isDivergence)
+        array.push(rt_AlertLabels,  label.new(last_bar_index + XAdditive, close + YDeviation, labelText, color = selectedColor, style = label.style_label_lower_left, textcolor = textColor) )
+        alert(labelText, alert.freq_once_per_bar)
+    else
+        array.push(rt_AlertLabels, na) 
+
+
+    while array.size(rt_AlertLabels) >= 2
+        label.delete(array.first(rt_AlertLabels))
+        array.shift(rt_AlertLabels)
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[rsPivLows_Osc, rsPivLows_Price, rsPivHighs_Osc, rsPivHighs_Price, lsPivLows_Osc, lsPivLows_Price, lsPivHighs_Osc, lsPivHighs_Price] = findPivots(RSPivLBars, RSPivRBars, LSPivLBars, LSPivRBars)
+[rt_rsPivLows_Osc, rt_rsPivLows_Price, rt_rsPivHighs_Osc, rt_rsPivHighs_Price, rt_lsPivLows_Osc, rt_lsPivLows_Price, rt_lsPivHighs_Osc, rt_lsPivHighs_Price] = findPivots(RSPivLBars, 0, LSPivLBars, LSPivRBars)
+
+//TODO:   Remove or deal with reduntant divergences right next to one another. The "Rightside Misalignment Allowance" leads to lots of reduntant divergences on screen right next to one another
+
+rsDevPivs := findDeviatedRSPivots(rsPivLows_Osc, rsPivLows_Price, rsPivHighs_Osc, rsPivHighs_Price, RSPivRBars) 
+rt_rsDevPivs := findDeviatedRSPivots(rt_rsPivLows_Osc, rt_rsPivLows_Price, rt_rsPivHighs_Osc, rt_rsPivHighs_Price, 0) 
+
+
+
+
+
+
+
+
+
+
+//FIX:  Does array.copy() even need to be used anywhere other than inside findDivergenceLines() ?
+
+
+
+////////////------------------------------------------------------------------------------
+////// Regular Bullish-----
+
+if (plotBull or plotBullLabels) and doHistorical
+    divergenceCanceled  := areRSDivergencePreconditionsOK(ALL_BULLS, rsDevPivs, false) 
+
+    //Price:  Test for lower low
+    chartCoords_PriceB1 = array.copy(findDivergenceLines(rsDevPivs.pricePLBar, lsPivLows_Price, PRICE_CHART, REG_BULL, divergenceCanceled , prc_AllBulls, LESS_THAN))
+    chartCoords_PriceB2 = array.copy(filterDivergenceLines(rsDevPivs.pricePLBar, divergenceCanceled , prc_AllBulls, REG_BULL, PRICE_CHART, chartCoords_PriceB1))
+
+    //Oscillator:  Test for higher low
+    chartCoord_OscB1 = array.copy(findDivergenceLines(rsDevPivs.oscPLBar, lsPivLows_Osc, OSC_CHART, REG_BULL, divergenceCanceled , osc_AllBulls, GREATER_THAN))
+    chartCoord_OscB2 = array.copy(filterDivergenceLines(rsDevPivs.oscPLBar, divergenceCanceled , osc_AllBulls, REG_BULL, OSC_CHART, chartCoord_OscB1))
+
+    [chartCoords_PriceB3, chartCoord_OscB3] = filterDivergenceLinesByLen(divergenceCanceled, chartCoords_PriceB2, chartCoord_OscB2) 
+
+    //If both the price chart and oscillator have at least one line each then it's an acceptable divergence
+    isBullDiv := (array.size(chartCoords_PriceB3) > 0 and array.size(chartCoord_OscB3) > 0)
+
+    display(REG_BULL, PRICE_CHART, chartCoords_PriceB3, isBullDiv, false)
+    display(REG_BULL, OSC_CHART, chartCoord_OscB3, isBullDiv, false)
+    divAlerts(REG_BULL, isBullDiv)
+
+
+
+//Realtime
+if (plotBull or plotBullLabels) and doRealtime
+    divergenceCanceled  := areRSDivergencePreconditionsOK(ALL_BULLS, rt_rsDevPivs, true) 
+    //Price:  Test for lower low
+    chartCoords_PriceB1 = array.copy(findDivergenceLines(rt_rsDevPivs.pricePLBar, rt_lsPivLows_Price, PRICE_CHART, REG_BULL, divergenceCanceled , prc_AllBulls, LESS_THAN))
+    chartCoords_PriceB2 = array.copy(filterDivergenceLines(rt_rsDevPivs.pricePLBar, divergenceCanceled , prc_AllBulls, REG_BULL, PRICE_CHART, chartCoords_PriceB1))
+
+    //Oscillator:  Test for higher low
+    chartCoord_OscB1 = array.copy(findDivergenceLines(rt_rsDevPivs.oscPLBar, rt_lsPivLows_Osc, OSC_CHART, REG_BULL, divergenceCanceled , osc_AllBulls, GREATER_THAN))
+    chartCoord_OscB2 = array.copy(filterDivergenceLines(rt_rsDevPivs.oscPLBar, divergenceCanceled , osc_AllBulls, REG_BULL, OSC_CHART, chartCoord_OscB1))
+
+    [chartCoords_PriceB3, chartCoord_OscB3] = filterDivergenceLinesByLen(divergenceCanceled, chartCoords_PriceB2, chartCoord_OscB2) 
+
+    //If both the price chart and oscillator have at least one line each then it's an acceptable divergence
+    isPotentialBullDiv := (array.size(chartCoords_PriceB3) > 0 and array.size(chartCoord_OscB3) > 0)
+
+    display(REG_BULL, PRICE_CHART, chartCoords_PriceB3, isPotentialBullDiv, true)
+    display(REG_BULL, OSC_CHART, chartCoord_OscB3, isPotentialBullDiv, true)
+
+    realtimePotentialDivAlerts(REG_BULL, isPotentialBullDiv)
+
+
+
+
+
+
+
+
+
+
+////////////------------------------------------------------------------------------------
+////// Hidden Bullish-----
+
+if (plotHiddenBull or plotHidBullLabels) and doHistorical
+    divergenceCanceled  := areRSDivergencePreconditionsOK(ALL_BULLS, rsDevPivs, false) 
+
+    //Price:  Test for higher low
+    chartCoords_PriceHB1 = array.copy(findDivergenceLines(rsDevPivs.pricePLBar, lsPivLows_Price, PRICE_CHART, HID_BULL, divergenceCanceled , prc_AllBulls, GREATER_THAN))
+    chartCoords_PriceHB2 = array.copy(filterDivergenceLines(rsDevPivs.pricePLBar, divergenceCanceled , prc_AllBulls, HID_BULL, PRICE_CHART, chartCoords_PriceHB1))
+
+    //Oscillator:  Test for lower low
+    chartCoord_OscHB1 = array.copy(findDivergenceLines(rsDevPivs.oscPLBar, lsPivLows_Osc, OSC_CHART, HID_BULL, divergenceCanceled , osc_AllBulls, LESS_THAN))
+    chartCoord_OscHB2 = array.copy(filterDivergenceLines(rsDevPivs.oscPLBar, divergenceCanceled , osc_AllBulls, HID_BULL, OSC_CHART, chartCoord_OscHB1))
+
+    [chartCoords_PriceHB3, chartCoord_OscHB3] = filterDivergenceLinesByLen(divergenceCanceled , chartCoords_PriceHB2, chartCoord_OscHB2) 
+
+    //If both the price chart and oscillator have at least one line each then it's an acceptable divergence
+    isHidBullDiv := (array.size(chartCoords_PriceHB3) > 0 and array.size(chartCoord_OscHB3) > 0)
+
+    display(HID_BULL, PRICE_CHART, chartCoords_PriceHB3, isHidBullDiv, false)
+    display(HID_BULL, OSC_CHART, chartCoord_OscHB3, isHidBullDiv, false)
+    divAlerts(HID_BULL, isHidBullDiv)
+
+
+
+//Realtime
+if (plotHiddenBull or plotHidBullLabels) and doRealtime
+    divergenceCanceled  := areRSDivergencePreconditionsOK(ALL_BULLS, rt_rsDevPivs, true) 
+    //Price:  Test for higher low
+    chartCoords_PriceHB1 = array.copy(findDivergenceLines(rt_rsDevPivs.pricePLBar, rt_lsPivLows_Price, PRICE_CHART, HID_BULL, divergenceCanceled , prc_AllBulls, GREATER_THAN))
+    chartCoords_PriceHB2 = array.copy(filterDivergenceLines(rt_rsDevPivs.pricePLBar, divergenceCanceled , prc_AllBulls, HID_BULL, PRICE_CHART, chartCoords_PriceHB1))
+
+    //Oscillator:  Test for lower low
+    chartCoord_OscHB1 = array.copy(findDivergenceLines(rt_rsDevPivs.oscPLBar, rt_lsPivLows_Osc, OSC_CHART, HID_BULL, divergenceCanceled , osc_AllBulls, LESS_THAN))
+    chartCoord_OscHB2 = array.copy(filterDivergenceLines(rt_rsDevPivs.oscPLBar, divergenceCanceled , osc_AllBulls, HID_BULL, OSC_CHART, chartCoord_OscHB1))
+
+    [chartCoords_PriceHB3, chartCoord_OscHB3] = filterDivergenceLinesByLen(divergenceCanceled , chartCoords_PriceHB2, chartCoord_OscHB2) 
+
+    //If both the price chart and oscillator have at least one line each then it's an acceptable divergence
+    isPotentialHidBullDiv := (array.size(chartCoords_PriceHB3) > 0 and array.size(chartCoord_OscHB3) > 0)
+
+    display(HID_BULL, PRICE_CHART, chartCoords_PriceHB3, isPotentialHidBullDiv, true)
+    display(HID_BULL, OSC_CHART, chartCoord_OscHB3, isPotentialHidBullDiv, true)
+    realtimePotentialDivAlerts(HID_BULL, isPotentialHidBullDiv)
+
+
+
+
+
+
+
+
+
+
+////////////------------------------------------------------------------------------------
+////// Regular Bearish-----
+
+if (plotBear or plotBearLabels) and doHistorical
+    divergenceCanceled  := areRSDivergencePreconditionsOK(ALL_BEARS, rsDevPivs, false) 
+
+    //Price:  Test for higher high
+    chartCoords_PriceBr1 = array.copy(findDivergenceLines(rsDevPivs.pricePHBar, lsPivHighs_Price, PRICE_CHART, REG_BEAR, divergenceCanceled , prc_AllBears, GREATER_THAN))
+    chartCoords_PriceBr2 = array.copy(filterDivergenceLines(rsDevPivs.pricePHBar, divergenceCanceled , prc_AllBears, REG_BEAR, PRICE_CHART, chartCoords_PriceBr1))
+
+    //Oscillator:  Test for lower high
+    chartCoord_OscBr1 = array.copy(findDivergenceLines(rsDevPivs.oscPHBar, lsPivHighs_Osc, OSC_CHART, REG_BEAR, divergenceCanceled , osc_AllBears, LESS_THAN))
+    chartCoord_OscBr2 = array.copy(filterDivergenceLines(rsDevPivs.oscPHBar, divergenceCanceled , osc_AllBears, REG_BEAR, OSC_CHART, chartCoord_OscBr1))
+
+    [chartCoords_PriceBr3, chartCoord_OscBr3] = filterDivergenceLinesByLen(divergenceCanceled, chartCoords_PriceBr2, chartCoord_OscBr2) 
+
+    //If both the price chart and oscillator have at least one line each then it's an acceptable divergence
+    isBearDiv := (array.size(chartCoords_PriceBr3) > 0 and array.size(chartCoord_OscBr3) > 0)
+
+    display(REG_BEAR, PRICE_CHART, chartCoords_PriceBr3, isBearDiv, false)
+    display(REG_BEAR, OSC_CHART, chartCoord_OscBr3, isBearDiv, false)
+    divAlerts(REG_BEAR, isBearDiv)
+
+
+
+//Realtime
+if (plotBear or plotBearLabels) and doRealtime
+    divergenceCanceled  := areRSDivergencePreconditionsOK(ALL_BEARS, rt_rsDevPivs, true) 
+
+    //Price:  Test for higher high
+    chartCoords_PriceBr1 = array.copy(findDivergenceLines(rt_rsDevPivs.pricePHBar, rt_lsPivHighs_Price, PRICE_CHART, REG_BEAR, divergenceCanceled , prc_AllBears, GREATER_THAN))
+    chartCoords_PriceBr2 = array.copy(filterDivergenceLines(rt_rsDevPivs.pricePHBar, divergenceCanceled , prc_AllBears, REG_BEAR, PRICE_CHART, chartCoords_PriceBr1))
+
+    //Oscillator:  Test for lower high
+    chartCoord_OscBr1 = array.copy(findDivergenceLines(rt_rsDevPivs.oscPHBar, rt_lsPivHighs_Osc, OSC_CHART, REG_BEAR, divergenceCanceled , osc_AllBears, LESS_THAN))
+    chartCoord_OscBr2 = array.copy(filterDivergenceLines(rt_rsDevPivs.oscPHBar, divergenceCanceled , osc_AllBears, REG_BEAR, OSC_CHART, chartCoord_OscBr1))
+
+    [chartCoords_PriceBr3, chartCoord_OscBr3] = filterDivergenceLinesByLen(divergenceCanceled, chartCoords_PriceBr2, chartCoord_OscBr2) 
+
+    //If both the price chart and oscillator have at least one line each then it's an acceptable divergence
+    isPotentialBearDiv := (array.size(chartCoords_PriceBr3) > 0 and array.size(chartCoord_OscBr3) > 0)
+
+    display(REG_BEAR, PRICE_CHART, chartCoords_PriceBr3, isPotentialBearDiv, true)
+    display(REG_BEAR, OSC_CHART, chartCoord_OscBr3, isPotentialBearDiv, true)
+    realtimePotentialDivAlerts(REG_BEAR, isPotentialBearDiv)
+
+
+
+
+
+
+
+
+
+
+////////////------------------------------------------------------------------------------
+////// Hidden Bearish-----
+
+if (plotHiddenBear or plotHidBearLabels) and doHistorical
+    divergenceCanceled  := areRSDivergencePreconditionsOK(ALL_BEARS, rsDevPivs, false) 
+
+    //Price:  Test for lower high
+    chartCoords_PriceHBr1 = array.copy(findDivergenceLines(rsDevPivs.pricePHBar, lsPivHighs_Price, PRICE_CHART, HID_BEAR, divergenceCanceled , prc_AllBears, LESS_THAN))
+    chartCoords_PriceHBr2 = array.copy(filterDivergenceLines(rsDevPivs.pricePHBar, divergenceCanceled , prc_AllBears, HID_BEAR, PRICE_CHART, chartCoords_PriceHBr1))
+
+    //Oscillator:  Test for higher high
+    chartCoord_OscHBr1 = array.copy(findDivergenceLines(rsDevPivs.oscPHBar, lsPivHighs_Osc, OSC_CHART, HID_BEAR, divergenceCanceled , osc_AllBears, GREATER_THAN))
+    chartCoord_OscHBr2 = array.copy(filterDivergenceLines(rsDevPivs.oscPHBar, divergenceCanceled , osc_AllBears, HID_BEAR, OSC_CHART, chartCoord_OscHBr1))
+
+    [chartCoords_PriceHBr3, chartCoord_OscHBr3] = filterDivergenceLinesByLen(divergenceCanceled, chartCoords_PriceHBr2, chartCoord_OscHBr2) 
+
+    //If both the price chart and oscillator have at least one line each then it's an acceptable divergence
+    isHidBearDiv := (array.size(chartCoords_PriceHBr3) > 0 and array.size(chartCoord_OscHBr3) > 0)
+
+    display(HID_BEAR, PRICE_CHART, chartCoords_PriceHBr3, isHidBearDiv, false)
+    display(HID_BEAR, OSC_CHART, chartCoord_OscHBr3, isHidBearDiv, false)
+    divAlerts(HID_BEAR, isHidBearDiv)
+
+
+
+//Realtime
+if (plotHiddenBear or plotHidBearLabels) and doRealtime
+    divergenceCanceled  := areRSDivergencePreconditionsOK(ALL_BEARS, rt_rsDevPivs, true) 
+
+    //Price:  Test for lower high
+    chartCoords_PriceHBr1 = array.copy(findDivergenceLines(rt_rsDevPivs.pricePHBar, rt_lsPivHighs_Price, PRICE_CHART, HID_BEAR, divergenceCanceled , prc_AllBears, LESS_THAN))
+    chartCoords_PriceHBr2 = array.copy(filterDivergenceLines(rt_rsDevPivs.pricePHBar, divergenceCanceled , prc_AllBears, HID_BEAR, PRICE_CHART, chartCoords_PriceHBr1))
+
+    //Oscillator:  Test for higher high
+    chartCoord_OscHBr1 = array.copy(findDivergenceLines(rt_rsDevPivs.oscPHBar, rt_lsPivHighs_Osc, OSC_CHART, HID_BEAR, divergenceCanceled , osc_AllBears, GREATER_THAN))
+    chartCoord_OscHBr2 = array.copy(filterDivergenceLines(rt_rsDevPivs.oscPHBar, divergenceCanceled , osc_AllBears, HID_BEAR, OSC_CHART, chartCoord_OscHBr1))
+
+    [chartCoords_PriceHBr3, chartCoord_OscHBr3] = filterDivergenceLinesByLen(divergenceCanceled, chartCoords_PriceHBr2, chartCoord_OscHBr2) 
+
+    //If both the price chart and oscillator have at least one line each then it's an acceptable divergence
+    isPotentialHidBearDiv := (array.size(chartCoords_PriceHBr3) > 0 and array.size(chartCoord_OscHBr3) > 0)
+
+    display(HID_BEAR, PRICE_CHART, chartCoords_PriceHBr3, isPotentialHidBearDiv, true)
+    display(HID_BEAR, OSC_CHART, chartCoord_OscHBr3, isPotentialHidBearDiv, true)
+    realtimePotentialDivAlerts(HID_BEAR, isPotentialHidBearDiv)
