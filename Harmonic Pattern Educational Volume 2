@@ -1,0 +1,152 @@
+
+
+//@version=4
+study("Harmonic Pattern Educational Volume 2 (Source Code)", shorttitle = "HPEV2_SC", precision = 4)
+
+// 0. Input
+// 1. array
+// 2. Ternary conditional operator and variables
+// 3. Custom functions
+// 4. array and custom functions for table
+// 5. Compile custom functions
+// 6. Construct
+
+// 0. Input
+G0              = " Direction       Pattern"
+G1              = "Font Size"
+T0              = "Small font size recommended for mobile app or multiple layout"
+input_direction = input("Bullish", "", options = ["Bullish", "Bearish"], inline = "0", group = G0)
+input_pattern   = input("5-0",     "", options = ["5-0", "Alt Bat"],     inline = "0", group = G0)
+input_font      = input("Normal",  "", options = ["Normal", "Small"],    group = G1, tooltip = T0)
+
+// 1. array
+arr_color             = array.new_color(),  arr_color            := array.from(color.black, color.teal, color.red, color.blue)
+//  array float ideal                                                          X      A      B      C      D
+arr_float_FiveO       = array.new_float(),  arr_float_FiveO      := array.from(0.226, -0.618, 0.382,   -1, 0)
+arr_float_aBat        = array.new_float(),  arr_float_aBat       := array.from(0.618, 0.000, 0.382, 0.236, 0.886)
+//  array range ideal                                                          XB       AC               BD               XD
+arr_label_FiveO       = array.new_string(), arr_label_FiveO      := array.from("1.13;\n1.618", "1.618;\n2.24", "0.5",  "0.786")
+arr_label_aBat        = array.new_string(), arr_label_aBat       := array.from("0.382", "0.382;\n0.886", "2.0;\n3.618", "0.886")
+//  array table                                                                XB               AC               BD               XD
+arr_title_table       = array.new_string(), arr_title_table      := array.from("B = XA",        "C = AB",        "D = BC",        "D = XA")
+//  array label ideal                                                          XB               AC               BD               XD
+arr_dir_FiveO         = array.new_float(),  arr_dir_FiveO        := array.from(0.309,           -0.809,           0.191,           0)
+arr_dir_aBat          = array.new_float(),  arr_dir_aBat         := array.from(0.691,           0.118,           0.693,           0.752)
+// 0 - FiveO, 1 - aBat
+// Reference                                                                     0     1      
+arr_vol0_bull         = array.new_string(), arr_vol0_bull        := array.from("79", "103")
+arr_vol0_bear         = array.new_string(), arr_vol0_bear        := array.from("88", "106")
+
+// 2. Ternary conditional operator and variables
+// Ternary conditional operator 
+font      = input_font      == "Small"     ? size.small              : size.normal
+pos0      = input_direction == "Bullish"   ? position.top_right      : position.bottom_right
+pos1      = input_direction == "Bullish"   ? position.top_left       : position.bottom_left
+col       = input_direction == "Bullish"   ? array.get(arr_color, 1) : array.get(arr_color, 2)
+col_1     = input_pattern   == "5-0"       ? array.get(arr_color, 3) : array.get(arr_color, 2)
+col_2     = input_pattern   == "5-0"       ? array.get(arr_color, 2) : array.get(arr_color, 3)
+style_0   = input_direction == "Bullish"   ? label.style_label_up    : label.style_label_down
+style_1   = input_direction == "Bullish"   ? label.style_label_down  : label.style_label_up
+dir       = input_direction == "Bullish"   ? -1                      : 1
+dir_title = input_direction == "Bullish"   ? "Bullish"               : "Bearish"
+pattern   = input_pattern   == "5-0"       ? "5-0"                   : "Alternate Bat"
+// variables
+cn = color.new(color.blue, 100)
+cb = color.black
+sc = label.style_label_center
+
+// 3. Custom functions
+// Label custom functions
+fun_label_XABCD(_arr0) =>
+    var label X  = na,     label.delete(X),  X  := label.new(x = bar_index[50], y = dir * array.get(_arr0, 0), text = "X",                 color = cn,    textcolor = col, style = style_0, size = size.large)
+    var label A  = na,     label.delete(A),  A  := label.new(x = bar_index[40], y = dir * array.get(_arr0, 1), text = "A",                 color = cn,    textcolor = col, style = style_1, size = size.large)
+    var label B  = na,     label.delete(B),  B  := label.new(x = bar_index[30], y = dir * array.get(_arr0, 2), text = "B",                 color = cn,    textcolor = col, style = style_0, size = size.large)
+    var label C  = na,     label.delete(C),  C  := label.new(x = bar_index[20], y = dir * array.get(_arr0, 3), text = "C",                 color = cn,    textcolor = col, style = style_1, size = size.large)
+    var label D  = na,     label.delete(D),  D  := label.new(x = bar_index[10], y = dir * array.get(_arr0, 4), text = "D",                 color = cn,    textcolor = col, style = style_0, size = size.large)
+fun_label_rng(_arr1, _arr2) =>
+    var label XB = na,     label.delete(XB), XB := label.new(x = bar_index[40], y = dir * array.get(_arr1, 0), text = array.get(_arr2, 0), color = col_1, textcolor = cb,  style = sc,      size = size.large)
+    var label AC = na,     label.delete(AC), AC := label.new(x = bar_index[30], y = dir * array.get(_arr1, 1), text = array.get(_arr2, 1), color = col_1, textcolor = cb,  style = sc,      size = size.large)
+    var label BD = na,     label.delete(BD), BD := label.new(x = bar_index[20], y = dir * array.get(_arr1, 2), text = array.get(_arr2, 2), color = col_2, textcolor = cb,  style = sc,      size = size.large)
+    if input_pattern != "5-0"
+        var label XD = na, label.delete(XD), XD := label.new(x = bar_index[30], y = dir * array.get(_arr1, 3), text = array.get(_arr2, 3), color = col_1, textcolor = cb,  style = sc,      size = size.large)
+fun_label_zero() =>
+    if input_pattern == "5-0"
+        var label zero = na, label.delete(zero)
+        var line OX    = na, line.delete(OX)
+        zero := label.new(x = bar_index[60], y  = dir * -1, text = "0", color = cn, textcolor = col, style = style_1, size = size.large)
+        OX   := line.new(x1 = bar_index[60], y1 = dir * -1, x2 = bar_index[50], y2 = dir * array.get(arr_float_FiveO, 0), color = col, width = 4)   
+// Line custom functions
+fun_line_solid(_arr0) =>
+    var line XA = na, line.delete(XA)
+    var line AB = na, line.delete(AB)
+    var line BC = na, line.delete(BC)
+    var line CD = na, line.delete(CD)
+    XA := line.new(x1 = bar_index[50], y1 = dir * array.get(_arr0, 0), x2 = bar_index[40], y2 = dir * array.get(_arr0, 1), color = col, width = 4)
+    AB := line.new(x1 = bar_index[40], y1 = dir * array.get(_arr0, 1), x2 = bar_index[30], y2 = dir * array.get(_arr0, 2), color = col, width = 4)
+    BC := line.new(x1 = bar_index[30], y1 = dir * array.get(_arr0, 2), x2 = bar_index[20], y2 = dir * array.get(_arr0, 3), color = col, width = 4)
+    CD := line.new(x1 = bar_index[20], y1 = dir * array.get(_arr0, 3), x2 = bar_index[10], y2 = dir * array.get(_arr0, 4), color = col, width = 4)
+fun_line_dot(_arr0) =>
+    if input_pattern != "5-0"
+        var line XD = na, line.delete(XD)
+        XD := line.new(x1 = bar_index[50], y1 = dir * array.get(_arr0, 0), x2 = bar_index[10], y2 = dir * array.get(_arr0, 4), color = col, style = line.style_dotted)
+    var line AC = na, line.delete(AC)
+    var line XB = na, line.delete(XB)
+    var line BD = na, line.delete(BD)
+    AC := line.new(x1 = bar_index[40], y1 = dir * array.get(_arr0, 1), x2 = bar_index[20], y2 = dir * array.get(_arr0, 3), color = col, style = line.style_dotted)
+    XB := line.new(x1 = bar_index[50], y1 = dir * array.get(_arr0, 0), x2 = bar_index[30], y2 = dir * array.get(_arr0, 2), color = col, style = line.style_dotted)
+    BD := line.new(x1 = bar_index[30], y1 = dir * array.get(_arr0, 2), x2 = bar_index[10], y2 = dir * array.get(_arr0, 4), color = col, style = line.style_dotted)
+
+// 4. array and custom functions for table
+table[] arr_table = array.new_table()
+fun_table_top()   => table.new(position = position.top_center,    rows = 2, columns = 4, bgcolor = cn)
+fun_table_right() => table.new(position = pos0,                   rows = 5, columns = 3, bgcolor = cn, border_color = cn, border_width = 1)
+fun_table_left()  => table.new(position = pos1,                   rows = 3, columns = 4, bgcolor = cn, border_color = cn, border_width = 1)
+
+array.push(arr_table, fun_table_top())   // 0 Table title
+array.push(arr_table, fun_table_right()) // 1 Table range
+array.push(arr_table, fun_table_left())  // 2 Table reference
+
+fun_table_title() =>
+    table.cell(array.get(arr_table, 0),     0, 0,    bgcolor = cb,           text_size = size.normal, text_color = color.yellow, text = "Harmonic")
+    table.cell(array.get(arr_table, 0),     1, 0,    bgcolor = cb,           text_size = size.normal, text_color = color.yellow, text = "Patterns")
+    table.cell(array.get(arr_table, 0),     2, 0,    bgcolor = cb,           text_size = size.normal, text_color = color.yellow, text = "Volume 2")
+    table.cell(array.get(arr_table, 0),     0, 1,    bgcolor = cb,           text_size = size.normal, text_color = color.blue,   text = "")
+    table.cell(array.get(arr_table, 0),     1, 1,    bgcolor = cb,           text_size = size.normal, text_color = col,          text = dir_title)
+    table.cell(array.get(arr_table, 0),     2, 1,    bgcolor = cb,           text_size = size.normal, text_color = color.blue,   text = pattern)
+fun_table_rng(_arr2) =>
+    table.cell(array.get(arr_table, 1),     0, 0,    bgcolor = cn,           text_size = font,        text_color = color.orange, text = " ")
+    table.cell(array.get(arr_table, 1),     0, 1,    bgcolor = color.yellow, text_size = font,        text_color = cb,           text = array.get(arr_title_table, 0))
+    table.cell(array.get(arr_table, 1),     0, 2,    bgcolor = color.yellow, text_size = font,        text_color = cb,           text = array.get(arr_title_table, 1))
+    table.cell(array.get(arr_table, 1),     0, 3,    bgcolor = color.yellow, text_size = font,        text_color = cb,           text = array.get(arr_title_table, 2))
+    table.cell(array.get(arr_table, 1),     0, 4,    bgcolor = color.yellow, text_size = font,        text_color = cb,           text = array.get(arr_title_table, 3))
+    table.cell(array.get(arr_table, 1),     1, 0,    bgcolor = cn,           text_size = font,        text_color = cb,           text = " ")
+    table.cell(array.get(arr_table, 1),     1, 1,    bgcolor = col_1,        text_size = font,        text_color = cb,           text = array.get(_arr2, 0))
+    table.cell(array.get(arr_table, 1),     1, 2,    bgcolor = col_1,        text_size = font,        text_color = cb,           text = array.get(_arr2, 1))
+    table.cell(array.get(arr_table, 1),     1, 3,    bgcolor = col_2,        text_size = font,        text_color = cb,           text = array.get(_arr2, 2))
+    table.cell(array.get(arr_table, 1),     1, 4,    bgcolor = col_1,        text_size = font,        text_color = cb,           text = array.get(_arr2, 3))
+    for _row = 0 to 3
+        table.cell(array.get(arr_table, 1), 2, _row, bgcolor = cn,           text_size = font,        text_color = color.orange, text = " ")
+fun_table_ref(_id) =>
+    table.cell(array.get(arr_table, 2),     0, 0,    bgcolor = cn,           text_size = font,        text_color = color.white, text = "")
+    table.cell(array.get(arr_table, 2),     0, 1,    bgcolor = color.black,  text_size = font,        text_color = color.white, text = "Reference")
+    table.cell(array.get(arr_table, 2),     1, 1,    bgcolor = color.teal,   text_size = font,        text_color = color.black, text = "Bullish (M)")
+    table.cell(array.get(arr_table, 2),     2, 1,    bgcolor = color.red,    text_size = font,        text_color = color.black, text = "Bearish (W)")
+    table.cell(array.get(arr_table, 2),     0, 2,    bgcolor = color.black,  text_size = font,        text_color = color.white, text = "Volume 2")
+    table.cell(array.get(arr_table, 2),     1, 2,    bgcolor = color.teal,   text_size = font,        text_color = color.black, text = "Page " + array.get(arr_vol0_bull, _id))
+    table.cell(array.get(arr_table, 2),     2, 2,    bgcolor = color.red,    text_size = font,        text_color = color.black, text = "Page " + array.get(arr_vol0_bear, _id))
+
+// 5. Compile custom functions
+fun_if(_expr, _arr0, _arr1, _arr2, _id) =>
+    if input_pattern == _expr
+        fun_label_XABCD(_arr0)
+        fun_label_rng(  _arr1, _arr2)
+        fun_line_solid( _arr0)
+        fun_line_dot(   _arr0)
+        fun_table_rng(  _arr2)
+        fun_table_ref(  _id)
+
+// 6. Construct
+fun_table_title()
+fun_if("5-0",     arr_float_FiveO, arr_dir_FiveO, arr_label_FiveO, 0)
+fun_if("Alt Bat", arr_float_aBat,  arr_dir_aBat,  arr_label_aBat,  1)
+fun_label_zero()
