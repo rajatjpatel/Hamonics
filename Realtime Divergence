@@ -1,0 +1,1061 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © JohnBartlesAccount
+
+//@version=5
+indicator("Realtime Divergence for Any Indicator", overlay=true, max_lines_count=300, max_bars_back=300)
+
+
+overlayChart = input(false, "Overlay Chart",  tooltip="Display addon on chart instead of oscillator. Also you must set the Source Input to the desired oscillator plot.")
+
+
+osc =              input.source(close,                      "Source Input")
+      
+lbR =              input(      5,                           "Pivot Lookback Right")     
+lbL =              input(      5,                           "Pivot Lookback Left")
+rangeUpper =       input(      60,                          "Max of Lookback Range", tooltip="The longest allowed length of divergence lines found")
+rangeLower =       input(      5,                           "Min of Lookback Range", tooltip="The shortest allowed length of divergence lines found")
+plotBull =         input(      true,                        "Bull Lines",            group="Display Plots")
+plotHiddenBull =   input(      true,                        "Hidden Bull Lines",     group="Display Plots")
+plotBear =         input(      true,                        "Bear Lines",            group="Display Plots")
+plotHiddenBear =   input(      true,                        "Hidden Bear Lines",     group="Display Plots")
+plotBullFlags =    input(      true,                        "Bull Flags")
+plotHidBullFlags = input(      true,                        "Hidden Bull Flags")
+plotBearFlags =    input(      true,                        "Bear Flags")
+plotHidBearFlags = input(      true,                        "Hidden Bear Flags")
+bearColor =        input.color(color.rgb(255, 0, 0, 0),     "Bearish Color")
+bullColor =        input.color(color.rgb(0, 255, 0, 0),     "Bullish Color")
+hiddenBullColor =  input.color(color.rgb(0, 255, 0, 80),    "Hidden Bullish Color")
+hiddenBearColor =  input.color(color.rgb(255, 0, 0, 80),    "Hidden Bearish Color")
+textColor =        input.color(color.rgb(255, 255, 255, 0), "Text Color")
+noneColor = color.new(color.white, 100)
+
+ 
+
+
+totallyInterBars = input.int(title="Bars Allowing Total Oscillator and Price Intersection", defval=0, minval=0, tooltip="Starting from both the beginning and ending of the divergence lines, the number of bars allowed to intersect those divergence lines to any degree")
+
+interAllowanceOsc = input.float(title="Allowance for Oscillator Intersection", defval=2.00, minval=0.0, step=0.01, tooltip="The percentage that the oscillator is allowed to intersect the divergence line. My code is buggy, so experiment to find what works for you. Daily timeframes will probably require higher allowances than minute timeframes. High oscillator values may require smaller allowances than  low oscillator values")
+interAllowanceOsc := interAllowanceOsc / 100.0
+
+interAllowancePrice = input.float(title="Allowance for Price Intersection", defval=2.00, minval=0.0, step=0.01, tooltip="The percentage that the price is allowed to intersect the divergence line. My code is buggy, so experiment to find what works for you. Daily timeframes will probably require higher allowances than minute timeframes. High price stocks should require smaller allowances than cheaper stocks.")
+interAllowancePrice := interAllowancePrice / 100.0
+
+deviation = input.int(title="Allowance for Misalignment Between Price and Oscillator", defval=1, minval=0, step=1, tooltip="The number of bars allowed to be misaligned between the price and oscillator. Right side pivots between price and oscillator are sometimes slightly misaligned, but SOME should still possibly be considered a valid divergence.")
+
+numPriorLines = input(title="Number of Prior RT Lines", defval=1, tooltip="The number of prior realtime lines you want visible before their deletion.")
+
+//FINISH: This currently does nothing at all
+//minLength = input(title="Minimum Ratio Between Price and Oscillator Lines", defval=1, tooltip="Decide the minimum length of price compared to oscillator lines. Some divergence lines should be considered legit even if the price and oscillator divergence lines are radically different sizes, and sometimes they shouldn't.")
+
+doRealtime = input(defval=true, title="Real Time Potential Divergences", tooltip="Show potential divergences as pivots are forming")
+doRealtimeAlerts = input(defval=true, title="Real Time Potential Divergence Alerts",  tooltip="Recieveee alerted to potential divergences")
+
+useBestSlope = input(defval=true, title="Use Only the Best Slope", tooltip="Depending on the type of divergence line, only the slope closest to 0 or the slope farthest from 0 will be used")
+
+
+
+
+
+plFound_Osc = na(ta.pivotlow(osc, lbL, lbR)) ? false : true
+plFound_Price = na(ta.pivotlow(low, lbL, lbR)) ? false : true
+phFound_Osc = na(ta.pivothigh(osc, lbL, lbR)) ? false : true
+phFound_Price = na(ta.pivothigh(high, lbL, lbR)) ? false : true
+
+
+
+lbR_rt = 0 //What makes realtime potential divergences realtime is that their right side pivot's have 0 right side bars 
+plFound_Osc_rt = na(ta.pivotlow(osc, lbL, lbR_rt)) ? false : true
+plFound_Price_rt = na(ta.pivotlow(low, lbL, lbR_rt)) ? false : true
+phFound_Osc_rt = na(ta.pivothigh(osc, lbL, lbR_rt)) ? false : true
+phFound_Price_rt = na(ta.pivothigh(high, lbL, lbR_rt)) ? false : true
+
+
+
+x1_osc = 0
+x2_osc = array.new_int()
+y1_osc = 0.0
+y2_osc = array.new_float()
+
+x1_price = 0
+x2_price = array.new_int()
+y1_price = 0.0
+y2_price = array.new_float()
+
+
+rightPivotsFound = false
+rightPivotsFound_rt = false
+devOscPivBar = 0
+devPricePivBar = 0
+devOscPivBar_rt = 0
+devPricePivBar_rt = 0
+
+
+i_POsc = 0
+i_PPrice = 0
+
+
+
+
+
+
+oscDivLineBarTotal = 0
+priceDivLineBarTotal = 0
+oscDiverLine = 0.0
+priceDiverLine = 0.0
+cancel_line = false
+
+bullLineOsc = array.new_line()
+bullLabelOsc = array.new_label()
+hidBullLineOsc = array.new_line()
+hidBullLabelOsc = array.new_label()
+bearLineOsc = array.new_line()
+bearLabelOsc = array.new_label()
+hidBearLineOsc = array.new_line()
+hidBearLabelOsc = array.new_label()
+
+bullLinePrice = array.new_line()
+bullLabelPrice = array.new_label()
+hidBullLinePrice = array.new_line()
+hidBullLabelPrice = array.new_label()
+bearLinePrice = array.new_line()
+bearLabelPrice = array.new_label()
+hidBearLinePrice = array.new_line()
+hidBearLabelPrice = array.new_label()
+
+
+pricePivBar = 0
+oscPivBar = 0 
+
+loopTotal_rt = doRealtime ? 2 : 1
+slope1 = 0.0
+slope2 = 0.0
+
+
+
+
+
+
+/////
+/////-----Search for rightside pivot
+
+//Price and Oscilator pivots are sometimes slightly misaligned. So test for any pivots from price and oscillator within "deviation" range
+while i_POsc <= deviation and rightPivotsFound == false
+    while i_PPrice <= deviation and rightPivotsFound == false
+        if plFound_Osc[i_POsc] and plFound_Price[i_PPrice]
+            rightPivotsFound := true
+            devOscPivBar  := i_POsc + lbR
+            devPricePivBar := i_PPrice + lbR
+        i_PPrice := i_PPrice + 1
+    i_PPrice := 0
+    i_POsc := i_POsc + 1
+
+
+
+i_POsc := 0
+i_PPrice := 0
+
+if doRealtime
+    //Price and Oscillator pivots are sometimes slightly misaligned. So test for any pivots from price and oscillator within "deviation" range
+    while i_POsc <= deviation and rightPivotsFound_rt == false
+        while i_PPrice <= deviation and rightPivotsFound_rt == false
+            if plFound_Osc_rt[i_POsc] and plFound_Price_rt[i_PPrice]
+                rightPivotsFound_rt := true
+                devOscPivBar_rt  := i_POsc + lbR_rt
+                devPricePivBar_rt := i_PPrice + lbR_rt
+            i_PPrice := i_PPrice + 1
+        i_PPrice := 0
+        i_POsc := i_POsc + 1
+
+
+
+
+i_POsc := 0
+i_PPrice := 0
+
+
+
+////////////------------------------------------------------------------------------------
+////// Regular Bullish-----
+size = 0
+i_delArray = 0
+
+for count_rt = 1 to loopTotal_rt
+    if doRealtime and count_rt == 1
+        pricePivBar := devPricePivBar_rt
+        oscPivBar := devOscPivBar_rt
+    else
+        pricePivBar := devPricePivBar
+        oscPivBar := devOscPivBar
+    
+    //If right side pivots are found - test for all left side HL pivots of oscillator then LL pivots of price. 
+    //I don't think left side pivots need to be aligned at ALL to be considered a divergence
+    if ((rightPivotsFound and doRealtime and count_rt == 2) or (rightPivotsFound and doRealtime == false and count_rt == 1) or (rightPivotsFound_rt and doRealtime and count_rt == 1)) and (oscPivBar + 1) <= rangeUpper and (pricePivBar + 1) <= rangeUpper
+        i_POsc := ((oscPivBar + 1 < rangeLower) ? rangeLower : (oscPivBar + 1)) //start the search after first found pivot, and don't search before rangeLower
+        
+/////   
+////// -- Osc: Higher Low
+        while (i_POsc+lbR) <= rangeUpper
+            if plFound_Osc[i_POsc] == true
+                if osc[i_POsc+lbR] < osc[oscPivBar]
+                    oscDivLineBarTotal :=  (i_POsc+lbR) - oscPivBar  + 1 //I think I'm supposed to add 1 because you must include all bars from beginning to end of (possible)divergence line for line segmentation formula
+                    
+                    //FIX: This is supposed to exlude totallyInterBars from being tested, but it's not working exactly
+                    if totallyInterBars <= math.floor((i_POsc+lbR )/2)//FIX: this doesn't account for the middle bar
+                        for i_OscDivLine = totallyInterBars to (i_POsc+lbR )- totallyInterBars
+                            oscDiverLine := osc[oscPivBar] + (i_OscDivLine / oscDivLineBarTotal) * (osc[i_POsc+lbR] - osc[oscPivBar])//This is the line segmentation formula for just y
+                            if osc[i_OscDivLine + oscPivBar] < oscDiverLine - (interAllowanceOsc * math.abs(oscDiverLine))//If oscillator crosses below divergence line (minus allowance) then cancel divergence
+                                cancel_line := true
+
+                    if useBestSlope and array.size(x2_osc) == 1 and cancel_line == false
+                        //Only keep oscillator divergence lines with slope farthest from 0
+                        slope1 := math.abs((osc[oscPivBar] - osc[i_POsc+lbR]) / (oscPivBar - (i_POsc+lbR)))
+                        slope2 := math.abs((y1_osc - array.get(y2_osc, 0)) / (x1_osc - array.get(x2_osc, 0))) 
+                        if slope1 < slope2
+                            cancel_line := true
+                        else
+                            array.remove(x2_osc, 0)    	            
+    	                    array.remove(y2_osc, 0) 
+
+                    if cancel_line == false
+                        x1_osc := oscPivBar
+                        array.push(x2_osc, i_POsc+lbR)
+                        y1_osc := osc[oscPivBar]
+                        array.push(y2_osc, osc[i_POsc+lbR])
+            cancel_line := false
+            i_POsc := i_POsc + 1
+            
+    
+ /////
+////// -- Price: Lower Low
+        i_PPrice :=  ((pricePivBar + 1 < rangeLower) ? rangeLower : (pricePivBar + 1)) 
+        cancel_line := false
+        while (i_PPrice+lbR )<= rangeUpper
+            if plFound_Price[i_PPrice] == true
+                if low[i_PPrice+lbR] > low[pricePivBar]
+                    priceDivLineBarTotal :=  (i_PPrice+lbR) - pricePivBar + 1//I added 1 because you must include all bars from beginning to end of (possible)divergence line for line segmentation formula
+                    
+                    if totallyInterBars <= math.floor((i_PPrice+lbR) / 2)//FIX: this doesn't account for the middle bar
+                        for i_PriceDivLine = totallyInterBars to (i_PPrice+lbR) - totallyInterBars
+                            priceDiverLine := low[pricePivBar] + (i_PriceDivLine / priceDivLineBarTotal) * (low[i_PPrice+lbR] - low[pricePivBar])//This is the line segmentation formula for just y
+                            if low[i_PriceDivLine + pricePivBar] < priceDiverLine - (interAllowancePrice * math.abs(priceDiverLine))//If oscillator crosses below (divergence line - allowance) then cancel divergence
+                                cancel_line := true
+    
+                    if useBestSlope and array.size(x2_price) == 1 and cancel_line == false
+                        //Only keep price divergences lines with slope near 0
+                        slope1 := math.abs((low[pricePivBar] - low[i_PPrice+lbR]) / (pricePivBar - (i_PPrice+lbR)))
+                        slope2 := math.abs((y1_price - array.get(y2_price, 0)) / (x1_price - array.get(x2_price, 0))) 
+                        if slope1 > slope2
+                            cancel_line := true
+                        else
+                            array.remove(x2_price, 0)    	            
+    	                    array.remove(y2_price, 0) 
+    
+                    if cancel_line == false
+                        x1_price := pricePivBar
+                        array.push(x2_price, i_PPrice+lbR)
+                        y1_price := low[pricePivBar]
+                        array.push(y2_price, low[i_PPrice+lbR])
+            cancel_line := false
+            i_PPrice := i_PPrice + 1
+            
+
+        if array.size(x2_osc) > 0 and array.size(x2_price) > 0 and plotBull
+            //Draw oscillator divergences
+            if overlayChart == false
+                for i_print_lines = 0 to array.size(x2_osc) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 350 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            
+                            if na(bullLineOsc[i_del]) == false
+                                size := array.size(bullLineOsc[i_del])
+                                
+    	                        while i_delArray <= size
+                                    line.delete( array.get(bullLineOsc[i_del], array.size(bullLineOsc[i_del]) - i_delArray))
+                                    i_delArray := i_delArray + 1                
+                        array.push(bullLineOsc, line.new(bar_index - array.get(x2_osc, i_print_lines), array.get(y2_osc, i_print_lines), bar_index - x1_osc,  y1_osc, color=bullColor, width=2, style=line.style_dashed) )
+                    else               
+                        line.new(bar_index - array.get(x2_osc, i_print_lines), array.get(y2_osc, i_print_lines), bar_index - x1_osc,  y1_osc,   color=bullColor, width=2)
+            //Draw price divergences
+            else
+                for i_print_lines = 0 to array.size(x2_price) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 150 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            
+                            if na(bullLinePrice[i_del]) == false
+                                size := array.size(bullLinePrice[i_del])
+                                
+    	                        while i_delArray <= size
+                                    line.delete( array.get(bullLinePrice[i_del], array.size(bullLinePrice[i_del]) - i_delArray))
+                                    i_delArray := i_delArray + 1                
+                        array.push(bullLinePrice, line.new(bar_index - array.get(x2_price, i_print_lines), array.get(y2_price, i_print_lines), bar_index - x1_price,  y1_price, color=bullColor, width=2, style=line.style_dashed) )
+                    else               
+                        line.new(bar_index - array.get(x2_price, i_print_lines), array.get(y2_price, i_print_lines), bar_index - x1_price,  y1_price,   color=bullColor, width=2)
+
+        if array.size(x2_osc) > 0 and array.size(x2_price) > 0 and plotBullFlags
+            //Draw oscillator divergence labels and create alert
+            if overlayChart == false
+                for i_print_lines = 0 to array.size(x2_osc) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 350 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            if na(bullLabelOsc[i_del]) == false
+                                size := array.size(bullLabelOsc[i_del])
+                                while i_delArray <= size
+                                    label.delete( array.get(bullLabelOsc[i_del], array.size(bullLabelOsc[i_del]) - i_delArray))        
+                                    i_delArray := i_delArray + 1
+
+                        array.push(bullLabelOsc, label.new(bar_index - x1_osc, y1_osc, text="B", yloc=yloc.price, color=bullColor, style=label.style_label_up, textcolor = color.white, size = size.normal) )
+                       
+                        if i_print_lines == 0 and doRealtimeAlerts
+                            alert("Potential Regular Bull", alert.freq_once_per_bar)
+            //Draw price divergence labels and create alert
+            else
+                for i_print_lines = 0 to array.size(x2_price) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 150 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            if na(bullLabelPrice[i_del]) == false
+                                size := array.size(bullLabelPrice[i_del])
+                                while i_delArray <= size
+                                    label.delete( array.get(bullLabelPrice[i_del], array.size(bullLabelPrice[i_del]) - i_delArray))        
+                                    i_delArray := i_delArray + 1
+
+                        array.push(bullLabelPrice, label.new(bar_index - x1_price, y1_price, text="B", yloc=yloc.price, color=bullColor, style=label.style_label_up, textcolor = color.white, size = size.normal) )
+
+                        if i_print_lines == 0 and doRealtimeAlerts   
+                            alert("Potential Regular Bull", alert.freq_once_per_bar)
+
+        //I can  only delete the realtime arrays here and the historical arrays below because plotshape() can't be inside a loop 
+        if doRealtime and count_rt == 1
+            i_delArray := 0
+            size := array.size(x2_osc)
+    	    while i_delArray < size
+    	    	array.pop(x2_osc)
+    	    	array.pop(y2_osc)
+                i_delArray := i_delArray + 1
+            
+            i_delArray := 0
+            size := array.size(x2_price) 
+    	    while i_delArray < size
+    	    	array.pop(x2_price)
+    	    	array.pop(y2_price)
+                i_delArray := i_delArray + 1
+
+isBullFlagReady = false
+if plotBullFlags and array.size(x2_osc) > 0 and array.size(x2_price) > 0
+    isBullFlagReady := true
+
+
+
+plotshape(
+	 (isBullFlagReady[1] == false and isBullFlagReady == true) ? (overlayChart ? y1_price : y1_osc) : na,
+	 offset= (overlayChart ? -(x1_price+lbR): -(x1_osc+lbR)),
+	 title="Bullish Label",
+	 text="B",
+	 style=shape.labelup,
+	 location=location.absolute,
+	 color=bullColor,
+	 textcolor=textColor,
+	 transp=0
+	 )
+
+
+
+i_delArray := 0
+size := array.size(x2_osc)
+while i_delArray < size
+    array.pop(x2_osc)
+    array.pop(y2_osc)
+    i_delArray := i_delArray + 1
+            
+i_delArray := 0
+size := array.size(x2_price) 
+while i_delArray < size
+    array.pop(x2_price)
+    array.pop(y2_price)
+    i_delArray := i_delArray + 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ////////////------------------------------------------------------------------------------
+////// Hidden Bullish-----
+for count_rt = 1 to loopTotal_rt
+    if doRealtime and count_rt == 1
+        pricePivBar := devPricePivBar_rt
+        oscPivBar := devOscPivBar_rt
+    else
+        pricePivBar := devPricePivBar
+        oscPivBar := devOscPivBar
+
+    if ((rightPivotsFound and doRealtime and count_rt == 2) or (rightPivotsFound and doRealtime == false and count_rt == 1) or (rightPivotsFound_rt and doRealtime and count_rt == 1)) and (oscPivBar + 1) <= rangeUpper and (pricePivBar + 1) <= rangeUpper
+        i_POsc := ((oscPivBar + 1 < rangeLower) ? rangeLower : (oscPivBar + 1)) //start the search after first found pivot, and don't search before rangeLower
+
+
+/////   
+////// -- Osc: Lower Low
+        while (i_POsc+lbR) <= rangeUpper
+            if plFound_Osc[i_POsc] == true
+                if osc[i_POsc+lbR] > osc[oscPivBar]
+                    oscDivLineBarTotal :=  (i_POsc+lbR) - oscPivBar + 1 //I added 1 because you must include all bars from beginning to end of (possible)divergence line for line segmentation formula
+                    
+                    if totallyInterBars <= math.floor((i_POsc+lbR)/2)//FIX: this doesn't account for the middle bar
+                        for i_OscDivLine = totallyInterBars to (i_POsc+lbR )- totallyInterBars
+                            oscDiverLine := osc[oscPivBar] + (i_OscDivLine / oscDivLineBarTotal) * (osc[i_POsc+lbR] - osc[oscPivBar])//This is the line segmentation formula for just y
+                            if osc[i_OscDivLine + oscPivBar] < oscDiverLine - (interAllowanceOsc * math.abs(oscDiverLine))//If oscillator crosses below divergence line (minus allowance) then cancel divergence
+                                cancel_line := true
+                  
+                    if useBestSlope and array.size(x2_osc) == 1 and cancel_line == false
+                        //If useBestSlope is true then only keep oscillator divergence lines with slope closest to 0
+                        slope1 := math.abs((osc[oscPivBar] - osc[i_POsc+lbR]) / (oscPivBar - (i_POsc+lbR)))
+                        slope2 := math.abs((y1_osc - array.get(y2_osc, 0)) / (x1_osc - array.get(x2_osc, 0))) 
+                        if slope1 > slope2
+                            cancel_line := true
+                        else
+                            array.remove(x2_osc, 0)    	            
+    	                    array.remove(y2_osc, 0)                   
+                  
+                    if cancel_line == false
+                        x1_osc := oscPivBar
+                        array.push(x2_osc, i_POsc+lbR)
+                        y1_osc := osc[oscPivBar]
+                        array.push(y2_osc, osc[i_POsc+lbR])
+            cancel_line := false
+            i_POsc := i_POsc + 1
+            
+    
+    
+/////
+////// -- Price: Higher Low
+        i_PPrice :=  ((pricePivBar + 1 < rangeLower) ? rangeLower : (pricePivBar + 1)) 
+        cancel_line := false
+        while (i_PPrice+lbR )<= rangeUpper
+            if plFound_Price[i_PPrice] == true
+                if low[i_PPrice+lbR] < low[pricePivBar]
+                    priceDivLineBarTotal :=  (i_PPrice+lbR) - pricePivBar + 1 //I added 1 because you must include all bars from beginning to end of (possible)divergence line for line segmentation formula
+                    
+                    if totallyInterBars <= math.floor((i_PPrice+lbR) / 2)//FIX: this doesn't account for the middle bar
+                        for i_PriceDivLine = totallyInterBars to (i_PPrice+lbR) - totallyInterBars
+                            priceDiverLine := low[pricePivBar] + (i_PriceDivLine / priceDivLineBarTotal) * (low[i_PPrice+lbR] - low[pricePivBar])//This is the line segmentation formula for just y
+                            if low[i_PriceDivLine + pricePivBar] < priceDiverLine - (interAllowancePrice * math.abs(priceDiverLine))//If oscillator crosses below (divergence line - allowance) then cancel divergence
+                                cancel_line := true
+    
+                    if useBestSlope and array.size(x2_price) == 1 and cancel_line == false
+                        //Only keep price divergence lines with slope farthest from 0
+                        slope1 := math.abs((low[pricePivBar] - low[i_PPrice+lbR]) / (pricePivBar - (i_PPrice+lbR)))
+                        slope2 := math.abs((y1_price - array.get(y2_price, 0)) / (x1_price - array.get(x2_price, 0))) 
+                        if slope1 < slope2
+                            cancel_line := true
+                        else
+                            array.remove(x2_price, 0)    	            
+    	                    array.remove(y2_price, 0)     
+    
+                    if cancel_line == false
+                        x1_price := pricePivBar
+                        array.push(x2_price, i_PPrice+lbR)
+                        y1_price := low[pricePivBar]
+                        array.push(y2_price, low[i_PPrice+lbR])
+            cancel_line := false
+            i_PPrice := i_PPrice + 1
+
+        if array.size(x2_osc) > 0 and array.size(x2_price) > 0 and plotHiddenBull
+            if overlayChart == false
+                for i_print_lines = 0 to array.size(x2_osc) - 1
+                //Draw oscillator divergences
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 150 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            
+                            if na(hidBullLineOsc[i_del]) == false
+                                size := array.size(hidBullLineOsc[i_del])
+                                while i_delArray <= size
+                                    line.delete( array.get(hidBullLineOsc[i_del], array.size(hidBullLineOsc[i_del]) - i_delArray))
+                                    i_delArray := i_delArray + 1                
+                        array.push(hidBullLineOsc, line.new(bar_index - array.get(x2_osc, i_print_lines), array.get(y2_osc, i_print_lines), bar_index - x1_osc,  y1_osc, color=hiddenBullColor, width=2, style=line.style_dashed) )
+                    else               
+                        line.new(bar_index - array.get(x2_osc, i_print_lines), array.get(y2_osc, i_print_lines), bar_index - x1_osc,  y1_osc,   color=hiddenBullColor, width=2)
+            else
+                //Draw price divergences
+                for i_print_lines = 0 to array.size(x2_price) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 150 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            
+                            if na(hidBullLinePrice[i_del]) == false
+                                size := array.size(hidBullLinePrice[i_del])
+                                
+    	                        while i_delArray <= size
+                                    line.delete( array.get(hidBullLinePrice[i_del], array.size(hidBullLinePrice[i_del]) - i_delArray))
+                                    i_delArray := i_delArray + 1                
+                        array.push(hidBullLinePrice, line.new(bar_index - array.get(x2_price, i_print_lines), array.get(y2_price, i_print_lines), bar_index - x1_price,  y1_price, color=hiddenBullColor, width=2, style=line.style_dashed) )
+                    else               
+                        line.new(bar_index - array.get(x2_price, i_print_lines), array.get(y2_price, i_print_lines), bar_index - x1_price,  y1_price,   color=hiddenBullColor, width=2)
+
+        if array.size(x2_osc) > 0 and array.size(x2_price) > 0 and plotHidBullFlags
+            if overlayChart == false
+                for i_print_lines = 0 to array.size(x2_osc) - 1
+                //Draw oscillator divergences and create alert
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 150 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            if na(hidBullLabelOsc[i_del]) == false
+                                size := array.size(hidBullLabelOsc[i_del])
+                                while i_delArray <= size
+                                    label.delete( array.get(hidBullLabelOsc[i_del], array.size(hidBullLabelOsc[i_del]) - i_delArray))        
+                                    i_delArray := i_delArray + 1
+
+                        array.push(hidBullLabelOsc, label.new(bar_index - x1_osc, y1_osc, text="HB", yloc=yloc.price, color=hiddenBullColor, style=label.style_label_up, textcolor = color.white, size = size.small) )
+
+                        if i_print_lines == 0 and doRealtimeAlerts
+                            alert("Potential Hidden Bull", alert.freq_once_per_bar)
+            else
+                //Draw price divergence labels and create alert
+                for i_print_lines = 0 to array.size(x2_price) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 150 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            if na(hidBullLabelPrice[i_del]) == false
+                                size := array.size(hidBullLabelPrice[i_del])
+                                while i_delArray <= size
+                                    label.delete( array.get(hidBullLabelPrice[i_del], array.size(hidBullLabelPrice[i_del]) - i_delArray))        
+                                    i_delArray := i_delArray + 1           
+
+                        array.push(hidBullLabelPrice, label.new(bar_index - x1_price, y1_price, text="HB", yloc=yloc.price, color=hiddenBullColor, style=label.style_label_up, textcolor = color.white,  size = size.small) )
+
+                        if i_print_lines == 0 and doRealtimeAlerts
+                            alert("Potential Hidden Bull", alert.freq_once_per_bar)
+
+    //delete
+        if doRealtime and count_rt == 1
+            i_delArray := 0
+            size := array.size(x2_osc)
+    	    while i_delArray < size
+    	    	array.pop(x2_osc)
+    	    	array.pop(y2_osc)
+                i_delArray := i_delArray + 1
+            
+            i_delArray := 0
+            size := array.size(x2_price) 
+    	    while i_delArray < size
+    	    	array.pop(x2_price)
+    	    	array.pop(y2_price)
+                i_delArray := i_delArray + 1
+
+isHidBullFlagReady = false
+if plotHidBullFlags and array.size(x2_osc) > 0 and array.size(x2_price) > 0
+    isHidBullFlagReady := true
+
+plotshape(
+	 (isHidBullFlagReady[1] == false and isHidBullFlagReady == true) ? (overlayChart ? y1_price : y1_osc) : na,
+	 offset= (overlayChart ? -(x1_price+lbR): -(x1_osc+lbR)),
+	 title="Hidden Bullish Label",
+	 text="HB",
+	 style=shape.labelup,
+	 location=location.absolute,
+	 color=hiddenBullColor,
+	 textcolor=textColor,
+	 transp=0
+	 )
+
+i_delArray := 0
+size := array.size(x2_osc)
+while i_delArray < size
+    array.pop(x2_osc)
+    array.pop(y2_osc)
+    i_delArray := i_delArray + 1
+            
+i_delArray := 0
+size := array.size(x2_price) 
+while i_delArray < size
+    array.pop(x2_price)
+    array.pop(y2_price)
+    i_delArray := i_delArray + 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+/////
+/////-----Search for rightside pivot
+
+rightPivotsFound := false
+
+i_POsc := 0
+i_PPrice := 0
+//Price and Oscillator pivots are sometimes slightly misaligned. So test for any pivots from price and oscillator within "deviation" range
+while i_POsc <= deviation and rightPivotsFound == false
+    while i_PPrice <= deviation and rightPivotsFound == false
+        if phFound_Osc[i_POsc] and phFound_Price[i_PPrice]
+            rightPivotsFound := true
+            devOscPivBar  := i_POsc + lbR
+            devPricePivBar := i_PPrice + lbR
+        i_PPrice := i_PPrice + 1
+    i_PPrice := 0
+    i_POsc := i_POsc + 1
+
+
+
+rightPivotsFound_rt := false
+i_POsc := 0
+i_PPrice := 0
+
+if doRealtime
+    //Price and Oscillator pivots are sometimes slightly misaligned. So test for any pivots from price and oscillator within "deviation" range
+    while i_POsc <= deviation and rightPivotsFound_rt == false
+        while i_PPrice <= deviation and rightPivotsFound_rt == false
+            if phFound_Osc_rt[i_POsc] and phFound_Price_rt[i_PPrice]
+                rightPivotsFound_rt := true
+                devOscPivBar_rt  := i_POsc + lbR_rt
+                devPricePivBar_rt := i_PPrice + lbR_rt
+            i_PPrice := i_PPrice + 1
+        i_PPrice := 0
+        i_POsc := i_POsc + 1
+
+
+
+////////////------------------------------------------------------------------------------
+////// Regular Bearish
+cancel_line := false
+
+for count_rt = 1 to loopTotal_rt
+    if doRealtime and count_rt == 1
+        pricePivBar := devPricePivBar_rt
+        oscPivBar := devOscPivBar_rt
+    else
+        pricePivBar := devPricePivBar
+        oscPivBar := devOscPivBar
+
+    if ((rightPivotsFound and doRealtime and count_rt == 2) or (rightPivotsFound and doRealtime == false and count_rt == 1) or (rightPivotsFound_rt and doRealtime and count_rt == 1)) and (oscPivBar + 1) <= rangeUpper and (pricePivBar + 1) <= rangeUpper
+        i_POsc := ((oscPivBar + 1 < rangeLower) ? rangeLower : (oscPivBar + 1)) //start the search after first found pivot, and don't search before rangeLower    
+    
+    
+////// -- Osc: Lower High
+        while (i_POsc+lbR) <= rangeUpper
+            if phFound_Osc[i_POsc] == true
+                if osc[i_POsc+lbR] > osc[oscPivBar]
+                    oscDivLineBarTotal :=  (i_POsc+lbR) - oscPivBar + 1 //I added 1 because you must include all bars from beginning to end of (possible)divergence line for line segmentation formula
+                    
+                    if totallyInterBars <= math.floor((i_POsc+lbR)/2)//FIX: this doesn't account for the middle bar
+                        for i_OscDivLine = totallyInterBars to (i_POsc+lbR )- totallyInterBars
+                            oscDiverLine := osc[oscPivBar] + (i_OscDivLine / oscDivLineBarTotal) * (osc[i_POsc+lbR] - osc[oscPivBar])//This is the line segmentation formula for just y
+                            if osc[i_OscDivLine + oscPivBar] > oscDiverLine + (interAllowanceOsc * math.abs(oscDiverLine))//If oscillator crosses above divergence line (minus allowance) then cancel divergence
+                                cancel_line := true
+                                
+                    if useBestSlope and array.size(x2_osc) == 1 and cancel_line == false
+                        //Only keep oscillator divergence line with slope farthest from 0
+                        slope1 := math.abs((osc[oscPivBar] - osc[i_POsc+lbR]) / (oscPivBar - (i_POsc+lbR)))
+                        slope2 := math.abs((y1_osc - array.get(y2_osc, 0)) / (x1_osc - array.get(x2_osc, 0))) 
+                        if slope1 < slope2
+                            cancel_line := true
+                        else
+                            array.remove(x2_osc, 0)    	            
+    	                    array.remove(y2_osc, 0) 
+
+                    if cancel_line == false
+                        x1_osc := oscPivBar
+                        array.push(x2_osc, i_POsc+lbR)
+                        y1_osc := osc[oscPivBar]
+                        array.push(y2_osc, osc[i_POsc+lbR])
+            cancel_line := false
+            i_POsc := i_POsc + 1
+    
+            
+////// -- Price: Higher High
+        i_PPrice :=  ((pricePivBar + 1 < rangeLower) ? rangeLower : (pricePivBar + 1)) 
+        cancel_line := false
+        while (i_PPrice+lbR )<= rangeUpper
+            if phFound_Price[i_PPrice] == true
+                if high[i_PPrice+lbR] < high[pricePivBar]
+                    priceDivLineBarTotal :=  (i_PPrice+lbR) - pricePivBar + 1 //I added 1 because you must include all bars from beginning to end of (possible)divergence line for line segmentation formula
+                    
+                    if totallyInterBars <= math.floor((i_PPrice+lbR) / 2)//FIX: this doesn't account for the middle bar
+                        for i_PriceDivLine = totallyInterBars to (i_PPrice+lbR) - totallyInterBars
+                            priceDiverLine := high[pricePivBar] + (i_PriceDivLine / priceDivLineBarTotal) * (high[i_PPrice+lbR] - high[pricePivBar])//This is the line segmentation formula for just y
+                            if high[i_PriceDivLine + pricePivBar] > priceDiverLine + (interAllowancePrice * math.abs(priceDiverLine))//If oscillator crosses below (divergence line - allowance) then cancel divergence
+                                cancel_line := true
+                                
+                    if useBestSlope and array.size(x2_price) == 1 and cancel_line == false
+                        //Only keep price divergence line with slope nearest 0
+                        slope1 := math.abs((high[pricePivBar] - high[i_PPrice+lbR]) / (pricePivBar - (i_PPrice+lbR)))
+                        slope2 := math.abs((y1_price - array.get(y2_price, 0)) / (x1_price - array.get(x2_price, 0))) 
+                        if slope1 > slope2
+                            cancel_line := true
+                        else
+                            array.remove(x2_price, 0)    	            
+    	                    array.remove(y2_price, 0)  
+                    
+                    if cancel_line == false
+                        x1_price := pricePivBar
+                        array.push(x2_price, i_PPrice+lbR)
+                        y1_price := high[pricePivBar]
+                        array.push(y2_price, high[i_PPrice+lbR])
+            cancel_line := false
+            i_PPrice := i_PPrice + 1
+
+        if array.size(x2_osc) > 0 and array.size(x2_price) > 0 and plotBear
+            if overlayChart == false
+                //Draw oscillator divergences
+                for i_print_lines = 0 to array.size(x2_osc) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 150 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            
+                            if na(bearLineOsc[i_del]) == false
+                                size := array.size(bearLineOsc[i_del])
+                                while i_delArray <= size
+                                    line.delete( array.get(bearLineOsc[i_del], array.size(bearLineOsc[i_del]) - i_delArray))
+                                    i_delArray := i_delArray + 1                
+                        array.push(bearLineOsc, line.new(bar_index - array.get(x2_osc, i_print_lines), array.get(y2_osc, i_print_lines), bar_index - x1_osc,  y1_osc, color=bearColor, width=2, style=line.style_dashed) )
+                    else               
+                        line.new(bar_index - array.get(x2_osc, i_print_lines), array.get(y2_osc, i_print_lines), bar_index - x1_osc,  y1_osc,   color=bearColor, width=2)
+            else
+                //Draw price divergences
+                for i_print_lines = 0 to array.size(x2_price) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 150 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            
+                            if na(bearLinePrice[i_del]) == false
+                                size := array.size(bearLinePrice[i_del])
+                                
+    	                        while i_delArray <= size
+                                    line.delete( array.get(bearLinePrice[i_del], array.size(bearLinePrice[i_del]) - i_delArray))
+                                    i_delArray := i_delArray + 1                
+                        array.push(bearLinePrice, line.new(bar_index - array.get(x2_price, i_print_lines), array.get(y2_price, i_print_lines), bar_index - x1_price,  y1_price, color=bearColor, width=2, style=line.style_dashed) )
+                    else               
+                        line.new(bar_index - array.get(x2_price, i_print_lines), array.get(y2_price, i_print_lines), bar_index - x1_price,  y1_price,   color=bearColor, width=2)
+
+        if array.size(x2_osc) > 0 and array.size(x2_price) > 0 and plotBearFlags
+            if overlayChart == false
+                //Draw REALTIME oscillator divergence labels and create alert
+                for i_print_lines = 0 to array.size(x2_osc) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 150 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            
+                            if na(bearLabelOsc[i_del]) == false
+                                size := array.size(bearLabelOsc[i_del])
+                                while i_delArray <= size
+                                    label.delete( array.get(bearLabelOsc[i_del], array.size(bearLabelOsc[i_del]) - i_delArray))
+                                    i_delArray := i_delArray + 1                
+                        array.push(bearLabelOsc, label.new(bar_index - x1_osc,  y1_osc, "Br",  yloc=yloc.price, color=bearColor,  style=label.style_label_down, textcolor = color.white, size = size.small) )
+
+                        if i_print_lines == 0 and doRealtimeAlerts
+                            alert("Potential Regular Bear", alert.freq_once_per_bar)
+            else
+                //Draw REALTIME price divergence labels and create alert
+                for i_print_lines = 0 to array.size(x2_price) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 150 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            
+                            if na(bearLabelPrice[i_del]) == false
+                                size := array.size(bearLabelPrice[i_del])   
+    	                        while i_delArray <= size
+                                    label.delete( array.get(bearLabelPrice[i_del], array.size(bearLabelPrice[i_del]) - i_delArray))
+                                    i_delArray := i_delArray + 1                
+                        array.push(bearLabelPrice, label.new(bar_index - x1_price,  y1_price, "Br",  yloc=yloc.price, color=bearColor,  style=label.style_label_down, textcolor = color.white, size = size.small) )
+
+                        if i_print_lines == 0 and doRealtimeAlerts
+                            alert("Potential Regular Bear", alert.freq_once_per_bar)
+
+    //delete
+        if doRealtime and count_rt == 1
+            i_delArray := 0
+            size := array.size(x2_osc)
+    	    while i_delArray < size
+    	    	array.pop(x2_osc)
+    	    	array.pop(y2_osc)
+                i_delArray := i_delArray + 1
+            
+            i_delArray := 0
+            size := array.size(x2_price) 
+    	    while i_delArray < size
+    	    	array.pop(x2_price)
+    	    	array.pop(y2_price)
+                i_delArray := i_delArray + 1
+
+isBearFlagReady = false
+if plotBearFlags and array.size(x2_osc) > 0 and array.size(x2_price) > 0 
+    isBearFlagReady := true
+
+plotshape(
+	 (isBearFlagReady[1] == false and isBearFlagReady == true) ? (overlayChart ? y1_price : y1_osc) : na,
+	 offset= (overlayChart ? -(x1_price+lbR): -(x1_osc+lbR)),
+	 title="Bearish Label",
+	 text="Br",
+	 style=shape.labeldown,
+	 location=location.absolute,
+	 color=bearColor,
+	 textcolor=textColor,
+	 transp=0
+	 )
+
+i_delArray := 0
+size := array.size(x2_osc)
+while i_delArray < size
+    array.pop(x2_osc)
+    array.pop(y2_osc)
+    i_delArray := i_delArray + 1
+            
+i_delArray := 0
+size := array.size(x2_price) 
+while i_delArray < size
+    array.pop(x2_price)
+    array.pop(y2_price)
+    i_delArray := i_delArray + 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+////////////------------------------------------------------------------------------------
+//////  Hidden Bearish
+
+cancel_line := false
+    
+for count_rt = 1 to loopTotal_rt
+    if doRealtime and count_rt == 1
+        pricePivBar := devPricePivBar_rt
+        oscPivBar := devOscPivBar_rt
+    else
+        pricePivBar := devPricePivBar
+        oscPivBar := devOscPivBar
+    //If right side pivots are found - test for all left side HL pivots of oscillator then LL pivots of price. 
+    //I don't think left side pivots need to be aligned at ALL to be considered a divergence
+    if ((rightPivotsFound and doRealtime and count_rt == 2) or (rightPivotsFound and doRealtime == false and count_rt == 1) or (rightPivotsFound_rt and doRealtime and count_rt == 1)) and (oscPivBar + 1) <= rangeUpper and (pricePivBar + 1) <= rangeUpper
+        i_POsc := ((oscPivBar + 1 < rangeLower) ? rangeLower : (oscPivBar + 1)) //start the search after first found pivot, and don't search before rangeLower    
+    
+    
+    
+////// -- Osc: Higher High
+        while (i_POsc+lbR) <= rangeUpper
+            if phFound_Osc[i_POsc] == true
+                if osc[i_POsc+lbR] < osc[oscPivBar]
+                    oscDivLineBarTotal :=  (i_POsc+lbR) - oscPivBar + 1 //I added 1 because you must include all bars from beginning to end of (possible)divergence line for line segmentation formula
+                    
+                    if totallyInterBars <= math.floor((i_POsc+lbR)/2)//FIX: this doesn't account for the middle bar
+                        for i_OscDivLine = totallyInterBars to (i_POsc+lbR )- totallyInterBars
+                            oscDiverLine := osc[oscPivBar] + (i_OscDivLine / oscDivLineBarTotal) * (osc[i_POsc+lbR] - osc[oscPivBar])//This is the line segmentation formula for just y
+                            if osc[i_OscDivLine + oscPivBar] > oscDiverLine + (interAllowanceOsc * math.abs(oscDiverLine))//If oscillator crosses above divergence line (minus allowance) then cancel divergence
+                                cancel_line := true
+
+                    if useBestSlope and array.size(x2_osc) == 1 and cancel_line == false
+                        //Only keep oscillator divergence lines with slope nearest 0
+                        slope1 := math.abs((osc[oscPivBar] - osc[i_POsc+lbR]) / (oscPivBar - (i_POsc+lbR)))
+                        slope2 := math.abs((y1_osc - array.get(y2_osc, 0)) / (x1_osc - array.get(x2_osc, 0))) 
+                        if slope1 > slope2
+                            cancel_line := true
+                        else
+                            array.remove(x2_osc, 0)    	            
+    	                    array.remove(y2_osc, 0) 
+    
+                    if cancel_line == false
+                        x1_osc := oscPivBar
+                        array.push(x2_osc, i_POsc+lbR)
+                        y1_osc := osc[oscPivBar]
+                        array.push(y2_osc, osc[i_POsc+lbR])
+            cancel_line := false
+            i_POsc := i_POsc + 1
+    
+    
+            
+////// -- Price: Lower High
+        i_PPrice :=  ((pricePivBar + 1 < rangeLower) ? rangeLower : (pricePivBar + 1)) 
+        cancel_line := false
+        while (i_PPrice+lbR )<= rangeUpper
+            if phFound_Price[i_PPrice] == true
+                if high[i_PPrice+lbR] > high[pricePivBar]
+                    priceDivLineBarTotal :=  (i_PPrice+lbR) - pricePivBar + 1 //I added 1 because you must include all bars from beginning to end of (possible)divergence line for line segmentation formula
+                    
+                    if totallyInterBars <= math.floor((i_PPrice+lbR) / 2)//FIX: this doesn't account for the middle bar
+                        for i_PriceDivLine = totallyInterBars to (i_PPrice+lbR) - totallyInterBars
+                            priceDiverLine := high[pricePivBar] + (i_PriceDivLine / priceDivLineBarTotal) * (high[i_PPrice+lbR] - high[pricePivBar])//This is the line segmentation formula for just y
+                            if high[i_PriceDivLine + pricePivBar] > priceDiverLine + (interAllowancePrice * math.abs(priceDiverLine))//If oscillator crosses below (divergence line - allowance) then cancel divergence
+                                cancel_line := true
+
+                    if useBestSlope and array.size(x2_price) == 1 and cancel_line == false
+                        //Only keep price divergence lines with slope farthest from 0
+                        slope1 := math.abs((high[pricePivBar] - high[i_PPrice+lbR]) / (pricePivBar - (i_PPrice+lbR)))
+                        slope2 := math.abs((y1_price - array.get(y2_price, 0)) / (x1_price - array.get(x2_price, 0))) 
+                        if slope1 < slope2
+                            cancel_line := true
+                        else
+                            array.remove(x2_price, 0)    	            
+    	                    array.remove(y2_price, 0) 
+                    
+                    if cancel_line == false
+                        x1_price := pricePivBar
+                        array.push(x2_price, i_PPrice+lbR)
+                        y1_price := high[pricePivBar]
+                        array.push(y2_price, high[i_PPrice+lbR])
+            cancel_line := false
+            i_PPrice := i_PPrice + 1
+    
+        if array.size(x2_osc) > 0 and array.size(x2_price) > 0 and plotHiddenBear
+            if overlayChart == false
+                //Draw oscillator divergences
+                for i_print_lines = 0 to array.size(x2_osc) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 150 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            
+                            if na(hidBearLineOsc[i_del]) == false
+                                size := array.size(hidBearLineOsc[i_del])
+                                while i_delArray <= size
+                                    line.delete( array.get(hidBearLineOsc[i_del], array.size(hidBearLineOsc[i_del]) - i_delArray))
+                                    i_delArray := i_delArray + 1                
+                        array.push(hidBearLineOsc, line.new(bar_index - array.get(x2_osc, i_print_lines), array.get(y2_osc, i_print_lines), bar_index - x1_osc,  y1_osc, color=hiddenBearColor, width=2, style=line.style_dashed) )
+                    else               
+                        line.new(bar_index - array.get(x2_osc, i_print_lines), array.get(y2_osc, i_print_lines), bar_index - x1_osc,  y1_osc,   color=hiddenBearColor, width=2)
+            else
+                for i_print_lines = 0 to array.size(x2_price) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 350 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            
+                            if na(hidBearLinePrice[i_del]) == false
+                                size := array.size(hidBearLinePrice[i_del])
+                                
+    	                        while i_delArray <= size
+                                    line.delete( array.get(hidBearLinePrice[i_del], array.size(hidBearLinePrice[i_del]) - i_delArray))
+                                    i_delArray := i_delArray + 1                
+                        array.push(hidBearLinePrice, line.new(bar_index - array.get(x2_price, i_print_lines), array.get(y2_price, i_print_lines), bar_index - x1_price,  y1_price, color=hiddenBearColor, width=2, style=line.style_dashed) )
+                    else               
+                        line.new(bar_index - array.get(x2_price, i_print_lines), array.get(y2_price, i_print_lines), bar_index - x1_price,  y1_price,   color=hiddenBearColor, width=2)
+
+
+        if array.size(x2_osc) > 0 and array.size(x2_price) > 0 and plotHidBearFlags
+            if overlayChart == false
+                //Draw REALTIME oscillator divergence labels and create alert
+                for i_print_lines = 0 to array.size(x2_osc) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 150 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            
+                            if na(hidBearLabelOsc[i_del]) == false
+                                size := array.size(hidBearLabelOsc[i_del])
+                                while i_delArray <= size
+                                    label.delete( array.get(hidBearLabelOsc[i_del], array.size(hidBearLabelOsc[i_del]) - i_delArray))
+                                    i_delArray := i_delArray + 1                
+                        array.push(hidBearLabelOsc, label.new(bar_index - x1_osc,  y1_osc, "HBr",  yloc=yloc.price, color=hiddenBearColor,  style=label.style_label_down, textcolor = color.white, size = size.small) )
+                        
+                        if i_print_lines == 0 and doRealtimeAlerts
+                            alert("Potential Hidden Bear", alert.freq_once_per_bar)
+            else
+                //Draw REALTIME price divergence labels and create alert
+                for i_print_lines = 0 to array.size(x2_price) - 1
+                    if doRealtime and count_rt == 1
+                        for i_del = numPriorLines to 350//FIX: 350 is arbitrary.
+                            size := 0
+                            i_delArray := 1
+                            
+                            if na(hidBearLabelPrice[i_del]) == false
+                                size := array.size(hidBearLabelPrice[i_del])
+                                
+    	                        while i_delArray <= size
+                                    label.delete( array.get(hidBearLabelPrice[i_del], array.size(hidBearLabelPrice[i_del]) - i_delArray))
+                                    i_delArray := i_delArray + 1                
+                        array.push(hidBearLabelPrice, label.new(bar_index - x1_price,  y1_price, "HBr",  yloc=yloc.price, color=hiddenBearColor,  style=label.style_label_down, textcolor = color.white, size = size.small) )
+
+                        if i_print_lines == 0 and doRealtimeAlerts
+                            alert("Potential Hidden Bear", alert.freq_once_per_bar)
+
+    //delete
+        if doRealtime and count_rt == 1
+            i_delArray := 0
+            size := array.size(x2_osc)
+    	    while i_delArray < size
+    	    	array.pop(x2_osc)
+    	    	array.pop(y2_osc)
+                i_delArray := i_delArray + 1
+            
+            i_delArray := 0
+            size := array.size(x2_price) 
+    	    while i_delArray < size
+    	    	array.pop(x2_price)
+    	    	array.pop(y2_price)
+                i_delArray := i_delArray + 1
+
+isHidBearFlagReady = false
+if plotHidBearFlags and array.size(x2_osc) > 0 and array.size(x2_price) > 0
+    isHidBearFlagReady := true
+
+plotshape(
+	 (isHidBearFlagReady[1] == false and isHidBearFlagReady == true) ? (overlayChart ? y1_price : y1_osc) : na,
+	 offset= (overlayChart ? -(x1_price+lbR): -(x1_osc+lbR)),
+	 title="Hidden Bearish Label",
+	 text="HBr",
+	 style=shape.labeldown,
+	 location=location.absolute,
+	 color=hiddenBearColor,
+	 textcolor=textColor,
+	 transp=0
+	 )
+
+i_delArray := 0
+size := array.size(x2_osc)
+while i_delArray < size
+    array.pop(x2_osc)
+    array.pop(y2_osc)
+    i_delArray := i_delArray + 1
+            
+i_delArray := 0
+size := array.size(x2_price) 
+while i_delArray < size
+    array.pop(x2_price)
+    array.pop(y2_price)
+    i_delArray := i_delArray + 1
