@@ -1,0 +1,172 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © RozaniGhani-RG
+// Credits to Scott M Carney, author of Harmonic Trading: Volume Two
+// Bullish XAB=CD BAMM Breakout  - Page 144
+// Bearish XAB=CD BAMM Breakdown - Page 148
+// Bullish  AB=CD BAMM Breakout  - Page 153
+// Bearish  AB=CD BAMM Breakdown - Page 156
+
+//@version=4
+study("Bat Action Magnet Move BAMM Theory Educational (Source Code)", shorttitle = "BAMMTE_SC")
+
+// 0. Input
+// 1. array
+// 2. Ternary conditional operator
+// 3. Custom functions
+// 4. array and custom functions for table
+// 5. Construct
+// 6. if statement
+
+// 0. Input
+G0 = " Direction       Pattern"
+input_direction = input("Bullish", "", options = ["Bullish", "Bearish"], inline = "0", group = G0)
+input_pattern   = input("AB=CD",   "", options = ["AB=CD",   "XAB=CD"],  inline = "0", group = G0)
+
+// 1. array
+arr_color = array.new_color(),  arr_color := array.from(color.black, color.teal, color.red)
+//                                                      0      1      2      3      4
+//                                                      X      A      B      C      D
+arr_label = array.new_string(), arr_label := array.from("X",   "A",   "B",   "C",   "D")
+arr_float = array.new_float(),  arr_float := array.from(1.000, 0.000, 0.500, 0.250, 0.886)
+arr_int   = array.new_int(),    arr_int   := array.from(50,    40,    30,    20,    10)
+//                                                      XB               XD               AC        BD
+arr_rng_0 = array.new_float(),  arr_rng_0 := array.from(0.750,           0.125,           0.943,    0.693)
+arr_rng_1 = array.new_float(),  arr_rng_1 := array.from(                                  0.125,    0.693)
+arr_val_0 = array.new_string(), arr_val_0 := array.from("0.382;\n0.500", "0.382;\n0.886", "0.886", "1.618;\n2.618")
+arr_val_1 = array.new_string(), arr_val_1 := array.from(                                  "0.500", "2.000")
+
+// 2. Ternary conditional operator
+col       = input_direction == "Bullish" ? array.get(arr_color, 1) : array.get(arr_color, 2)
+style_0   = input_direction == "Bullish" ? label.style_label_down  : label.style_label_up
+style_1   = input_direction == "Bullish" ? label.style_label_up    : label.style_label_down
+dir       = input_direction == "Bullish" ? 1                       : -1
+dir_title = input_direction == "Bullish" ? "Bullish"               : "Bearish"
+dir_break = input_direction == "Bullish" ? "Breakout"              : "Breakdown"
+pattern   = input_pattern   == "AB=CD"   ? "AB=CD"                 : "XAB=CD"
+
+// 3. Custom functions
+// Label custom functions
+fun_label_0(_a) =>
+    var label id = na, label.delete(id)
+    id := label.new(
+     x = bar_index[array.get(arr_int, _a)], y = dir * array.get(arr_float, _a), text = array.get(arr_label, _a),
+     color = color.new(color.blue, 100), textcolor = col,
+     style = style_0, size = size.large)
+fun_label_1(_a) =>
+    var label id = na, label.delete(id)
+    id := label.new(
+     x = bar_index[array.get(arr_int, _a)], y = dir * array.get(arr_float, _a), text = array.get(arr_label, _a),
+     color = color.new(color.blue, 100), textcolor = col,
+     style = style_1, size = size.large)
+fun_label_2(_a, _b) =>
+    var label id = na, label.delete(id)
+    id := label.new(
+     x = bar_index[array.get(arr_int, _a)], y = dir * array.get(arr_rng_0, _b), text = array.get(arr_val_0, _b),
+     color = col,                        textcolor = array.get(arr_color, 0),
+     style = label.style_label_center, size = size.large)
+fun_label_3(_a, _b) =>
+    var label id = na, label.delete(id)
+    id := label.new(
+     x = bar_index[array.get(arr_int, _a)], y = dir * array.get(arr_rng_1, _b), text = array.get(arr_val_1, _b),
+     color = col,                        textcolor = array.get(arr_color, 0),
+     style = label.style_label_center, size = size.large)
+fun_label_buy() =>
+    var label id = na, label.delete(id)
+    id := label.new(
+     x = bar_index[0],                      y = dir * array.get(arr_float, 2),  text = "BUY",
+     color = color.new(color.blue, 100), textcolor = array.get(arr_color, 1),
+     style = label.style_label_left,   size = size.large)
+fun_label_sell() =>
+    var label id = na, label.delete(id)
+    id := label.new(
+     x = bar_index[0], y = dir * array.get(arr_float, 4),                       text = "SELL",
+     color = color.new(color.blue, 100), textcolor = array.get(arr_color, 2),
+     style = label.style_label_left,   size = size.large)
+fun_label_bamm() =>
+    var label id = na, label.delete(id)
+    id := label.new(
+     x = bar_index[5], y = dir * 0.7,                                           text = "BAMM\nTRIGGER",
+     color = color.new(color.blue, 100), textcolor = array.get(arr_color, 0),
+     style = label.style_label_center, size = size.large)
+// Line custom functions
+fun_line_solid(_a, _b) =>
+    var line id = na, line.delete(id)
+    id := line.new(
+     x1 = bar_index[array.get(arr_int, _a)], y1 = dir * array.get(arr_float, _a), x2 = bar_index[array.get(arr_int, _b)], y2 = dir * array.get(arr_float, _b),
+     color = col)
+fun_line_dot(_a, _b) =>
+    var line id = na, line.delete(id)
+    id := line.new(
+     x1 = bar_index[array.get(arr_int, _a)], y1 = dir * array.get(arr_float, _a), x2 = bar_index[array.get(arr_int, _b)], y2 = dir * array.get(arr_float, _b),
+     color = col,                     style = line.style_dotted)
+fun_line_dash() =>
+    var line id = na, line.delete(id)
+    id := line.new(
+     x1 = bar_index[30],                     y1 = dir * array.get(arr_float, 2),  x2 = bar_index[10],                     y2 = dir * array.get(arr_float, 2),
+     color = array.get(arr_color, 1), style = line.style_dashed)
+fun_line_buy() =>
+    var line id = na, line.delete(id)
+    id := line.new(
+     x1 = bar_index[10],                     y1 = dir * array.get(arr_float, 2),  x2 = bar_index[0],                      y2 = dir * array.get(arr_float, 2),
+     color = array.get(arr_color, 1), width = 4)
+fun_line_sell() =>
+    var line id = na, line.delete(id)
+    id := line.new(
+     x1    = bar_index[10],                  y1 = dir * array.get(arr_float, 4),  x2 = bar_index[0],                      y2 = dir * array.get(arr_float, 4),
+     color = array.get(arr_color, 2), width = 4)
+fun_line_bamm_0() =>
+    var line id = na, line.delete(id)
+    id := line.new(
+     x1 = bar_index[10],                     y1 = dir * array.get(arr_float, 2),  x2 = bar_index[10],                     y2 = dir * array.get(arr_float, 4),
+     color = color.blue, style = line.style_arrow_right, width = 4)
+fun_line_bamm_1() =>
+    var line id = na, line.delete(id)
+    id := line.new(
+     x1    = bar_index[0],                   y1 = dir * array.get(arr_float, 2),  x2 = bar_index[0],                      y2 = dir * array.get(arr_float, 4),
+     color = color.blue, style = line.style_arrow_right, width = 4)
+// Box custom functions
+fun_box() =>
+    var box id = na, box.delete(id)
+    id := box.new(
+     left = bar_index[10], top = dir * array.get(arr_float, 2), right = bar_index[0], bottom = dir * array.get(arr_float, 4),
+     bgcolor = color.new(color.yellow, 50), border_color = color.new(color.blue, 100))
+
+// 4. array and custom functions for table
+table[] arr_table = array.new_table()
+fun_table_top()   => table.new(position = position.top_center, rows = 1, columns = 4, bgcolor = na)
+array.push(arr_table, fun_table_top())
+fun_cell() =>
+    table.cell(array.get(arr_table, 0), 0, 0, bgcolor = color.black, text_size = size.large, text_color = col,        text = dir_title)
+    table.cell(array.get(arr_table, 0), 1, 0, bgcolor = color.black, text_size = size.large, text_color = color.blue, text = pattern)
+    table.cell(array.get(arr_table, 0), 2, 0, bgcolor = color.black, text_size = size.large, text_color = color.blue, text = "BAMM")
+    table.cell(array.get(arr_table, 0), 3, 0, bgcolor = color.black, text_size = size.large, text_color = col,        text = dir_break)
+
+// 5. Construct
+fun_cell()
+fun_box()
+fun_label_buy(),  fun_line_buy(),    fun_line_dash()
+fun_label_sell(), fun_line_sell()
+fun_label_bamm(), fun_line_bamm_0(), fun_line_bamm_1()
+fun_label_1(1)       // Label A
+fun_label_0(2)       // Label B
+fun_label_1(3)       // Label C
+fun_label_0(4)       // Label D
+fun_line_solid(1, 2) // Point AB
+fun_line_solid(2, 3) // Point BC
+fun_line_solid(3, 4) // Point CD
+fun_line_dot(2, 4)   // Point BD
+fun_line_dot(1, 3)   // Point AC
+
+// 6. if statement
+if input_pattern == "XAB=CD"
+    fun_label_0(0)       // Label X
+    fun_line_solid(0, 1) // Point XA
+    fun_line_dot(0, 2)   // Point XB
+    fun_line_dot(0, 4)   // Point XD
+    fun_label_2(1, 0)    // Label XB
+    fun_label_2(2, 1)    // Label XD
+    fun_label_2(2, 2)    // Label AC
+    fun_label_2(3, 3)    // Label BD
+else if input_pattern == "AB=CD"
+    fun_label_3(2, 0)    // Label AC
+    fun_label_3(3, 1)    // Label BD
