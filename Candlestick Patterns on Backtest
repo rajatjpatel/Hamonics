@@ -1,0 +1,421 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// ©
+
+//@version=5
+indicator("Candlestick Patterns on Backtest", overlay = true, max_labels_count = 500, max_bars_back = 50)
+import shoonya0000/CandlestickPatterns/1 as cp
+
+// |++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+// |                                   INPUT                                    |
+// |++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+s = " ‏"
+// +++++++++++++++ Table Settings
+// Location 
+tablePos = input.string("Middle Right", "Table Location ", 
+             ["Top Right" , "Middle Right"  , "Bottom Right" , 
+             "Top Center", "Middle Center" , "Bottom Center", 
+             "Top Left"  , "Middle Left"   , "Bottom Left" ], inline = "1", group = "Table Setting")
+
+// Size
+tableSiz = input.string("Small", "", 
+             ["Auto", "Huge", "Large", "Normal", "Small", "Tiny"], inline = "1", group = "Table Setting")
+
+// Table Color
+posCol = input.color(#006400, "Positive",   group = "Table Setting", inline = "4")
+neuCol = input.color(#ffffff, " Neutral",   group = "Table Setting", inline = "4")
+negCol = input.color(#882336, " Negative ", group = "Table Setting", inline = "4")
+
+tBgCol = input.color(#696969, "Titles ",    group = "Table Setting", inline = "2")
+txtCl1 = input.color(#ffffff, "    Text",   group = "Table Setting", inline = "2")
+txtCl2 = input.color(#000000, "",           group = "Table Setting", inline = "2")
+
+// +++++++++++++++ Label Color
+labChk = input.bool(false, "Show Pattern Label", inline = "lab")
+labCl1 = input.color(color.blue,  "", inline = "lab")
+labCl2 = input.color(color.red,   "", inline = "lab")
+labCl3 = input.color(color.white, "", inline = "lab")
+
+// +++++++++++++++ Backtest Setting
+sTim  = input.time(timestamp("01 Jan 2000 20:00"), "From", inline = "0", group = "Backtest Setting",
+         tooltip = "Backtest Starting Period\n\nNote: If the datetime of the first candle on the chart" +
+         " is after the entreated datetime, the calculation will start from the first candle on the chart.")
+cash  = input.float(100000, "Initial Equity ($)", 1, group = "Backtest Setting")
+mrgn  = input.float(1, "Leverage", 1, group = "Backtest Setting")
+enMod = input.string("At Close", "Entry Mode", ["At Close", "Breakout High (Low for Short)"], group = "Backtest Setting")
+cnclC = input.bool(true, "Cancel Entry Within Bars", group = "Backtest Setting", inline = "cnc")
+cnclN = input.int(3, "", 1, group = "Backtest Setting", inline = "cnc", 
+         tooltip = "This option is applicable with\n  {Entry Mode = Breakout High (Low for Short)}\n"+
+                   "\nCancel the Entry Order if it's not executed within certain number of Bars.")
+
+stpls = input.float(1, "StopLoss Range        ", 0, step = 0.1, tooltip = "Example & Illustration" 
+       + "\n0.5 is half distance of pattern's range." + "\n1 is distance of pattern's range."
+       + "\n2 is twice distance of pattern's range."  
+       + "\n\n*Pattern's Range: high of pattern - low of pattern", group = "Backtest Setting")
+
+// Risk Rewards Inputs
+rw01c = input.bool(true, "", inline = "01", group = "Backtest Setting")
+rw02c = input.bool(true, "", inline = "02", group = "Backtest Setting")
+rw03c = input.bool(true, "", inline = "03", group = "Backtest Setting")
+rw04c = input.bool(true, "", inline = "04", group = "Backtest Setting")
+rw05c = input.bool(true, "", inline = "05", group = "Backtest Setting")
+rw06c = input.bool(true, "", inline = "06", group = "Backtest Setting")
+rw07c = input.bool(true, "", inline = "07", group = "Backtest Setting")
+rw01v = input.float(1.0, "[01] Risk:Reward     ", 0, inline = "01", group = "Backtest Setting")
+rw02v = input.float(1.5, "[02] Risk:Reward     ", 0, inline = "02", group = "Backtest Setting")
+rw03v = input.float(2.0, "[03] Risk:Reward     ", 0, inline = "03", group = "Backtest Setting")
+rw04v = input.float(3.0, "[04] Risk:Reward     ", 0, inline = "04", group = "Backtest Setting")
+rw05v = input.float(4.0, "[05] Risk:Reward     ", 0, inline = "05", group = "Backtest Setting")
+rw06v = input.float(5.0, "[06] Risk:Reward     ", 0, inline = "06", group = "Backtest Setting")
+rw07v = input.float(6.0, "[07] Risk:Reward     ", 0, inline = "07", group = "Backtest Setting")
+
+// +++++++++++++++ Technical Settings
+// Moving Average
+maChk   = input.bool(true, "Detect Trend Based on SMA", inline = "0", group = "Technical")
+maLen   = input.int(50, "", 1,                          inline = "0", group = "Technical")
+
+// +++++++++++++++ Candle Patterns
+// Type
+ptrnTyp = input.string("Both", "Pattern Type", ["Bullish", "Bearish", "Both"], group = "Candle Patterns")
+
+// Patterns
+abandonedBabyChk       = input.bool(true, "Abandoned Baby",        group = "Candle Patterns", inline = "01") 
+dbarkCloudCoverChk     = input.bool(true, "Dark Cloud Cover",      group = "Candle Patterns", inline = "01") 
+dojiStarChk            = input.bool(true, "Doji Star",             group = "Candle Patterns", inline = "02") 
+downsideTasukiGapChk   = input.bool(true, "Downside Tasuki Gap",   group = "Candle Patterns", inline = "02") 
+dragonflyDojiChk       = input.bool(true, "Dragonfly Doji",        group = "Candle Patterns", inline = "03") 
+engulfingChk           = input.bool(true, "Engulfing",             group = "Candle Patterns", inline = "03")
+eveningDojiStarChk     = input.bool(true, "Evening Doji Star",     group = "Candle Patterns", inline = "03") 
+eveningStarChk         = input.bool(true, "Evening Star",          group = "Candle Patterns", inline = "04") 
+fallingThreeMethodsChk = input.bool(true, "Falling Three Methods", group = "Candle Patterns", inline = "04") 
+fallingWindowChk       = input.bool(true, "Falling Window",        group = "Candle Patterns", inline = "05") 
+gravestoneDojiChk      = input.bool(true, "Gravestone Doji",       group = "Candle Patterns", inline = "05") 
+hammerChk              = input.bool(true, "Hammer",                group = "Candle Patterns", inline = "05") 
+hangingManChk          = input.bool(true, "Hanging Man",           group = "Candle Patterns", inline = "06") 
+haramiCrossChk         = input.bool(true, "Harami Cross",          group = "Candle Patterns", inline = "06") 
+haramiChk              = input.bool(true, "Harami",                group = "Candle Patterns", inline = "06")
+invertedHammerChk      = input.bool(true, "Inverted Hammer",       group = "Candle Patterns", inline = "07") 
+kickingChk             = input.bool(true, "Kicking",               group = "Candle Patterns", inline = "07") 
+longLowerShadowChk     = input.bool(true, "Long Lower Shadow",     group = "Candle Patterns", inline = "08") 
+longUpperShadowChk     = input.bool(true, "Long Upper Shadow",     group = "Candle Patterns", inline = "08") 
+marubozuBlackChk       = input.bool(true, "Marubozu Black",        group = "Candle Patterns", inline = "09") 
+marubozuWhiteChk       = input.bool(true, "Marubozu White",        group = "Candle Patterns", inline = "09") 
+morningDojiStarChk     = input.bool(true, "Morning Doji Star",     group = "Candle Patterns", inline = "10") 
+morningStarChk         = input.bool(true, "Morning Star",          group = "Candle Patterns", inline = "10") 
+onNeckChk              = input.bool(true, "On Neck",               group = "Candle Patterns", inline = "10") 
+piercingChk            = input.bool(true, "Piercing",              group = "Candle Patterns", inline = "11") 
+risingThreeMethodsChk  = input.bool(true, "Rising Three Methods",  group = "Candle Patterns", inline = "11") 
+risingWindowChk        = input.bool(true, "Rising Window",         group = "Candle Patterns", inline = "12") 
+shootingStarChk        = input.bool(true, "Shooting Star",         group = "Candle Patterns", inline = "12") 
+threeBlackCrowsChk     = input.bool(true, "Three Black Crows",     group = "Candle Patterns", inline = "14") 
+threeWhiteSoldiersChk  = input.bool(true, "Three White Soldiers",  group = "Candle Patterns", inline = "14") 
+triStarChk             = input.bool(true, "Tri-Star",              group = "Candle Patterns", inline = "15") 
+tweezerBottomChk       = input.bool(true, "Tweezer Bottom",        group = "Candle Patterns", inline = "15") 
+tweezerTopChk          = input.bool(true, "Tweezer Top",           group = "Candle Patterns", inline = "15") 
+upsideTasukiGapChk     = input.bool(true, "Upside Tasuki Gap",     group = "Candle Patterns", inline = "16") 
+
+pattern(a, x) =>
+    switch a
+        01 => x == "d" ? "Abandoned Baby (Bear)" : "AB"
+        02 => x == "d" ? "Abandoned Baby (Bull)" : "AB"
+        03 => x == "d" ? "Dark Cloud Cover (Bear)" : "DCC"
+        04 => x == "d" ? "Doji Star (Bear)" : "DS"
+        05 => x == "d" ? "Doji Star (Bull)" : "DS"
+        06 => x == "d" ? "Downside Tasuki Gap (Bear)" : "DTG"
+        07 => x == "d" ? "Dragonfly Doji (Bull)" : "DD"
+        08 => x == "d" ? "Engulfing (Bear)" : "BE"
+        09 => x == "d" ? "Engulfing (Bull)" : "BE"
+        10 => x == "d" ? "Evening Doji Star (Bear)" : "EDS"
+        11 => x == "d" ? "Evening Star (Bear)" : "ES"
+        12 => x == "d" ? "Falling Three Methods (Bear)" : "FTM"
+        13 => x == "d" ? "Falling Window (Bear)" : "FW"
+        14 => x == "d" ? "Gravestone Doji (Bear)" : "GD"
+        15 => x == "d" ? "Hammer (Bull)" : "H"
+        16 => x == "d" ? "Hanging Man (Bear)" : "HM"
+        17 => x == "d" ? "Harami Cross (Bear)" : "HC"
+        18 => x == "d" ? "Harami Cross (Bull)" : "HC"
+        19 => x == "d" ? "Harami (Bear)" : "BH"
+        20 => x == "d" ? "Harami (Bull)" : "BH"
+        21 => x == "d" ? "Inverted Hammer (Bull)" : "IH"
+        22 => x == "d" ? "Kicking (Bear)" : "K"
+        23 => x == "d" ? "Kicking (Bull)" : "K"
+        24 => x == "d" ? "Long Lower Shadow (Bull)" : "LLS"
+        25 => x == "d" ? "Long Upper Shadow (Bear)" : "LUS"
+        26 => x == "d" ? "Marubozu Black (Bear)" : "MB"
+        27 => x == "d" ? "Marubozu White (Bull)" : "MW"
+        28 => x == "d" ? "Morning Doji Star (Bull)" : "MDS"
+        29 => x == "d" ? "Morning Star (Bull)" : "MS"
+        30 => x == "d" ? "On Neck (Bear)" : "ON"
+        31 => x == "d" ? "Piercing (Bull)" : "P"
+        32 => x == "d" ? "Rising Three Methods (Bull)" : "RTM"
+        33 => x == "d" ? "Rising Window (Bull)" : "RW"
+        34 => x == "d" ? "Shooting Star (Bear)" : "SS"
+        35 => x == "d" ? "Three Black Crows (Bear)" : "3BC"
+        36 => x == "d" ? "Three White Soldiers (Bull)" : "3WS"
+        37 => x == "d" ? "Tri-Star (Bear)" : "TS"
+        38 => x == "d" ? "Tri-Star (Bull)" : "TS"
+        39 => x == "d" ? "Tweezer Bottom (Bull)" : "TB"
+        40 => x == "d" ? "Tweezer Top (Bear)" : "TT"
+        41 => x == "d" ? "Upside Tasuki Gap (Bull)" : "UTG"
+
+// |++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+// |                                CALCULATION                                 |
+// |++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+// Create Matrices
+var strt = sTim
+var rwIn = array.new<string>(na)
+rwInFun(flg, val) => 
+    if flg
+        array.push(rwIn, "1:" + str.tostring(val))
+
+if barstate.isfirst
+    strt := time > sTim ? time : sTim
+    rwInFun(true,    "0"), rwInFun(rw01c, rw01v), rwInFun(rw02c, rw02v), rwInFun(rw03c, rw03v)
+    rwInFun(rw04c, rw04v), rwInFun(rw05c, rw05v), rwInFun(rw06c, rw06v), rwInFun(rw07c, rw07v)
+
+var rtnMtx = matrix.new<float>(na,  array.size(rwIn), na) 
+var infMtx = matrix.new<string>(na, array.size(rwIn), na)
+
+// Get Label Location
+loc  = ta.sma(high - low, 14)/2 
+
+// Label ToolTip
+lbTip(id, lb, row, tp, ent, ext, pnl, rtn) => 
+    sign1 = (math.sign((rtn - 1)) < 0 ? "-" :  "")
+    sign2 = (math.sign((rtn - 1)) < 0 ? "-" : "+")
+    label.set_tooltip(lb, "Pattern = " + pattern(row, "d") + "\nRisk:Reward = 1:" + str.tostring(tp) + 
+     "\n\nResult = " + id + "\nEntry = "  + str.tostring(ent, format.mintick) + 
+     "\nExit = " + str.tostring(ext,  format.mintick) + "\nPnL = " + str.tostring(pnl * 100, format.percent) + 
+     "\n\nEquity = " + sign1 + "$" + str.tostring(math.abs((rtn - 1) * cash + cash), "#.00") +
+     " (" + sign2 + str.tostring(math.abs(rtn - 1) * 100, format.percent) + ")")
+
+// Matrix ToolTip
+mxTip(infMtx, idx, col, nmTrd, nmWin, nmLos, rtn) =>
+    matrix.set(infMtx, idx, col, "Number of Trades: " + str.tostring(nmTrd) +
+     "\nWon: " + str.tostring(nmWin) + "\nLost: " + str.tostring(nmLos) +
+     "\nCum PnL: " + str.tostring((rtn - 1) * 100, format.percent) + 
+     "\nEquity: $" + str.tostring((rtn - 1) * cash + cash, "#.00"))
+
+// Pattern Type 
+bull = not(ptrnTyp == "Bearish")
+bear = not(ptrnTyp == "Bullish")
+
+// Trend Detection (Moving Average)
+uTrd = maChk ? close > ta.sma(close, maLen) : true
+dTrd = maChk ? close < ta.sma(close, maLen) : true
+
+// Backtest Function
+test(int side, bool ptrn, int cand, float tp, int row, int col) =>
+    // [0] Declaring Variables
+    idx = array.indexof(matrix.col(rtnMtx, 0), row)
+    var label lb = na, var nmTrd = 0, var nmWin = 0, var nmLos = 0 
+    var bn = 0, var rtn = 1.0, var onTrd = false,       
+    var enTrd = float(na), var exTrd = float(na),
+    var tpTrd = float(na), var slTrd = float(na)
+
+    // [2] Exit Singal
+    if onTrd
+        // TakeProfit
+        if (side == 1 ? high >= tpTrd : low  <= tpTrd)
+            exTrd := (side == 1 ? open >= tpTrd ? open : tpTrd :
+                                  open <= tpTrd ? open : tpTrd)
+
+            // Calculate Return
+            pnl    = math.abs((exTrd - enTrd)/enTrd) * mrgn
+            rtn   := rtn * (1 + pnl)
+            nmWin += 1
+
+            // Fill Label Tooltip
+            lbTip("Won", lb, row, tp, enTrd, exTrd, pnl, rtn)
+
+            // Fill Mtrix
+            matrix.set(rtnMtx, idx, col, math.round((rtn - 1) * 100, 2))
+            mxTip(infMtx, idx, col, nmTrd, nmWin, nmLos, rtn)
+
+            // Rest
+            onTrd := false, enTrd := float(na), exTrd := float(na)
+
+        // StopLoss
+        else if (side == 1 ? low <= slTrd : high >= slTrd)
+            exTrd := (side == 1 ? open <= slTrd ? open : slTrd : 
+                                  open >= slTrd ? open : slTrd)
+        
+            // Calculate Return
+            pnl    = math.abs((exTrd - enTrd)/enTrd) * mrgn
+            rtn   := rtn * (1 - pnl)
+            nmLos += 1
+    
+            // Fill Label Tooltip
+            lbTip("Lost", lb, row, tp, enTrd, exTrd, -pnl, rtn)
+           
+            // Fill Mtrix
+            matrix.set(rtnMtx, idx, col, math.round((rtn - 1) * 100, 2))
+            mxTip(infMtx, idx, col, nmTrd, nmWin, nmLos, rtn)
+
+            // Rest
+            onTrd := false, enTrd := float(na), exTrd := float(na)
+
+    // [1] Entry Signals
+    var upRng = float(na),  upRng1 = ta.highest(cand)
+    var dnRng = float(na),  dnRng1 = ta.lowest(cand)
+    if  ptrn and stpls > 0 and na(exTrd) and not(side == 1 ? high > enTrd : low < enTrd)
+        upRng := upRng1, dnRng := dnRng1
+        enTrd := enMod == "At Close" ? close : side == 1 ? high : low
+        bn    := bar_index
+
+    if not(onTrd) 
+        if   (enMod == "At Close" ? enTrd : (side == 1 ? high > enTrd : low < enTrd)) and 
+             (enMod != "At Close" and cnclC ? cnclN >= bar_index - bn : true) and rtn > 0
+
+            enTrd := side == 1 ? open >= enTrd ? open : enTrd :
+                                 open <= enTrd ? open : enTrd
+
+            onTrd := true,   nmTrd += 1,   exTrd := enTrd
+
+            // Set TP & SL
+            slRng = (upRng - dnRng) * stpls 
+
+            tpTrd := enTrd + (side == 1 ?  slRng : -slRng) * tp
+            slTrd := enTrd + (side == 1 ? -slRng :  slRng)
+
+            // Draw Trade
+            if labChk
+                color = side == 1 ? labCl1 : labCl2
+                prce  = side == 1 ?  low [bar_index - bn] - loc[bar_index - bn] * col : 
+                                     high[bar_index - bn] + loc[bar_index - bn] * col
+
+                lb := label.new(bar_index[bar_index - bn], prce, pattern(row, "") + "\n1:" + str.tostring(tp), 
+                         xloc.bar_index, yloc.price, color, label.style_label_center, labCl3, size.small, 
+                         tooltip = "Pattern = " + pattern(row, "d") + "\nRisk:Reward = 1:" + str.tostring(tp) 
+                         + "\n\n" + "Entry = " + str.tostring(enTrd, format.mintick) + "\nTakeProfit = " + 
+                         str.tostring(tpTrd, format.mintick) + "\nStopLoss = " + str.tostring(slTrd, format.mintick))
+
+
+// Run Function
+run(side, flg, ptrn, cndl, row) =>
+    if flg 
+        if barstate.isfirst
+            matrix.add_row(rtnMtx, matrix.rows(rtnMtx), array.new<float>(array.size(rwIn),            0))
+            matrix.add_row(infMtx, matrix.rows(infMtx), array.new<string>(array.size(rwIn), "No Trades"))
+            matrix.set(rtnMtx, matrix.rows(rtnMtx) - 1, 0, row)
+            matrix.set(infMtx, matrix.rows(infMtx) - 1, 0, str.tostring(row))
+
+        i = 0, p = ptrn and time >= strt
+        if rw01c
+            i += 1, test(side, p, cndl, rw01v, row, i)
+        if rw02c
+            i += 1, test(side, p, cndl, rw02v, row, i)
+        if rw03c
+            i += 1, test(side, p, cndl, rw03v, row, i)
+        if rw04c
+            i += 1, test(side, p, cndl, rw04v, row, i)
+        if rw05c
+            i += 1, test(side, p, cndl, rw05v, row, i)
+        if rw06c
+            i += 1, test(side, p, cndl, rw06v, row, i)
+        if rw07c
+            i += 1, test(side, p, cndl, rw07v, row, i)
+        
+// Call Run on Patterns
+run(-1, bear and abandonedBabyChk, cp.abandonedBaby("bear") and uTrd[2], 3, 1)
+run( 1, bull and abandonedBabyChk, cp.abandonedBaby("bull") and dTrd[2], 3, 2)
+run(-1, bear and dbarkCloudCoverChk, cp.darkCloudCover() and uTrd[1], 2, 3)
+run(-1, bear and dojiStarChk, cp.dojiStar("bear") and uTrd, 2, 4)
+run( 1, bull and dojiStarChk, cp.dojiStar("bull") and dTrd, 2, 5)
+run(-1, bear and downsideTasukiGapChk, cp.downsideTasukiGap() and dTrd, 3, 6)
+run( 1, bull and dragonflyDojiChk, cp.dragonflyDoji(), 1, 7)
+run(-1, bear and engulfingChk, cp.engulfing("bear") and uTrd, 2, 08)
+run( 1, bull and engulfingChk, cp.engulfing("bull") and dTrd, 2, 09)
+run(-1, bear and eveningDojiStarChk, cp.eveningDojiStar() and uTrd, 3, 10)
+run(-1, bear and eveningStarChk, cp.eveningStar() and uTrd, 3, 11)
+run(-1, bear and fallingThreeMethodsChk, cp.fallingThreeMethods() and dTrd[4], 5, 12)
+run(-1, bear and fallingWindowChk, cp.fallingWindow() and dTrd[1], 1, 13)
+run(-1, bear and gravestoneDojiChk, cp.gravestoneDoji() and bear, 1, 14)
+run( 1, bull and hammerChk, cp.hammer() and dTrd, 1, 15)
+run(-1, bear and hangingManChk, cp.hangingMan() and uTrd, 1, 16)
+run(-1, bear and haramiCrossChk, cp.haramiCross("bear") and uTrd[1], 2, 17)
+run( 1, bull and haramiCrossChk, cp.haramiCross("bull") and dTrd[1], 2, 18)
+run(-1, bear and haramiChk, cp.harami("bear") and uTrd[1], 2, 19)
+run( 1, bull and haramiChk, cp.harami("bull") and dTrd[1], 2, 20)
+run( 1, bull and invertedHammerChk, cp.invertedHammer() and dTrd, 1, 21)
+run(-1, bear and kickingChk, cp.kicking("bear") and bear, 2, 22)
+run( 1, bull and kickingChk, cp.kicking("bull"), 2, 23)
+run( 1, bull and longLowerShadowChk, cp.longLowerShadow(), 1, 24)
+run(-1, bear and longUpperShadowChk, cp.longUpperShadow() and bear, 1, 25)
+run(-1, bear and marubozuBlackChk, cp.marubozuBlack() and bear, 1, 26)
+run( 1, bull and marubozuWhiteChk, cp.marubozuWhite(), 1, 27)
+run( 1, bull and morningDojiStarChk, cp.morningDojiStar() and dTrd, 3, 28)
+run( 1, bull and morningStarChk, cp.morningStar() and dTrd, 3, 29)
+run(-1, bear and onNeckChk, cp.onNeck() and dTrd, 2, 30)
+run( 1, bull and piercingChk, cp.piercing() and dTrd[1], 2, 31)
+run( 1, bull and risingThreeMethodsChk, cp.risingThreeMethods() and uTrd[4], 5, 32)
+run( 1, bull and risingWindowChk, cp.risingWindow() and uTrd[1], 1, 33)
+run(-1, bear and shootingStarChk, cp.shootingStar() and uTrd, 1, 34)
+run(-1, bear and threeBlackCrowsChk, cp.threeBlackCrows() and bear, 3, 35)
+run( 1, bull and threeWhiteSoldiersChk, cp.threeWhiteSoldiers(), 3, 36)
+run(-1, bear and triStarChk, cp.triStar("bear") and uTrd[2], 3, 37)
+run( 1, bull and triStarChk, cp.triStar("bull") and dTrd[2], 3, 38)
+run( 1, bull and tweezerBottomChk, cp.tweezerBottom() and dTrd[1], 2, 39)
+run(-1, bear and tweezerTopChk, cp.tweezerTop() and uTrd[1], 2, 40)
+run( 1, bull and upsideTasukiGapChk, cp.upsideTasukiGap() and uTrd, 3, 41)
+
+// |++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+// |                                   TABLE                                    |
+// |++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+// Get Tbale Location & Size
+locNsze(x) => 
+    y   = str.split(str.lower(x), " ")
+    out = ""
+    for i = 0 to array.size(y) - 1
+        out := out + array.get(y, i)
+        if i != array.size(y) - 1
+            out := out + "_"
+    out
+
+// Create Table
+nCols = matrix.columns(rtnMtx)
+nRows = matrix.rows(rtnMtx)
+var tbl = table.new(locNsze(tablePos), nCols, nRows+2, color.new(tBgCol, 100), 
+                     color.new(tBgCol, 100), 1, color.new(tBgCol, 100), 1)
+
+// Cell Function
+cell(col, row, txt, color, txtCol, tip) => 
+    table.cell(tbl, col, row, text = txt, text_color = txtCol, bgcolor = color, 
+     text_size = locNsze(tableSiz), tooltip = tip)
+
+if barstate.islast
+    table.clear(tbl, 0, 0, nCols-1, nRows+1)
+
+    // Find Max Min Values
+    maxVal = 100.0, minVal = -50.0
+    if nCols > 1 and nRows > 0
+        mtxVal  = matrix.submatrix(rtnMtx, 0, nRows, 1, nCols)
+        maxVal := matrix.max(mtxVal) < 100 and matrix.max(mtxVal) != 0 ? matrix.max(mtxVal) : 100
+        minVal := matrix.min(mtxVal) > -50 and matrix.min(mtxVal) != 0 ? matrix.min(mtxVal) : -50
+
+    if array.size(rwIn) > 1
+        cell(1, 0, "R E T U R N (%)", tBgCol, txtCl1, "Return (%)"), table.merge_cells(tbl, 1, 0, nCols-1, 0)
+
+    start = "Backtest Start From\n" + str.format_time(strt, "yyyy-MM-dd", syminfo.timezone)
+    cell(0, 0, start, tBgCol, txtCl1, start)
+    cell(0, 1, "P A T T E R N S", tBgCol, txtCl1, "Patterns")
+    
+    y = 2
+    if array.size(rwIn) > 0
+        for j = 0 to array.size(rwIn) - 1
+            if j > 0 
+                a = array.get(rwIn, j), cell(j, 1, a, tBgCol, txtCl1, a)
+        
+            if nCols - 1 >= j and nRows > 0
+                for i = 0 to nRows - 1
+                    if j == 0
+                        p = pattern(matrix.get(rtnMtx, i, 0), "d"), cell(j, y, p, tBgCol, txtCl1, p)
+
+                    else
+                        val = matrix.get(rtnMtx, i, j)
+                        col = val >= 0 ? color.from_gradient(val, 0, maxVal, neuCol, posCol) :
+                                         color.from_gradient(val, minVal, 0, negCol, neuCol)
+
+                        cell(j, y, str.tostring(val, format.percent), col, txtCl2, matrix.get(infMtx, i, j))
+                    y += 1
+            y := 2
+
