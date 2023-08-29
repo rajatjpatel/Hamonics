@@ -1,0 +1,474 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © MUQWISHI
+
+//@version=5
+
+// @description This library provides a wide range of candlestick patterns, and available for user to call each pattern individually. It's a comprehensive and common tool designed for traders seeking to raise their technical analysis, and it may help users identify key turning of price action in financial instruments. Credit to public technical “*All Candlestick Patterns*” indicator.
+library("CandlestickPatterns")
+
+// Candle Structure 
+cUpBody = open < close   // Green Candle 
+cDnBody = open > close   // Red Candle
+cRange  = high-low       // Candle Range
+
+// Candle's Body Structure
+cBodyHi = math.max(close, open) // Body high (Open/Close)
+cBodyLw = math.min(close, open)	// Body low (Open/Close)
+cBody   = cBodyHi - cBodyLw     // Tall body
+cUpWick = high - cBodyHi		// Tall upper Wick
+cDnWick = cBodyLw - low			// Tall lower Wick
+cBodyMd = cBody / 2 + cBodyLw   // Midpoint body
+
+
+// Candle Calculation
+cBodyAvg(len)    => ta.ema(cBody, len)             // Compare candle's body to the average of previous candles' body.
+
+cLwBodyAvg(x, n) => x ? cBody < cBodyAvg(n) : true // Candle's Body lower than average
+cHiBodyAvg(x, n) => x ? cBody > cBodyAvg(n) : true // Candle's Body higher than average
+
+cHasUpWick = cUpWick > 5.0 / 100 * cBody           // Compare candle's body to its upper wick.
+cHasDnWick = cDnWick > 5.0 / 100 * cBody 		   // Compare candle's body to its lower wick.
+
+
+// Doji Calculation
+dojiBody(x)   => cRange > 0 and cBody <= cRange * x / 100
+dojiCandle(x) => dojiBody(x) and cUpWick == cDnWick or 
+			     (math.abs(cUpWick - cDnWick) / cDnWick * 100) < 100 and 
+				 (math.abs(cDnWick - cUpWick) / cUpWick * 100) < 100
+
+
+
+// ++++ Abandoned Baby
+// Bull/Bear, 3 Candles
+// @function The "Abandoned Baby" candlestick pattern is a bullish/bearish pattern consists of three candles.
+// @param order (simple string) Pattern order type "bull" or "bear".
+// @param d1    (simple float)  Previous candle's body percentage out of candle range. Optional argument, default is 5.
+export abandonedBaby(simple string order, simple float d1 = 5.0) =>
+	if order == "bull"
+		cDnBody[2] and dojiBody(d1)[1] and low[2] > high[1] and cUpBody and high[1] < low // C_DownTrend[2]
+	else if order == "bear"
+		cUpBody[2] and dojiBody(d1)[1] and high[2] < low[1] and cDnBody and low[1] > high // C_UpTrend[2]
+	else
+		false
+
+
+// ++++ Dark Cloud Cover
+// Bear, 2 Candles
+// @function The "Dark Cloud Cover" is a bearish pattern consists of two candles.
+// @param c1 (simple bool) Previous candle's body must be higher than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export darkCloudCover(simple bool c1 = true, simple int n = 14) =>
+	cUpBody[1] and cHiBodyAvg(c1, n)[1] and cDnBody and open >= high[1] and  close < cBodyMd[1] and close > open[1] // C_UpTrend[1]
+
+
+// ++++ Doji
+// Neither, 1 Candle
+// @function The "Doji" is neither bullish or bearish consists of one candles.
+// @param d0 (simple float)  Current candle's body percentage out of candle range. Optional argument, default is 5.
+export doji(simple float d0 = 5.0) =>
+	dojiCandle(d0) and not(dojiBody(d0) and cUpWick <= cBody) and not(dojiBody(d0) and cDnWick <= cBody)
+
+
+// ++++ Doji Star
+// Bull/Bear, 2 Candles
+// @function The "Doji Star" is a bullish/bearish pattern consists of two candles.
+// @param order (simple string) Pattern order type "bull" or "bear" .
+// @param d0 (simple float) Current candle's body percentage out of candle range. Optional argument, default is 5.
+// @param c1 (simple bool) Previous candle's body must be higher than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export dojiStar(simple string order, simple bool c1 = true, simple int n = 14, simple float d0 = 5.0) =>
+	cHiBodyAvg = cHiBodyAvg(c1, n)
+	if order == "bull" 
+		cDnBody[1] and cHiBodyAvg[1] and dojiBody(d0) and cBodyHi < cBodyLw[1] // C_DownTrend
+	
+	else if order == "bear" 
+		cUpBody[1] and cHiBodyAvg[1] and dojiBody(d0) and cBodyLw > cBodyHi[1] // C_UpTrend
+	
+	else 
+		false
+
+
+// ++++ Downside Tasuki Gap
+// Bear, 3 Candles
+// @function The "Downside Tasuki Gap" is a bearish pattern consists of three candles.
+// @param c2 (simple bool) Before previous candle's body must be higher than average. Optional argument, default is true.
+// @param c1 (simple bool) Previous candle's body must be lower than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export downsideTasukiGap(simple bool c2 = true, simple bool c1 = true, simple int n = 14) =>
+	cHiBodyAvg(c2, n)[2] and cLwBodyAvg(c1, n)[1] and cDnBody[2] and cBodyHi[1] < cBodyLw[2] and 
+	 cDnBody[1] and cUpBody and cBodyHi <= cBodyLw[2] and cBodyHi >= cBodyHi[1] // C_DownTrend
+
+
+// ++++ Dragon Fly Doji
+// Bull, 1 Candle
+// @function The "Dragon Fly Doji" is a bullish pattern consists of one candle.
+// @param d0 (simple float)  Current candle's body percentage out of candle range. Optional argument, default is 5.
+export dragonflyDoji(simple float d0 = 5.0) =>
+	dojiBody(d0) and cUpWick <= cBody
+
+
+// ++++ Engulfing
+// Bull/Bear, 2 Candles
+// @function The "Engulfing" is a bullish/bearish pattern consists of two candles.
+// @param order (simple string) Pattern order type "bull" or "bear".
+// @param c1    (simple bool) Previous candle's body must be lower than average. Optional argument, default is true.
+// @param c0    (simple bool) Current candle's body must be higher than average. Optional argument, default is true.
+// @param n     (simple int)  Length of average candle's body. Optional argument, default is 14.
+export engulfing(simple string order, simple bool c1 = true, simple bool c0 = true, simple int n = 14) =>
+	cHiBodyAvg = cHiBodyAvg(c0, n)
+	cLwBodyAvg = cLwBodyAvg(c1, n)
+	if order == "bull" 
+		cUpBody and cHiBodyAvg and cDnBody[1] and cLwBodyAvg[1] and close >= open[1] and 
+		 open <= close[1] and (close > open[1] or open < close[1]) // C_DownTrend
+		
+	else if order == "bear" 
+		cDnBody and cHiBodyAvg and cUpBody[1] and cLwBodyAvg[1] and close <= open[1] and 
+		 open >= close[1] and ( close < open[1] or open > close[1]) // C_UpTrend
+		
+	else 
+		false
+
+
+// ++++ Evening Doji Star
+// Bear, 3 Candles
+// @function The "Evening Doji Star" is a bearish pattern consists of three candles.
+// @param c2 (simple bool) Before previous candle's body must be higher than average, default is true.
+// @param c0 (simple bool) Current candle's body must be higher than average. Optional argument, default is true.
+// @param d1 (simple float) Previous candle's body percentage out of candle range. Optional argument, default is 5.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export eveningDojiStar(simple bool c2 = true, simple bool c0 = true, simple float d1 = 5.0, simple int n = 14) =>
+	cHiBodyAvg(c2, n)[2] and dojiBody(d1)[1] and cHiBodyAvg(c0, n) and cUpBody[2] and cBodyLw[1] > cBodyHi[2] and 
+	 cDnBody and cBodyLw <= cBodyMd[2] and cBodyLw > cBodyLw[2] and cBodyLw[1] > cBodyHi // C_UpTrend
+
+
+// ++++ Evening Star
+// Bear, 3 Candles
+// @function The "Evening Star" is a bearish pattern consists of three candles.
+// @param c2 (simple bool) Before previous candle's body must be higher than average. Optional argument, default is true.
+// @param c1 (simple bool) Previous candle's body must be lower than average. Optional argument, default is true.
+// @param c0 (simple bool) Current candle's body must be higher than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export eveningStar(simple bool c2 = true, simple bool c1 = true, simple bool c0 = true, simple int n = 14) =>
+	cHiBodyAvg(c2, n)[2] and cLwBodyAvg(c1, n)[1] and cHiBodyAvg(c0, n) and  cUpBody[2] and 
+	 cBodyLw[1] > cBodyHi[2] and cDnBody and cBodyLw <= cBodyMd[2] and cBodyLw > cBodyLw[2] and cBodyLw[1] > cBodyHi // C_UpTrend
+
+
+// ++++ Falling Three Methods
+// Bear, 5 Candles
+// @function The "Falling Three Methods" is a bearish pattern consists of five candles.
+// @param c4 (simple bool) 5th candle ago body must be higher than average. Optional argument, default is true.
+// @param c3 (simple bool) 4th candle ago body must be lower than average. Optional argument, default is true.
+// @param c2 (simple bool) 3rd candle ago body must be lower than average. Optional argument, default is true.
+// @param c1 (simple bool) 2nd candle ago body must be lower than average. Optional argument, default is true.
+// @param c0 (simple bool) Current candle's body must be higher than average. Optional argument, default is true.
+// @param n  (simple int) Length of average candle's body. Optional argument, default is 14.
+// @returns  (bool)
+export fallingThreeMethods(simple bool c4 = true, simple bool c3 = true, simple bool c2 = true, simple bool c1 = true, simple bool c0 = true, simple int n = 14) =>
+	( cHiBodyAvg(c4, n)[4] and cDnBody[4]) and 
+	 (cLwBodyAvg(c3, n)[3] and cUpBody[3] and open[3]>low[4] and close[3]<high[4]) and 
+	 (cLwBodyAvg(c2, n)[2] and cUpBody[2] and open[2]>low[4] and close[2]<high[4]) and 
+	 (cLwBodyAvg(c1, n)[1] and cUpBody[1] and open[1]>low[4] and close[1]<high[4]) and 
+	 (cHiBodyAvg(c0, n) and cDnBody and close<close[4]) // C_DownTrend[4] 
+
+
+// ++++ Falling Window
+// Bear, 2 Candles
+// @function The "Falling Window" is a bearish pattern consists of two candles.
+export fallingWindow() =>
+	(cRange != 0 and cRange[1] != 0) and high < low[1] // C_DownTrend[1] and 
+
+
+// ++++ Gravestone Doji
+// Bear, 1 Candle
+// @function The "Gravestone Doji" is a bearish pattern consists of one candle.
+// @param d0 (simple float)  Current candle's body percentage out of candle range. Optional argument, default is 5.
+export gravestoneDoji(simple float d0 = 5.0) =>
+	dojiBody(d0) and cDnWick <= cBody
+
+
+// ++++ Hammer
+// Bull, 1 Candle
+// @function The "Hammer" is a bullish pattern consists of one candle.
+// @param c0 (simple bool) Current candle's body must be lower than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export hammer(simple bool c0 = true, simple int n = 14) =>
+	cLwBodyAvg(c0, n) and cBody > 0 and cBodyLw > hl2 and cDnWick >= 2.0 * cBody and not cHasUpWick // C_DownTrend
+
+
+// ++++ Hanging Man
+// Bear, 1 Candle
+// @function The "Hanging Man" is a bearish pattern consists of one candle.
+// @param c0 (simple bool) Current candle's body must be lower than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export hangingMan(simple bool c0 = true, simple int n = 14) =>
+	cLwBodyAvg(c0, n) and cBody > 0 and cBodyLw > hl2 and cDnWick >= 2.0 * cBody and not cHasUpWick // C_UpTrend
+
+
+// ++++ Harami Cross
+// Bull/Bear, 2 Candles
+// @function The "Harami Cross" candlestick pattern is a bullish/bearish pattern consists of two candles.
+// @param order (simple string) Pattern order type "bull" or "bear".
+// @param c1    (simple bool)   Previous candle's body must be higher than average. Optional argument, default is true.
+// @param n     (simple int)    Length of average candle's body. Optional argument, default is 14.
+export haramiCross(string order, simple bool c1 = true, simple int n = 14) =>
+	cHiBodyAvg = cHiBodyAvg(c1, n)
+	if order == "bull" 
+		cHiBodyAvg[1] and cDnBody[1] and dojiBody(5.0) and high <= cBodyHi[1] and low >= cBodyLw[1] // C_DownTrend[1]
+	
+	else if order == "bear" 
+		cHiBodyAvg[1] and cUpBody[1] and dojiBody(5.0) and high <= cBodyHi[1] and low >= cBodyLw[1] // C_UpTrend[1]
+	else 
+		false
+
+
+// ++++ Harami
+// Bull/Bear, 2 Candles
+// @function The "Harami" candlestick pattern is a bullish/bearish pattern consists of two candles.
+// @param order (simple string) Pattern order type "bull" or "bear" 
+// @param c1    (simple bool)   Previous candle's body must be higher than average. Optional argument, default is true.
+// @param c0    (simple bool)   Current candle's body must be lower than average. Optional argument, default is true.
+// @param n     (simple int)    Length of average candle's body. Optional argument, default is 14.
+export harami(string order, simple bool c1 = true, simple bool c0 = true, simple int n = 14) =>
+	cHiBodyAvg = cHiBodyAvg(c1, n)
+	cLwBodyAvg = cLwBodyAvg(c0, n)
+	if order == "bull" 
+		cHiBodyAvg[1] and cDnBody[1] and cUpBody and cLwBodyAvg and high <= cBodyHi[1] and low >= cBodyLw[1] // C_DownTrend[1]
+	else if order == "bear" 
+		cHiBodyAvg[1] and cUpBody[1] and cDnBody and cLwBodyAvg and high <= cBodyHi[1] and low >= cBodyLw[1] // C_UpTrend[1]
+	else 
+		false
+
+
+// ++++ Inverted Hammer
+// Bull, 1 Candle
+// @function The "Inverted Hammer" is a bullish pattern consists of one candle.
+// @param c0    (simple bool)   Current candle's body must be lower than average. Optional argument, default is true.
+// @param n     (simple int)    Length of average candle's body. Optional argument, default is 14.
+export invertedHammer(simple bool c0 = true, simple int n = 14) =>
+	cLwBodyAvg(c0, n) and cBody > 0 and cBodyHi < hl2 and cUpWick >= 2.0 * cBody and not cHasDnWick // C_DownTrend
+
+
+// +++ Kicking
+// Bull/Bear, 2 Candles
+// @function The "Kicking" candlestick pattern is a bullish/bearish pattern consists of two candles.
+// @param order (simple string) Pattern order type "bull" or "bear" 
+// @param c1    (simple bool)   Previous candle's body must be higher than average. Optional argument, default is true.
+// @param c0    (simple bool)   Current candle's body must be higher than average. Optional argument, default is true.
+// @param n     (simple int)    Length of average candle's body. Optional argument, default is 14.
+export kicking(string order, simple bool c1 = true, simple bool c0 = true, simple int n = 14) =>
+	marubozu  = cHiBodyAvg(c0, n) and cUpWick <= 5.0/100*cBody and cDnWick <= 5.0/100*cBody
+	marubozu1 = cHiBodyAvg(c1, n) and cUpWick <= 5.0/100*cBody and cDnWick <= 5.0/100*cBody
+	if order == "bull"
+		marubozu1[1] and cDnBody[1] and marubozu and cUpBody and high[1] < low
+	else if order == "bear"
+		marubozu1[1] and cUpBody[1] and marubozu and cDnBody and low[1] > high
+	else 
+		false
+
+
+// +++ Long Lower Shadow
+// Bull, 1 Candle
+// @function The "Long Lower Shadow" candlestick pattern is a bullish pattern consists of one candles.
+// @param l0    (simple float)  Current candle's lower wick min percentage out of candle range. Optional argument, default is 75.
+export longLowerShadow(simple float l0 = 75.0) =>
+	cDnWick > cRange/100*l0
+
+
+// +++ Long Upper Shadow
+// Bear, 1 Candle
+// @function The "Long Upper Shadow" candlestick pattern is a bearish pattern consists of one candles.
+// @param u0    (simple float)  Current candle's upper wick min percentage out of candle range. Optional argument, default is 75.
+export longUpperShadow(simple float u0 = 75.0) =>
+	cUpWick > cRange/100*u0
+
+
+// +++ Marubozu Black
+// Bear, 1 Candle
+// @function The "Marubozu Black" candlestick pattern is a bearish pattern consists of one candles.
+// @param c0    (simple bool)   Current candle's body must be higher than average. Optional argument, default is true.
+// @param n     (simple int)    Length of average candle's body. Optional argument, default is 14.
+export marubozuBlack(simple bool c0 = true, simple int n = 14) =>
+	cDnBody and cHiBodyAvg(c0, n) and cUpWick <= 5.0/100*cBody and cDnWick <= 5.0/100*cBody and cDnBody
+
+
+// +++ Marubozu White
+// Bull, 1 Candle
+// @function The "Marubozu White" candlestick pattern is a bullish pattern consists of one candles.
+// @param c0    (simple bool)   Current candle's body must be higher than average. Optional argument, default is true.
+// @param n     (simple int)    Length of average candle's body. Optional argument, default is 14.
+export marubozuWhite(simple bool c0 = true, simple int n = 14) =>
+	cUpBody and cHiBodyAvg(c0, n) and cUpWick <= 5.0/100*cBody and cDnWick <= 5.0/100*cBody and cUpBody
+
+
+// ++++ Morning Doji Star
+// Bull, 3 Candles
+// @function The "Morning Doji Star" candlestick pattern is a bullish pattern consists of three candles.
+// @param c2 (simple bool)  Before previous candle's body must be higher than average. Optional argument, default is true.
+// @param d1 (simple float) Previous candle's body percentage out of candle range. Optional argument, default is 5.
+// @param c0 (simple bool)  Current candle's body must be higher than average. Optional argument, default is true.
+// @param n  (simple int)   Length of average candle's body. Optional argument, default is 14.
+export morningDojiStar(simple bool c2 = true, simple float d1 = 5.0, simple bool c0 = true, simple int n = 14) =>
+	cHiBodyAvg(c2, n)[2] and cDnBody[2] and dojiBody(d1)[1] and cHiBodyAvg(c0, n) and cUpBody and 
+	 cBodyHi[1] < cBodyLw[2] and cBodyHi >= cBodyMd[2] and cBodyHi < cBodyHi[2] and cBodyHi[1] < cBodyLw // C_DownTrend
+
+
+// ++++ Morning Star
+// Bull, 3 Candles
+// @function The "Morning Star" candlestick pattern is a bullish pattern consists of three candles.
+// @param c2 (simple bool) Before previous candle's body must be higher than average. Optional argument, default is true.
+// @param c1 (simple bool) Previous candle's body must be lower than average. Optional argument, default is true.
+// @param c0 (simple bool) Cuurent candle's body must be higher than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export morningStar(simple bool c2 = true, simple bool c1 = true, simple bool c0 = true, simple int n = 14) =>
+	cHiBodyAvg(c2, n)[2] and cLwBodyAvg(c1, n)[1] and cHiBodyAvg(c0, n) and cDnBody[2] and cBodyHi[1] < cBodyLw[2] and 
+	 cUpBody and cBodyHi >= cBodyMd[2] and cBodyHi < cBodyHi[2] and cBodyHi[1] < cBodyLw // C_DownTrend
+
+
+// ++++ On Neck
+// Bear, 2 Candles
+// @function The "On Neck" candlestick pattern is a bearish pattern consists of two candles.
+// @param c1 (simple bool) Previous candle's body must be higher than average. Optional argument, default is true.
+// @param c0 (simple bool) Cuurent candle's body must be lower than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export onNeck(simple bool c1 = true, simple bool c0 = true, simple int n = 14) =>
+	cDnBody[1] and cHiBodyAvg(c1, n)[1] and cUpBody and open < close[1] and cLwBodyAvg(c0, n) and cRange!=0 
+	 and math.abs(close-low[1])<=cBodyAvg(14)*0.05 // C_DownTrend
+
+
+// ++++ Piercing
+// Bull, 2 Candles
+// @function The "Piercing" candlestick pattern is a bullish pattern consists of two candles.
+// @param c1 (simple bool) Previous candle's body must be higher than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export piercing(simple bool c1 = true, simple int n = 14) =>
+	cDnBody[1] and cHiBodyAvg(c1, n)[1] and cUpBody and open <= low[1] and close > cBodyMd[1] and close < open[1] // C_DownTrend[1]
+
+
+// ++++ Rising Three Methods
+// Bull, 5 Candles
+// @function The "Rising Three Methods" candlestick pattern is a bullish pattern consists of five candles.
+// @param c4 (simple bool) 5th candle ago body must be higher than average. Optional argument, default is true.
+// @param c3 (simple bool) 4th candle ago body must be Lower than average. Optional argument, default is true.
+// @param c2 (simple bool) 3rd candle ago body must be Lower than average. Optional argument, default is true.
+// @param c1 (simple bool) 2nd candle ago body must be Lower than average. Optional argument, default is true.
+// @param c0 (simple bool) Current candle's body must be higher than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export risingThreeMethods(simple bool c4 = true, simple bool c3 = true, simple bool c2 = true, simple bool c1 = true, simple bool c0 = true, simple int n = 14) =>
+	(cHiBodyAvg (c4, n)[4] and cUpBody[4]) and 
+	 (cLwBodyAvg(c3, n)[3] and cDnBody[3] and open[3]<high[4] and close[3]>low[4]) and 
+	 (cLwBodyAvg(c2, n)[2] and cDnBody[2] and open[2]<high[4] and close[2]>low[4]) and 
+	 (cLwBodyAvg(c1, n)[1] and cDnBody[1] and open[1]<high[4] and close[1]>low[4]) and 
+	 (cHiBodyAvg(c0, 14)   and cUpBody    and close>close[4]) // C_UpTrend[4] and 
+
+
+// ++++ Rising Window
+// Bull, 2 Candles
+// @function The "Rising Window" candlestick pattern is a bullish pattern consists of two candle.
+export risingWindow() =>
+	cRange!=0 and cRange[1]!=0 and low > high[1] // C_UpTrend[1] and 
+
+
+// ++++ Shooting Star
+// Bear, 1 Candle
+// @function The "Shooting Star" candlestick pattern is a bearish pattern consists of one candle.
+// @param c0 (simple bool) Current candle's body must be higher than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export shootingStar(simple bool c0 = true, simple int n = 14) =>
+	cLwBodyAvg(c0, n) and cBody > 0 and cBodyHi < hl2 and cUpWick >= 2.0 * cBody and not cHasDnWick // C_UpTrend
+
+
+// ++++ Spinning Top Black
+// Neither, 1 Candle
+// @function The "Spinning Top Black" is neither bullish or bearish.
+// @param l0    (simple float)  Current candle's lower wick min percentage out of candle range. Optional argument, default is 34.
+// @param u0    (simple float)  Current candle's upper wick min percentage out of candle range. Optional argument, default is 34.
+export spinningTopBlack(simple float l0 = 34.0, simple float u0 = 34) =>
+	cDnWick >= cRange / 100 * l0 and cUpWick >= cRange / 100 * u0 and not dojiBody(5.0) and cDnBody
+
+
+// ++++ Spinning Top White
+// Neither, 1 Candle
+// @function The "Spinning Top White" is neither bullish or bearish.
+// @param l0    (simple float)  Current candle's lower wick min percentage out of candle range. Optional argument, default is 34.
+// @param u0    (simple float)  Current candle's upper wick min percentage out of candle range. Optional argument, default is 34.
+export spinningTopWhite(simple float l0 = 34.0, simple float u0 = 34) =>
+	cDnWick >= cRange / 100 * l0 and cUpWick >= cRange / 100 * u0 and not dojiBody(5.0) and cUpBody
+
+
+// ++++ Three Black Crows
+// Bear, 3 Candles
+// @function The "Three Black Crows" candlestick pattern is a bearish pattern consists of three candles.
+// @param c2 (simple bool) Before previous candle's body must be higher than average. Optional argument, default is true.
+// @param c1 (simple bool) Previous candle's body must be higher than average. Optional argument, default is true.
+// @param c0 (simple bool) Cuurent candle's body must be higher than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export threeBlackCrows(simple bool c2 = true, simple bool c1 = true, simple bool c0 = true, simple int n = 14) =>
+	noDnWick = cRange * 5.0 / 100 > cDnWick
+	cHiBodyAvg(c0, n) and cHiBodyAvg(c1, n)[1] and cHiBodyAvg(c2, n)[2] and cDnBody and cDnBody[1] and cDnBody[2] and
+	 close < close[1] and close[1] < close[2] and open > close[1] and open < open[1] and open[1] > close[2] and 
+	 open[1] < open[2] and noDnWick and noDnWick[1] and noDnWick[2]
+
+
+// ++++ Three White Soldiers
+// Bull, 3 Candles
+// @function The "Three White Soldiers" candlestick pattern is a bullish pattern consists of three candles.
+// @param c2 (simple bool) Before previous candle's body must be higher than average. Optional argument, default is true.
+// @param c1 (simple bool) Previous candle's body must be higher than average. Optional argument, default is true.
+// @param c0 (simple bool) Cuurent candle's body must be higher than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export threeWhiteSoldiers(simple bool c2 = true, simple bool c1 = true, simple bool c0 = true, simple int n = 14) =>
+	noUpWick = cRange * 5.0 / 100 > cUpWick
+	cHiBodyAvg(c0, n) and cHiBodyAvg(c1, n)[1] and cHiBodyAvg(c2, n)[2] and cUpBody and cUpBody[1] and cUpBody[2] and
+	 close > close[1] and close[1] > close[2] and open < close[1] and open > open[1] and open[1] < close[2] and 
+	 open[1] > open[2] and noUpWick and noUpWick[1] and noUpWick[2]
+
+
+// ++++ Tri Star
+// Bull/Bear, 3 Candles
+// @function The "Tri Star" candlestick pattern is a bullish/bearish pattern consists of three candles.
+// @param order (simple string) Pattern order type "bull" or "bear".
+// @param d2    (simple float)  Before previous candle's body percentage out of candle range. Optional argument, default is 5.
+// @param d1    (simple float)  Previous candle's body percentage out of candle range. Optional argument, default is 5.
+// @param d0    (simple float)  Current candle's body percentage out of candle range. Optional argument, default is 5.
+export triStar(simple string order, simple float d2 = 5.0, simple float d1 = 5.0, simple float d0 = 5.0) =>
+	if order == "bull"
+		dojiCandle(d2)[2] and dojiCandle(d1)[1] and dojiCandle(d0) and 
+		 cBodyLw[2] > cBodyHi[1] and cBodyHi[1] < cBodyLw // C_DownTrend[2]
+	
+	else if order == "bear"
+		dojiCandle(d2)[2] and dojiCandle(d1)[1] and dojiCandle(d0) and 
+		 cBodyHi[2] < cBodyLw[1] and cBodyLw[1] > cBodyHi // C_UpTrend[2]
+	else 
+		false
+
+
+// ++++ Tweezer Bottom
+// Bull, 2 Candles 
+// @function The "Tweezer Bottom" candlestick pattern is a bullish pattern consists of two candles.
+// @param c1 (simple bool) Previous candle's body must be higher than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export tweezerBottom(simple bool c1 = true, simple int n = 14) =>
+	(not dojiBody(5.0) or (cHasUpWick and cHasDnWick)) and math.abs(low-low[1]) <= cBodyAvg(n)*0.05 
+	 and cDnBody[1] and cUpBody and cHiBodyAvg(c1, n)[1] // C_DownTrend[1] and 
+
+
+// ++++ Tweezer Top
+// Bear, 2 Candles 
+// @function The "Tweezer Top" candlestick pattern is a bearish pattern consists of two candles.
+// @param c1 (simple bool) Previous candle's body must be higher than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export tweezerTop(simple bool c1 = true, simple int n = 14) =>
+	(not dojiBody(5.0) or (cHasUpWick and cHasDnWick)) and math.abs(high-high[1]) <= cBodyAvg(n)*0.05 
+	 and cUpBody[1] and cDnBody and cHiBodyAvg(c1, n)[1] // C_UpTrend[1] 
+
+
+// ++++ Upside Tasuki Gap
+// Bull, 3 Candles
+// @function The "Tri Star" candlestick pattern is a bullish pattern consists of three candles.
+// @param c2 (simple bool) Before Previous candle's body must be higher than average. Optional argument, default is true.
+// @param c1 (simple bool) Previous candle's body must be lower than average. Optional argument, default is true.
+// @param n  (simple int)  Length of average candle's body. Optional argument, default is 14.
+export upsideTasukiGap(simple bool c2 = true, simple bool c1 = true, simple int n = 14) =>
+	cHiBodyAvg(c2, n)[2] and cLwBodyAvg(c1, n)[1] and cUpBody[2] and cBodyLw[1] > cBodyHi[2] 
+	 and cUpBody[1] and cDnBody and cBodyLw >= cBodyHi[2] and cBodyLw <= cBodyLw[1] // C_UpTrend
+
