@@ -1,0 +1,25 @@
+//@version=5
+indicator(title="Banana RSI", shorttitle="🍌 RSI", precision=2)
+
+rsi_len = input.int(14, minval=1, title="RSI Length")
+f_len = input.int(9,minval = 1, title = "Fast Reg. Length")
+s_len = input.int(21,minval = 1, title = "Slow Reg. Length")
+
+rsi = ta.rsi(close,rsi_len)
+
+linreg1 = ta.linreg(rsi,s_len,0)
+linreg2 = ta.linreg(rsi,f_len,0) 
+
+plot(rsi, title = "RSI", color= #40311c, editable = true)
+plot(linreg1, title = "Slow Regression", color = #ffffcc)
+plot(linreg2, title = "Fast Regression", color = #ffff00)
+
+avg = ta.cum(rsi) / bar_index
+high_avg = ta.cum(rsi>avg?rsi:0) / ta.cum(rsi>avg?1:0)
+low_avg = ta.cum(rsi<avg?rsi:0) / ta.cum(rsi<avg?1:0)
+
+dash = (bar_index/2 - math.floor(bar_index/2)) > 0 // is true every other bar to alternate coloring for avg lines
+
+plot(high_avg, title = "High_Avg", color = dash?#C0C0C0:color.new(#C0C0C0, 100))
+plot(avg, title = "Avg", color= dash?color.new(#C0C0C0, 100):color.new(#C0C0C0, 50))
+plot(low_avg, title = "Low_Avg", color = dash?#C0C0C0:color.new(#C0C0C0, 100))
