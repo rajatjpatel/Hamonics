@@ -1,0 +1,11 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+//@version=4
+study(title ="CRSI", shorttitle="CRSI")
+
+rs = ema(rsi(close,14),11)  //smooth the rsi
+
+mycolor = iff(rs>70,#FF5252,iff(rs<30,#4CAF50,#311B92)) //#FF5252
+
+plot(rs,title="RSI",color = mycolor,linewidth=2)
