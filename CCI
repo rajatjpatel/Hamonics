@@ -1,0 +1,228 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+
+//@version=4
+study(title = "CCI", shorttitle="CCI", overlay=true)
+
+//study("Darvas Box Buy Sell", overlay=true)
+
+boxp = input(defval=5, title="Length", minval=1, maxval=500)
+
+LL = lowest(low, boxp)
+k1 = highest(high, boxp)
+k2 = highest(high, boxp - 1)
+k3 = highest(high, boxp - 2)
+
+NH = valuewhen(high > k1[1], high, 0)
+box1 = k3 < k2
+TopBox = valuewhen(barssince(high > k1[1]) == boxp - 2 and box1, NH, 0)
+BottomBox = valuewhen(barssince(high > k1[1]) == boxp - 2 and box1, LL, 0)
+
+plot(TopBox, linewidth=2, color=#4CAF50, title="TBbox")
+plot(BottomBox, linewidth=2, color=#FF0000, title="BBbox")
+
+Buy = crossover(close, TopBox)
+Sell = crossunder(close, BottomBox)
+
+alertcondition(Buy, title="Buy Signal", message="Buy")
+alertcondition(Sell, title="Sell Signal", message="Sell")
+
+plotshape(Buy, style=shape.labelup, location=location.belowbar, color=#4CAF50, size=size.tiny, title="Buy Signal", text="b", textcolor=color.black)
+plotshape(Sell, style=shape.labeldown, location=location.abovebar, color=#FF0000, size=size.tiny, title="Sell Signal", text="s", textcolor=color.white)
+//End of Darvas Box Buy Sell
+
+//study("MavilimW", overlay=true)
+mavilimold = input(false, title="Show Previous Version of MavilimW?")
+fmal=input(1,"First Moving Average length")
+smal=input(1,"Second Moving Average length")
+tmal=fmal+smal
+Fmal=smal+tmal
+Ftmal=tmal+Fmal
+Smal=Fmal+Ftmal
+
+M1= wma(close, fmal)
+M2= wma(M1, smal)
+M3= wma(M2, tmal)
+M4= wma(M3, Fmal)
+M5= wma(M4, Ftmal)
+MAVW= wma(M5, Smal)
+col1= MAVW>MAVW[1]
+col3= MAVW<MAVW[1]
+colorM = col1 ? #00FF00 : col3 ? #FD0E35 : color.yellow
+
+plot(MAVW, color=colorM, linewidth=2, title="MAVW")
+
+M12= wma(close, 3)
+M22= wma(M12, 5)
+M32= wma(M22, 8)
+M42= wma(M32, 13)
+M52= wma(M42, 21)
+MAVW2= wma(M52, 34)
+
+plot(mavilimold and MAVW2 ? MAVW2 : na, color=color.blue, linewidth=2, title="MavWOld")
+
+alertcondition(crossover(MAVW,MAVW[1]), title="MAVW BUY", message="MAVW BUY!")
+alertcondition(crossunder(MAVW,MAVW[1]), title="MAVW SELL", message="MAVW SELL!")
+
+alertcondition(cross(MAVW,MAVW[1]), title="Color ALARM", message="MavilimW has changed color!")
+
+//End of MavilimW
+
+// study(shorttitle = "TManyMA Improved - ST4", title="Triple Many Moving Averages Improved", overlay=true) // Improved with HMA and source options for MAs
+
+// MA#Period is a variable used to store the indicator lookback period.  In this case, from the input.
+// input - https://www.tradingview.com/pine-script-docs/en/v4/annotations/Script_inputs.html
+MA1Period = input(20, title="MA1 Period")
+MA1Type = input(title="MA1 Type", defval="SMA", options=["RMA", "SMA", "EMA", "WMA", "HMA"])
+MA1Source = input(title="MA1 Source", type=input.source, defval=close)
+MA2Period = input(40, title="MA2 Period")
+MA2Type = input(title="MA2 Type", defval="SMA", options=["RMA", "SMA", "EMA", "WMA", "HMA"])
+MA2Source = input(title="MA2 Source", type=input.source, defval=close)
+MA3Period = input(200, title="MA3 Period")
+MA3Type = input(title="MA3 Type", defval="WMA", options=["RMA", "SMA", "EMA", "WMA", "HMA"])
+MA3Source = input(title="MA3 Source", type=input.source, defval=close)
+
+// MA# is a variable used to store the actual moving average value.
+// if statements - https://www.tradingview.com/pine-script-reference/#op_if
+// MA functions - https://www.tradingview.com/pine-script-reference/ (must search for appropriate MA)
+MA1 = if MA1Type == "SMA"
+    sma(MA1Source, MA1Period)
+else
+    if MA1Type == "EMA"
+        ema(MA1Source, MA1Period)
+    else
+        if MA1Type == "WMA"
+            wma(MA1Source, MA1Period)
+        else
+            if MA1Type == "RMA"
+                rma(MA1Source, MA1Period)
+            else
+                if MA1Type == "HMA"
+                    wma(2*wma(MA1Source, MA1Period/2)-wma(MA1Source, MA1Period), round(sqrt(MA1Period)))
+                    
+MA2 = if MA2Type == "SMA"
+    sma(MA2Source, MA2Period)
+else
+    if MA2Type == "EMA"
+        ema(MA2Source, MA2Period)
+    else
+        if MA2Type == "WMA"
+            wma(MA2Source, MA2Period)
+        else
+            if MA2Type == "RMA"
+                rma(MA2Source, MA2Period)
+            else
+                if MA2Type == "HMA"
+                    wma(2*wma(MA2Source, MA2Period/2)-wma(MA2Source, MA2Period), round(sqrt(MA2Period)))
+                    
+MA3 = if MA3Type == "SMA"
+    sma(MA3Source, MA3Period)
+else
+    if MA3Type == "EMA"
+        ema(MA3Source, MA3Period)
+    else
+        if MA3Type == "WMA"
+            wma(MA3Source, MA3Period)
+        else
+            if MA3Type == "RMA"
+                rma(MA3Source, MA3Period)
+            else
+                if MA3Type == "HMA"
+                    wma(2*wma(MA3Source, MA3Period/2)-wma(MA3Source, MA3Period), round(sqrt(MA3Period)))
+
+// plot - This will draw the information on the chart
+//plot(MA1, color=color.blue, linewidth=2)
+//plot(MA2, color=color.orange, linewidth=2)
+plot(MA3, color=color.red, linewidth=2)
+
+//End of Tripple Moving averages, only plot 200WMA
+
+//study(title = "Hull MA", shorttitle="HMA", overlay = true)
+
+length = input(9, minval=1)
+price = input(close, title="Source")
+showCrossovers = input(true, title="Show crossovers")
+hull = wma(2*wma(price, length/2)-wma(price, length), round(sqrt(length)))
+//plot(hull, title='Hull', color=change(hull) < 0 ? #5218FA : #FFFF66, linewidth=2, transp=0)
+plotshape(showCrossovers and crossover(price, hull), color=#008000, style=shape.circle, location=location.belowbar)
+plotshape(showCrossovers and crossunder(price, hull), color=#ff0000, style=shape.circle, location=location.abovebar)
+
+//End of Hull MA
+
+// ### 3 Line Strike
+
+bearS = input(title="Show Bearish 3 Line Strike", type=input.bool, defval=true, group = "3 Line Strike")
+bullS = input(title="Show Bullish 3 Line Strike", type=input.bool, defval=true, group = "3 Line Strike")
+
+bearSig = close[3] > open[3] and close[2] > open[2] and close[1] > open[1] and close < open[1]
+bullSig = close[3] < open[3] and close[2] < open[2] and close[1] < open[1] and close > open[1]
+
+plotshape(bullS ? bullSig : na, style=shape.triangleup, color=color.green, location=location.belowbar, size = size.small,  text="3s-Bull", title="3 Line Strike Up")
+plotshape(bearS ? bearSig : na, style=shape.triangledown, color=color.red, location=location.abovebar, size = size.small,  text="3s-Bear", title="3 Line Strike Down")
+
+// End 3 lines strike ###
+
+//### Engulfing Candles
+
+bearE = input(title="Show Bearish Big A$$ Candles", type=input.bool, defval=true, group = "Big A$$ Candles")
+bullE = input(title="Show Bullish Big A$$ Candles", type=input.bool, defval=true, group = "Big A$$ Candles")
+
+openBarPrevious = open[1]
+closeBarPrevious = close[1]
+openBarCurrent = open
+closeBarCurrent = close
+
+//If current bar open is less than equal to the previous bar close AND current bar open is less than previous bar open AND current bar close is greater than previous bar open THEN True
+bullishEngulfing = openBarCurrent <= closeBarPrevious and openBarCurrent < openBarPrevious and 
+   closeBarCurrent > openBarPrevious
+//If current bar open is greater than equal to previous bar close AND current bar open is greater than previous bar open AND current bar close is less than previous bar open THEN True
+bearishEngulfing = openBarCurrent >= closeBarPrevious and openBarCurrent > openBarPrevious and 
+   closeBarCurrent < openBarPrevious
+
+//bullishEngulfing/bearishEngulfing return a value of 1 or 0; if 1 then plot on chart, if 0 then don't plot
+plotshape(bullE ? bullishEngulfing : na, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.tiny, title="Big Ass Candle Up" )
+plotshape(bearE ? bearishEngulfing : na, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny, title="Big Ass Candle Down")
+
+alertcondition(bullishEngulfing, title="Bullish Engulfing", message="[CurrencyPair] [TimeFrame], Bullish candle engulfing previous candle")
+alertcondition(bearishEngulfing, title="Bearish Engulfing", message="[CurrencyPair] [TimeFrame], Bearish candle engulfing previous candle")
+
+//End of Engulfing candles
+
+//study("Supertrend", overlay = true, format=format.price, precision=2, resolution="")
+
+Periods = input(title="ATR Period", type=input.integer, defval=10)
+srca = input(hl2, title="Source")
+Multiplier = input(title="ATR Multiplier", type=input.float, step=0.1, defval=3.0)
+changeATR= input(title="Change ATR Calculation Method ?", type=input.bool, defval=true)
+showsignals = input(title="Show Buy/Sell Signals ?", type=input.bool, defval=true)
+highlighting = input(title="Highlighter On/Off ?", type=input.bool, defval=true)
+atr2 = sma(tr, Periods)
+atr= changeATR ? atr(Periods) : atr2
+up=srca-(Multiplier*atr)
+up1 = nz(up[1],up)
+up := close[1] > up1 ? max(up,up1) : up
+dn=srca+(Multiplier*atr)
+dn1 = nz(dn[1], dn)
+dn := close[1] < dn1 ? min(dn, dn1) : dn
+trend = 1
+trend := nz(trend[1], trend)
+trend := trend == -1 and close > dn1 ? 1 : trend == 1 and close < up1 ? -1 : trend
+//upPlot = plot(trend == 1 ? up : na, title="Up Trend", style=plot.style_linebr, linewidth=2, color=color.green)
+buySignal = trend == 1 and trend[1] == -1
+plotshape(buySignal ? up : na, title="UpTrend Begins", location=location.absolute, style=shape.circle, size=size.tiny, color=color.blue, transp=0)
+//plotshape(buySignal and showsignals ? up : na, title="Buy", text="Buy", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.green, textcolor=color.white, transp=0)
+//dnPlot = plot(trend == 1 ? na : dn, title="Down Trend", style=plot.style_linebr, linewidth=2, color=color.red)
+sellSignal = trend == -1 and trend[1] == 1
+plotshape(sellSignal ? dn : na, title="DownTrend Begins", location=location.absolute, style=shape.circle, size=size.tiny, color=color.yellow, transp=0)
+//plotshape(sellSignal and showsignals ? dn : na, title="Sell", text="Sell", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.red, textcolor=color.white, transp=0)
+mPlot = plot(ohlc4, title="", style=plot.style_circles, linewidth=0)
+longFillColor = highlighting ? (trend == 1 ? color.green : color.white) : color.white
+shortFillColor = highlighting ? (trend == -1 ? color.red : color.white) : color.white
+//fill(mPlot, upPlot, title="UpTrend Highligter", color=longFillColor)
+//fill(mPlot, dnPlot, title="DownTrend Highligter", color=shortFillColor)
+alertcondition(buySignal, title="SuperTrend Buy", message="SuperTrend Buy!")
+alertcondition(sellSignal, title="SuperTrend Sell", message="SuperTrend Sell!")
+changeCond = trend != trend[1]
+alertcondition(changeCond, title="SuperTrend Direction Change", message="SuperTrend has changed direction!")
+
