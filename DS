@@ -1,0 +1,161 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+//Main signals :
+//Green Call : Call (Buy)
+//Reg Put : Put (Sell)
+
+//Secondary signal :
+//Yellow Call : Call (Buy)
+//Orange Put : Put (Sell)
+
+//Fast signal :
+//White Call : Call (Buy)
+//Gray Put : Put (Sell)
+//@version=4
+
+// Test Strategy
+study("DS", overlay=true )
+//strategy("Demeter Strategy", overlay=true )
+// End Test Strategy
+
+
+periodK = input(5, title="%K Length")
+smoothK = input(3, title="%K Smoothing")
+periodD = input(3, title="%D Smoothing")
+lengthsma = input(60, title="Length")
+k = sma(stoch(close, high, low, periodK), smoothK)
+d = sma(k, periodD)
+ssma = sma(close, lengthsma)
+
+
+
+
+kc = k < 20 ? 1 : 0
+dc = d < 20 ? 1 : 0
+
+kdl = kc + dc
+
+kb = kdl == 2 ? k : 0
+db = kdl == 2 ? d : 0
+
+buygolds = kb > db ? 1 : 0
+checksma = close > ssma ? 1 : 0
+
+gb = buygolds + checksma
+crossover = crossover(k, d)
+buygold = gb == 2 ? crossover ? 1 : 0 : na
+buygoldgood = d <= 19 ? k <= 21 ? crossover ? 1 : 0 : na : na
+buygoldfastmore = d[1] <= 20 ? crossover ? 1 : 0 : na
+buygoldfast = d <= 19 ? crossover ? 1 : 0 : na
+
+/////////////
+
+
+kcs = k > 80 ? 1 : 0
+dcs = d > 80 ? 1 : 0
+
+kdls = kcs + dcs
+
+kbs = kdls == 2 ? k : 0
+dbs = kdls == 2 ? d : 0
+
+sellgolds = kbs < dbs ? 1 : 0
+checksmas = close < ssma ? 1 : 0
+
+gbs = sellgolds + checksmas
+
+crossunder = crossunder(k, d)
+
+sellgold = gbs == 2 ? crossunder ? 1 : 0 : na
+sellgoldgood = d >= 81 ? k > 79 ? crossunder ? 1 : 0 : na : na
+sellgoldfastmore = d[1] >= 80 ? crossunder ? 1 : 0 : na
+sellgoldfast = d >= 81 ? crossunder ? 1 : 0 : na
+
+
+//Color Bar
+blackbar = d > 80 ? 1 : na
+whitebar = d < 20 ? 1 : na
+graybar = d > 75 ? d < 80 ? 1 : na : na
+yellowbar = d > 20 ? d < 25 ? 1 : na : na
+//Color Bar End
+
+alertcondition(blackbar,"Bar-Black","Black Bar")
+alertcondition(whitebar,"Bar-White","White Bar")
+alertcondition(graybar,"Bar-Gray","Gray Bar")
+alertcondition(yellowbar,"Bar-Yellow","Yellow Bar")
+
+
+alertcondition(buygold,"Call Signal","Call")
+alertcondition(sellgold,"Put Signal","Put")
+
+alertcondition(buygoldgood,"Call Good Signal","Call Good")
+alertcondition(sellgoldgood,"Put Good Signal","Put Good")
+
+alertcondition(buygoldfast,"Call Fast Signal","Call Fast")
+alertcondition(sellgoldfast,"Put Fast Signal","Put Fast")
+
+alertcondition(buygoldfastmore,"Call Fast More Signal","Call Fast More")
+alertcondition(sellgoldfastmore,"Put Fast More Signal","Put Fast More")
+
+
+//Plot
+plotshape(buygoldfastmore, title="Call Fast More", text="Call", textcolor=color.black, style=shape.labelup, location=location.belowbar, color=color.white, size=size.tiny)
+plotshape(sellgoldfastmore, title="Put Fast More", text="Put", textcolor=color.white, style=shape.labeldown, location=location.abovebar, color=color.gray, size=size.tiny)
+
+plotshape(buygoldfast, title="Call Fast", text="Call", textcolor=color.black, style=shape.labelup, location=location.belowbar, color=color.white, size=size.tiny)
+plotshape(sellgoldfast, title="Put Fast", text="Put", textcolor=color.white, style=shape.labeldown, location=location.abovebar, color=color.gray, size=size.tiny)
+
+plotshape(buygoldgood, title="Call good", text="Call", textcolor=color.black, style=shape.labelup, location=location.belowbar, color=color.yellow, size=size.tiny)
+plotshape(sellgoldgood, title="Put good", text="Put", textcolor=color.white, style=shape.labeldown, location=location.abovebar, color=color.orange, size=size.tiny)
+
+
+
+plotshape(buygold, title="Call", text="Call", textcolor=color.white, style=shape.labelup, location=location.belowbar, color=color.green, size=size.tiny)
+plotshape(sellgold, title="Put", text="Put", textcolor=color.white, style=shape.labeldown, location=location.abovebar, color=color.red, size=size.tiny)
+
+
+
+
+
+
+
+// Test Call 
+//strategy.entry("Call",true,1,when = buygold == 1)
+//strategy.close("Call",when = close == close)
+// End Test Call 
+
+// Test Put
+//strategy.entry("Put",true,1,when = sellgold == 1)
+//strategy.close("Put",when = close == close)
+// End Test Put
+
+
+//plotshape(crossover(k, d), title="Long", text="Call", textcolor=black, style=shape.labelup, location=location.belowbar, color=lime, transp=0, size=size.tiny)
+//plotshape(crossunder(k, d), title="Sell", text="Put", textcolor=black, style=shape.labeldown, location=location.abovebar, color=yellow, transp=0, size=size.tiny)
+
+
+// Test Call & Put Forex Martingale
+//calt = strategy.grossprofit-strategy.grossloss
+//mar = calt < 0 ? 0.01+((calt*-35)/close) : 0.01
+//strategy.entry("Call",true,mar,when = buygold == 1)
+//closeoder = close >= strategy.position_avg_price*1.03 ? 1 : close <= strategy.position_avg_price*0.99 ? 1 : na 
+///strategy.close("Call",when = close == close)
+//strategy.close("Call",when = closeoder == 1)
+// End Test Call & Put Martingale
+
+//SMA line
+plot (ssma,"SMA",linewidth=1,color=color.white)
+//SMA line End
+
+//Color Bar
+
+bcolor = d < 20 ? color.white : d > 80 ? color.black : d > 75 ? d < 80 ? color.gray : na : d > 20 ? d < 25 ? color.yellow : na : na
+barcolor(color=bcolor)
+
+//plot(mar,color=color.green)
+//plot(calt)
+
+
+
+//Color Bar End
+
