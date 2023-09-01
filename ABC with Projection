@@ -1,0 +1,95 @@
+//@version=5
+
+indicator('ABC with Projection', overlay = true)
+
+////////////////////////////
+// HIGHER TIMEFRAME (HTF) //
+////////////////////////////
+
+htf = input.timeframe(title = 'HTF Resolution', defval = '1D', group = 'Higher Timeframes')
+
+/////////////////
+// ABC PATTERN //
+/////////////////
+
+shPrice = close[1] >= open[1] and close < open and high >= high[1] and barstate.isconfirmed ? high : 
+ close[1] >= open[1] and close < open and high <= high[1] and barstate.isconfirmed ? high[1] : na
+shPriceBarIndex = close[1] >= open[1] and close < open and high >= high[1] and barstate.isconfirmed ? bar_index : 
+ close[1] >= open[1] and close < open and high <= high[1] and barstate.isconfirmed ? bar_index - 1 : na
+peak = ta.valuewhen(shPrice, shPrice, 0)
+peakBarIndex = ta.valuewhen(shPrice, shPriceBarIndex, 0)
+shPriceOne = ta.valuewhen(shPrice, shPrice, 1)
+shPriceBarIndexOne = ta.valuewhen(shPriceBarIndex, shPriceBarIndex, 1)
+
+slPrice = close[1] < open[1] and close >= open and low <= low[1] and barstate.isconfirmed ? low : 
+ close[1] < open[1] and close >= open and low >= low[1] and barstate.isconfirmed ? low[1] : na
+slPriceBarIndex = close[1] < open[1] and close >= open and low <= low[1] and barstate.isconfirmed ? bar_index : 
+ close[1] < open[1] and close >= open and low >= low[1] and barstate.isconfirmed ? bar_index - 1 : na
+trough = ta.valuewhen(slPrice, slPrice, 0)
+troughBarIndex = ta.valuewhen(slPrice, slPriceBarIndex, 0)
+slPriceOne = ta.valuewhen(slPrice, slPrice, 1)
+slPriceBarIndexOne = ta.valuewhen(slPriceBarIndex, slPriceBarIndex, 1)
+
+returnLineUptrend = ta.valuewhen(shPrice, shPrice, 0) > ta.valuewhen(shPrice, shPrice, 1)
+uptrend = ta.valuewhen(slPrice, slPrice, 0) > ta.valuewhen(slPrice, slPrice, 1)
+downtrend = ta.valuewhen(shPrice, shPrice, 0) < ta.valuewhen(shPrice, shPrice, 1)
+returnLineDowntrend = ta.valuewhen(slPrice, slPrice, 0) < ta.valuewhen(slPrice, slPrice, 1)
+
+slRangeRatio = (peak - trough) / (peak - trough[1]) * 100
+shRangeRatio = (peak - trough) / (peak[1] - trough) * 100
+
+slRangeRatioZero = ta.valuewhen(slPrice, slRangeRatio, 0)
+shRangeRatioZero = ta.valuewhen(shPrice, shRangeRatio, 0)
+
+bcLowerTolerance = input(defval = 10, title = 'BC Lower Tolerance (%)', group = 'Tolerances')
+bcUpperTolerance = input(defval = 10, title = 'BC Upper Tolerance (%)', group = 'Tolerances')
+cdLowerTolerance = input(defval = 10, title = 'CD Lower Tolerance (%)', group = 'Tolerances')
+cdUpperTolerance = input(defval = 10, title = 'CD Upper Tolerance (%)', group = 'Tolerances')
+
+bullishABC = shPrice and downtrend
+ and shRangeRatioZero >= 61.8 - bcLowerTolerance and shRangeRatioZero <= 78.6 + bcUpperTolerance
+
+/////////////////////
+// ABC PATTERN HTF //
+/////////////////////
+
+higherTimeFramebullishABC = request.security(syminfo.tickerid, htf, bullishABC[1], lookahead = barmerge.lookahead_on)
+
+////////////////////////////////////
+// SWING HIGH AND SWING LOW (HTF) //
+////////////////////////////////////
+
+[shPriceHTF, slPriceHTF] = request.security(syminfo.tickerid, htf, [shPrice[1], slPrice[1]], lookahead = barmerge.lookahead_on)
+
+shPriceZeroHTF = ta.valuewhen(shPriceHTF and not shPriceHTF[1], shPriceHTF, 0)
+slPriceZeroHTF = ta.valuewhen(slPriceHTF and not slPriceHTF[1], slPriceHTF, 0)
+
+shCloseBarIndexHTF = ta.valuewhen(shPriceHTF and not shPriceHTF[1], bar_index, 0)
+slCloseBarIndexHTF = ta.valuewhen(slPriceHTF and not slPriceHTF[1], bar_index, 0)
+
+shPriceOneHTF = ta.valuewhen(shPriceHTF and not shPriceHTF[1], shPriceHTF, 1)
+slPriceOneHTF = ta.valuewhen(slPriceHTF and not slPriceHTF[1], slPriceHTF, 1)
+
+///////////
+// LINES //
+///////////
+
+variableRatioD = input(defval = 1.272, title = 'D Extension Ratio')
+
+if higherTimeFramebullishABC and not higherTimeFramebullishABC[1] 
+    labelOne = label.new(bar_index, high, color = color.rgb(54, 58, 69, 100), style = label.style_label_down,
+     text = 'HTF BULLISH ABC', textcolor = color.blue)
+    patternUpperProjection = line.new(bar_index, shPriceOneHTF, bar_index + 10, shPriceOneHTF, color = color.red, style = line.style_dashed)
+    patternLowerProjection = line.new(bar_index, shPriceZeroHTF - ((shPriceZeroHTF - slPriceZeroHTF) * variableRatioD), bar_index + 10, shPriceZeroHTF - ((shPriceZeroHTF - slPriceZeroHTF) * variableRatioD), 
+     color = color.green, style = line.style_dashed)
+    var myLineArray = array.new_line()
+    array.push(myLineArray, patternUpperProjection)
+    array.push(myLineArray, patternLowerProjection)
+    if array.size(myLineArray) >= 500
+        firstLine = array.remove(myLineArray, 0) 
+        line.delete(firstLine)
+    var myLabelArray = array.new_label()
+    array.push(myLabelArray, labelOne)
+    if array.size(myLabelArray) >= 250
+        firstLabel = array.remove(myLabelArray, 0) 
+        label.delete(firstLabel)
