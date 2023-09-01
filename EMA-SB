@@ -1,0 +1,29 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+//@version=4
+study("EMA", overlay=true)
+
+fast = input(9, minval=1, title="Fast EMA")
+slow = input(12, minval=1, title="Fast EMA")
+
+fastEMA = ema(close, fast)
+slowEMA = ema(close, slow)
+
+buy = crossover(fastEMA, slowEMA)
+sell = crossunder(fastEMA, slowEMA)
+
+if (buy)
+    lbl = label.new(bar_index, low, "B")
+    label.set_color(lbl, color.green)
+    label.set_yloc(lbl, yloc.belowbar)
+    label.set_style(lbl, label.style_label_up)
+
+if (sell)
+    lbl = label.new(bar_index, low, "S")
+    label.set_color(lbl, color.red)
+    label.set_yloc(lbl, yloc.abovebar)
+    label.set_style(lbl, label.style_label_down)
+
+plot(fastEMA, "Fast EMA", color=color.blue, linewidth=2)
+plot(slowEMA, "Slow EMA", color=color.red, linewidth=2)
