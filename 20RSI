@@ -1,0 +1,180 @@
+//@version=5
+indicator(title='20RSI Shoonay', shorttitle='20RSI', format=format.price)
+len = 14
+//len = 2
+//input(title="RSI Period", minval=1, defval=14)
+src = close
+//input(title="RSI Source", defval=close)
+lbR = 5
+//input(title="Pivot Lookback Right", defval=5)
+lbL = 5
+//input(title="Pivot Lookback Left", defval=5)
+rangeUpper = 60
+//input(title="Max of Lookback Range", defval=60)
+rangeLower = 5
+//input(title="Min of Lookback Range", defval=5)
+plotBull = input(title='Plot Bullish', defval=true)
+plotHiddenBull = input(title='Plot Hidden Bullish', defval=true)
+plotBear = input(title='Plot Bearish', defval=true)
+plotHiddenBear = input(title='Plot Hidden Bearish', defval=true)
+bearColor = color.red
+bullColor = color.green
+hiddenBullColor = color.new(color.green, 80)
+hiddenBearColor = color.new(color.red, 80)
+textColor = color.black
+noneColor = color.new(color.black, 100)
+osc = ta.rsi(src, len)
+
+// ### Smoothed MA
+
+showSmma = input.bool(title='Show Moving Average', defval=true, group='Smoothed MA')
+
+smmaLen = 50
+//input(50, minval=1, title="SMMA Length", group = "Smoothed MA")
+smmaSrc = osc
+smma = 0.0
+smma := na(smma[1]) ? ta.sma(smmaSrc, smmaLen) : (smma[1] * (smmaLen - 1) + smmaSrc) / smmaLen
+plot(showSmma ? smma : na, linewidth=2, color=color.new(color.blue, 0))
+
+// End ###
+
+//lineColor = (osc > smma) ?color.purple :  color.purple
+
+lineColor = osc > smma ? color.green : color.red
+
+plot(osc, title='RSI', linewidth=2, color=lineColor)
+hline(50, title='Middle Line', linestyle=hline.style_solid)
+// obLevel = hline(70, title="Overbought", linestyle=hline.style_dotted)
+// osLevel = hline(30, title="Oversold", linestyle=hline.style_dotted)
+//fill(obLevel, osLevel, title="Background", color=#9915FF, transp=90)
+
+plFound = na(ta.pivotlow(osc, lbL, lbR)) ? false : true
+phFound = na(ta.pivothigh(osc, lbL, lbR)) ? false : true
+_inRange(cond) =>
+    bars = ta.barssince(cond == true)
+    rangeLower <= bars and bars <= rangeUpper
+
+//------------------------------------------------------------------------------
+// Regular Bullish
+// Osc: Higher Low
+
+oscHL = osc[lbR] > ta.valuewhen(plFound, osc[lbR], 1) and _inRange(plFound[1])
+
+// Price: Lower Low
+
+priceLL = low[lbR] < ta.valuewhen(plFound, low[lbR], 1)
+bullCond = plotBull and priceLL and oscHL and plFound
+
+plot(plFound ? osc[lbR] : na, offset=-lbR, title='Regular Bullish', linewidth=2, color=bullCond ? bullColor : noneColor, transp=0)
+plotshape(bullCond ? osc[lbR] : na, offset=-lbR, title='Regular Bullish Label', text=' Bull ', style=shape.labelup, location=location.absolute, color=color.new(bullColor, 0), textcolor=color.new(textColor, 0))
+
+//------------------------------------------------------------------------------
+// Hidden Bullish
+// Osc: Lower Low
+
+oscLL = osc[lbR] < ta.valuewhen(plFound, osc[lbR], 1) and _inRange(plFound[1])
+
+// Price: Higher Low
+
+priceHL = low[lbR] > ta.valuewhen(plFound, low[lbR], 1)
+hiddenBullCond = plotHiddenBull and priceHL and oscLL and plFound
+
+plot(plFound ? osc[lbR] : na, offset=-lbR, title='Hidden Bullish', linewidth=2, color=hiddenBullCond ? hiddenBullColor : noneColor, transp=0)
+plotshape(hiddenBullCond ? osc[lbR] : na, offset=-lbR, title='Hidden Bullish Label', text=' H Bull ', style=shape.labelup, location=location.absolute, color=color.new(bullColor, 0), textcolor=color.new(textColor, 0))
+
+//------------------------------------------------------------------------------
+// Regular Bearish
+// Osc: Lower High
+
+oscLH = osc[lbR] < ta.valuewhen(phFound, osc[lbR], 1) and _inRange(phFound[1])
+
+// Price: Higher High
+
+priceHH = high[lbR] > ta.valuewhen(phFound, high[lbR], 1)
+
+bearCond = plotBear and priceHH and oscLH and phFound
+
+plot(phFound ? osc[lbR] : na, offset=-lbR, title='Regular Bearish', linewidth=2, color=bearCond ? bearColor : noneColor, transp=0)
+
+plotshape(bearCond ? osc[lbR] : na, offset=-lbR, title='Regular Bearish Label', text=' Bear ', style=shape.labeldown, location=location.absolute, color=color.new(bearColor, 0), textcolor=color.new(textColor, 0))
+
+//------------------------------------------------------------------------------
+// Hidden Bearish
+// Osc: Higher High
+
+oscHH = osc[lbR] > ta.valuewhen(phFound, osc[lbR], 1) and _inRange(phFound[1])
+
+// Price: Lower High
+
+priceLH = high[lbR] < ta.valuewhen(phFound, high[lbR], 1)
+
+hiddenBearCond = plotHiddenBear and priceLH and oscHH and phFound
+
+plot(phFound ? osc[lbR] : na, offset=-lbR, title='Hidden Bearish', linewidth=2, color=hiddenBearCond ? hiddenBearColor : noneColor, transp=0)
+
+plotshape(hiddenBearCond ? osc[lbR] : na, offset=-lbR, title='Hidden Bearish Label', text=' H Bear ', style=shape.labeldown, location=location.absolute, color=color.new(bearColor, 0), textcolor=color.new(textColor, 0))
+
+
+// ### Alerts
+
+
+if bearCond
+    alert('Bearish Divergence')
+else if hiddenBearCond
+    alert('Hidden Bearish Divergence')
+else if bullCond
+    alert('Bullish Divergence')
+else if hiddenBullCond
+    alert('Hidden Bullish Divergence')
+
+// ### Number
+
+rsi = ta.rsi(close, 14)
+
+var table t = table.new(position.bottom_right, 2, 3, border_width=1)
+
+if barstate.islast
+    //table.cell(t, 0, 0, "RSI", width = 5, bgcolor = #aaaaaa)
+    table.cell(t, 1, 0, str.tostring(math.round(rsi, 2)), width=5, bgcolor=rsi > 40 ? color.red : color.green)
+
+
+// ### Logo
+
+//var table logo = table.new(position.bottom_right, 1, 1, bgcolor = color.yellow, frame_width = 2, frame_color = color.black)
+
+//if barstate.islast
+//    table.cell(logo, 0, 0, "Shoonay", text_color = color.black)
+
+// END ###
+
+//TDI Part
+
+//rsiPeriod = input(11, minval = 1, title = "RSI Period")
+//bandLength = input(31, minval = 1, title = "Band Length")
+//lengthrsipl = input(1, minval = 0, title = "Fast MA on RSI")
+//lengthtradesl = input(9, minval = 1, title = "Slow MA on RSI")
+
+//srcA = close                                                             // Source of Calculations (Close of Bar)
+//r = rsi(srcA, rsiPeriod)                                                 // RSI of Close
+//ma = sma(r, bandLength)                                                 // Moving Average of RSI [current]
+//offs = (1.6185 * stdev(r, bandLength))                                  // Offset
+//up = ma + offs                                                          // Upper Bands
+//dn = ma - offs                                                          // Lower Bands
+//mid = (up + dn) / 2                                                     // Average of Upper and Lower Bands
+//fastMA = sma(r, lengthrsipl)                                            // Moving Averag//e of RSI 2 bars back
+//slowMA = sma(r, lengthtradesl)                                          // Moving Average of RSI 7 bars back
+
+//hline(30)                                                               // Oversold
+//hline(50)                                                               // Midline
+//hline(70)                                                               // Overbought
+
+//upl = plot(up, "Upper Band", color = color.blue)                              // Upper Band
+//dnl = plot(dn, "Lower Band", color = color.blue)                              // Lower Band
+//midl = plot(mid, "Middle of Bands", color = color.orange, linewidth = 2)      // Middle of Bands
+
+//plot(slowMA, "Slow MA", color = color.green, linewidth=2)                       // Plot Slow MA
+//plot(fastMA, "Fast MA", color = color.red, linewidth=2)                         // Plot Fast MA
+
+//fill(upl, midl, color = color.new(color.green, transp = 90))                                         // Fill Upper Half Red
+//fill(midl, dnl, color = color.new(color.red, transp = 90))                                       // Fill Lower Half Green
+
