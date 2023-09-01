@@ -1,0 +1,169 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+/// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// ©Hotchachachaaa, requested creation by @AceJeff37---Discord @PheonixAlgo(RIP) for at least an approximation of his code for RSI divergence tags.
+//@version=5
+//
+indicator("DMI+OBV+RSI", overlay=false)
+//////////////////////////////////////////////////////////////////////
+
+//--------------------------------------------------------------Code Insert----------------------------------------------------------
+
+normalize(_src, _min, _max) => 
+    var _historicMin = 10e10
+    var _historicMax = -10e10
+    _historicMin := math.min(nz(_src, _historicMin), _historicMin)
+    _historicMax := math.max(nz(_src, _historicMax), _historicMax)
+    _min + (_max - _min) * (_src - _historicMin) / math.max(_historicMax - _historicMin, 10e-10)
+
+normalisedObv = normalize(ta.obv, 0, 50)
+smaLength = input(title="OBV SMA length", defval=55)
+normalisedOBVsma = ta.sma(normalisedObv, smaLength)
+//plot(normalisedObv,  color=color.gray, linewidth=2, title="OBV")
+//plot(normalisedOBVsma, color=color.orange, linewidth=1, title="OBV SMA")
+col_grow_above = input(#26A69A, "Above   Grow", group="Histogram", inline="Above")
+col_fall_above = input(#B2DFDB, "Fall", group="Histogram", inline="Above")
+col_grow_below = input(#FFCDD2, "Below Grow", group="Histogram", inline="Below")
+col_fall_below = input(#FF5252, "Fall", group="Histogram", inline="Below")
+scaling= input.int(title="Scaling factor for OBV",minval=1,defval=1)
+hist=(normalisedObv-normalisedOBVsma)*scaling
+plot(hist, title="Histogram", style=plot.style_columns, color=(hist>=0 ? (hist[1] < hist ? col_grow_above : col_fall_above) : (hist[1] < hist ? col_grow_below : col_fall_below)))
+
+
+adxLength = input.int(14, minval=1, title="DI length")
+lensig = input.int(14, title="ADX Smoothing", minval=1, maxval=50)
+[diplus, diminus, adx] = ta.dmi(adxLength, lensig)
+adxSma = input.int(2, minval=1, title="ADX SMA length")
+
+normalisedAdx = normalize(ta.sma(adx, adxSma), 0, 100)
+normalisedDirPlus = normalize(ta.sma(diplus, adxSma), 0, 100) 
+normalisedDirMinus = normalize(ta.sma(diminus, adxSma), 0, 100)
+//plot(normalisedAdx, color=normalisedDirPlus[1] > normalisedDirMinus and normalisedDirPlus > normalisedDirMinus ? color.green : color.red, linewidth=2)
+//plot(normalisedDirPlus, color=color.green, title="+DI")
+//plot(normalisedDirMinus, color=color.red, title="-DI")
+
+
+secondEdge = hline(70, title="secondEdge")
+thirdEdge = hline(50, title="thirdEdge")
+fourthEdge = hline(30, title="fourthEdge")
+
+
+bullColor = color.new(color.lime,25)
+bearColor = color.new(color.fuchsia,25)
+
+// Generate a bull gradient when position is 50-100%, bear gradient when position is 0-50%.
+bColor = if normalisedDirPlus > normalisedDirMinus
+    color.from_gradient(normalisedAdx,0, 100, color.new(bullColor, 100), bullColor)
+else
+    color.from_gradient(100-normalisedAdx,0, 100, bearColor, color.new(bearColor, 100))
+
+//bgcolor(bColor)
+fill(secondEdge, fourthEdge, color=bColor)
+
+
+////////////////////////////////////RSI Divergence////////////////////////////////////////////////
+lenrsidiv = input.int(title="RSI Period", minval=1, defval=14)
+srcrsidiv = input(title="RSI Source", defval=close)
+lbR = 5
+//input(title="Pivot Lookback Right", defval=5)
+lbL = 5
+//input(title="Pivot Lookback Left", defval=5)
+rangeUpper = 60
+//input(title="Max of Lookback Range", defval=60)
+rangeLower = 5
+//input(title="Min of Lookback Range", defval=5)
+plotBull = input.bool(title="Plot Bullish", defval=true)
+plotHiddenBull = input.bool(title="Plot Hidden Bullish", defval=true)
+plotBear = input.bool(title="Plot Bearish", defval=true)
+plotHiddenBear = input.bool(title="Plot Hidden Bearish", defval=true)
+bearColorrsidiv = color.red
+bullColorrsidiv = color.green
+hiddenBullColor = color.new(color.green, 80)
+hiddenBearColor = color.new(color.red, 80)
+textColor = color.white
+noneColor = color.new(color.white, 100)
+osc = ta.rsi(srcrsidiv, lenrsidiv)
+
+// ### Smoothed MA
+
+showSmma = input.bool(title="Show Moving Average", defval=true, group = "Smoothed MA")
+
+smmaLen = 50
+//input(50, minval=1, title="SMMA Length", group = "Smoothed MA")
+smmaSrc = osc
+smma = 0.0
+smma := na(smma[1]) ? ta.sma(smmaSrc, smmaLen) : (smma[1] * (smmaLen - 1) + smmaSrc) / smmaLen
+plot(showSmma ? smma : na, linewidth=2, color=color.white)
+
+// End ###
+
+lineColor = (osc > smma) ?color.yellow :  color.yellow
+
+plot(osc, title="RSI", linewidth=2, color=lineColor)
+hline(50, title="Middle Line", linestyle=hline.style_solid)
+// obLevel = hline(70, title="Overbought", linestyle=hline.style_dotted)
+// osLevel = hline(30, title="Oversold", linestyle=hline.style_dotted)
+//fill(obLevel, osLevel, title="Background", color=#9915FF, transp=90)
+
+plFound = na(ta.pivotlow(osc, lbL, lbR)) ? false : true
+phFound = na(ta.pivothigh(osc, lbL, lbR)) ? false : true
+_inRange(cond) =>
+	bars = ta.barssince(cond == true)
+	rangeLower <= bars and bars <= rangeUpper
+
+//------------------------------------------------------------------------------
+// Regular Bullish
+// Osc: Higher Low
+oscHL = osc[lbR] > ta.valuewhen(plFound, osc[lbR], 1) and _inRange(plFound[1])
+// Price: Lower Low
+priceLL = low[lbR] < ta.valuewhen(plFound, low[lbR], 1)
+bullCond = plotBull and priceLL and oscHL and plFound
+plot(plFound ? osc[lbR] : na,offset=-lbR,title="Regular Bullish",linewidth=2,color=(bullCond ? bullColorrsidiv : noneColor))
+plotshape(bullCond ? osc[lbR] : na,offset=-lbR,title="Regular Bullish Label",text=" Bull ",style=shape.labelup,location=location.absolute,color=bullColorrsidiv,textcolor=textColor)
+//------------------------------------------------------------------------------
+// Hidden Bullish
+// Osc: Lower Low
+oscLL = osc[lbR] < ta.valuewhen(plFound, osc[lbR], 1) and _inRange(plFound[1])
+// Price: Higher Low
+priceHL = low[lbR] > ta.valuewhen(plFound, low[lbR], 1)
+hiddenBullCond = plotHiddenBull and priceHL and oscLL and plFound
+plot(plFound ? osc[lbR] : na, offset=-lbR, title="Hidden Bullish", linewidth=2, color=(hiddenBullCond ? hiddenBullColor : noneColor))
+plotshape( hiddenBullCond ? osc[lbR] : na, offset=-lbR, title="Hidden Bullish Label", text=" H Bull ", style=shape.labelup, location=location.absolute, color=bullColorrsidiv, textcolor=textColor)
+//------------------------------------------------------------------------------
+// Regular Bearish
+// Osc: Lower High
+oscLH = osc[lbR] < ta.valuewhen(phFound, osc[lbR], 1) and _inRange(phFound[1])
+// Price: Higher High
+priceHH = high[lbR] > ta.valuewhen(phFound, high[lbR], 1)
+bearCond = plotBear and priceHH and oscLH and phFound
+plot(phFound ? osc[lbR] : na, offset=-lbR, title="Regular Bearish", linewidth=2, color=(bearCond ? bearColorrsidiv : noneColor))
+plotshape(bearCond ? osc[lbR] : na, offset=-lbR, title="Regular Bearish Label", text=" Bear ", style=shape.labeldown, location=location.absolute, color=bearColorrsidiv, textcolor=textColor)
+
+//------------------------------------------------------------------------------
+// Hidden Bearish
+// Osc: Higher High
+oscHH = osc[lbR] > ta.valuewhen(phFound, osc[lbR], 1) and _inRange(phFound[1])
+// Price: Lower High
+priceLH = high[lbR] < ta.valuewhen(phFound, high[lbR], 1)
+hiddenBearCond = plotHiddenBear and priceLH and oscHH and phFound
+plot(phFound ? osc[lbR] : na, offset=-lbR, title="Hidden Bearish", linewidth=2, color=(hiddenBearCond ? hiddenBearColor : noneColor))
+plotshape(hiddenBearCond ? osc[lbR] : na, offset=-lbR, title="Hidden Bearish Label", text=" H Bear ", style=shape.labeldown, location=location.absolute, color=bearColorrsidiv, textcolor=textColor)
+	 
+// ### Alerts
+
+
+if bearCond
+    alert("Bearish Divergence")
+else if hiddenBearCond
+    alert("Hidden Bearish Divergence")
+else if bullCond
+    alert("Bullish Divergence")
+else if hiddenBullCond
+    alert("Hidden Bullish Divergence")
+
+obvcrossup = ta.crossover(normalisedObv,normalisedOBVsma)
+obvcrossdown = ta.crossunder(normalisedObv,normalisedOBVsma)
+
+plotshape(obvcrossup,  location=location.bottom,  color=color.green, style=shape.triangleup, size = size.small )  
+plotshape(obvcrossdown,  location=location.top, color=color.red, style=shape.triangledown, size = size.small )  
+
