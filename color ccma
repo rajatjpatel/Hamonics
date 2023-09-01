@@ -1,0 +1,69 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+//@version=4
+
+
+study(title="CCMA", shorttitle="MA", overlay=true, resolution="")
+
+
+//inputs
+len = input(21, minval=1, title="Length")
+src = input(close, title="Source")
+offset = input(title="Offset", type=input.integer, defval=0, minval=-500, maxval=500)
+type=input(true, "Use EMA? (Off=SMA)")
+
+
+//output
+out=type? ema(src, len) : sma(src, len)
+
+
+//rsi filter
+rsifil=input(true, title="Add RSI Filter?", type=input.bool)
+rsilen=input(50, "RSI Length")
+rsi=rsi(close, rsilen)
+
+
+//color change
+
+
+//no rsi color change
+col=out<open and out<close ? #00ff00 : #ff0000
+
+
+//trend color change
+colsh=out<open and out<close and rsi>50 ? #00ff00 : na
+colsh2=out>open and out>close and rsi<50? #ff0000 : na
+
+
+//no trend color change
+colsh3=out<open and out<close and rsi<50 ? #9598a1 : na
+colsh4=out>open and out>close and rsi>50 ? #9598a1 : na
+
+
+//plots
+
+
+//no rsi plot
+plot(rsifil? na : out, color=col, linewidth=3, offset=offset)
+
+
+//BG line plot
+plot(rsifil? out : na, color=#9598a1, linewidth=3, offset=offset)
+
+
+//trend line plot
+plot(rsifil? out : na, color=colsh, linewidth=3, offset=offset)
+plot(rsifil? out : na, color=colsh2, linewidth=3, offset=offset)
+
+
+//no trend line plot
+plot(rsifil? out : na, color=colsh3, linewidth=3, offset=offset)
+plot(rsifil? out : na, color=colsh4, linewidth=3, offset=offset)
+
+//Alert condition
+alertcondition(out<open and out<close and rsi>50, title="MA Buy", message="Moving average has turned green!")
+alertcondition(out>open and out>close and rsi<50, title="MA Sell", message="Moving average has turned red!")
+
+alertcondition(out<open and out<close and rsi<50, title="MA Cancel Buy", message="Moving average has turned grey (from green)")
+alertcondition(out>open and out>close and rsi>50, title="MA Cancel Sell", message="Moving average has turned grey (from red)")
