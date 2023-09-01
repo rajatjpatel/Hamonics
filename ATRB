@@ -1,0 +1,20 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+//@version=3
+study("ATRB", overlay = true)
+
+// Inputs
+atrPeriod = input(title = "ATR Period", defval = 14, minval = 1)
+srcUpper = input(title = "Source Upper", type = source, defval = close)
+srcLower = input(title = "Source Lower", type = source, defval = close)
+atrMultiplierUpper = input(title = "ATR Multiplier Upper", defval = 1)
+atrMultiplierLower = input(title = "ATR Multiplier Lower", defval = 1)
+
+// ATR
+atr = atr(atrPeriod)
+
+// Plotting
+plot(srcUpper + atr * atrMultiplierUpper, color = green)
+plot(srcLower - atr * atrMultiplierLower, color = red)
+
