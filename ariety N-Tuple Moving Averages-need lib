@@ -1,0 +1,1176 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+
+
+//@version=5
+indicator("Variety N-Tuple Moving Averages ",
+     shorttitle="VNTMA",
+     overlay = true, 
+     timeframe="", 
+     timeframe_gaps = true)
+
+import loxx/loxxexpandedsourcetypes/4
+
+greencolor = #2DD204  
+redcolor = #D2042D 
+
+_iT3(src, per, hot, clean)=>
+    a = hot
+    _c1 = -a * a * a
+    _c2 = 3 * a * a + 3 * a * a * a
+    _c3 = -6 * a * a - 3 * a - 3 * a * a * a
+    _c4 = 1 + 3 * a + a * a * a + 3 * a * a
+    
+    alpha = 0.
+    
+    if (clean == "T3 New")
+        alpha := 2.0 / (2.0 + (per - 1.0) / 2.0)
+    else 
+        alpha := 2.0 / (1.0 + per)
+
+    _t30 = src, _t31 = src
+    _t32 = src, _t33 = src
+    _t34 = src, _t35 = src
+    
+    _t30 := nz(_t30[1]) + alpha * (src -  nz(_t30[1]))
+    _t31 := nz(_t31[1]) + alpha * (_t30 - nz(_t31[1]))
+    _t32 := nz(_t32[1]) + alpha * (_t31 - nz(_t32[1]))
+    _t33 := nz(_t33[1]) + alpha * (_t32 - nz(_t33[1]))
+    _t34 := nz(_t34[1]) + alpha * (_t33 - nz(_t34[1]))
+    _t35 := nz(_t35[1]) + alpha * (_t34 - nz(_t35[1]))
+    out =
+         _c1 * _t35 + _c2 * _t34 +
+         _c3 * _t33 +  _c4 * _t32
+    out
+    
+fact(int n)=>
+    float a = 1
+    for i = 1 to n 
+        a *= i
+    a
+	
+smthtype = input.string("Kaufman", "Heiken-Ashi Better Smoothing", options = ["AMA", "T3", "Kaufman"], group=  "Source Settings")
+srcoption = input.string("Close", "Source", group= "Source Settings", 
+     options = 
+     ["Close", "Open", "High", "Low", "Median", "Typical", "Weighted", "Average", "Average Median Body", "Trend Biased", "Trend Biased (Extreme)", 
+     "HA Close", "HA Open", "HA High", "HA Low", "HA Median", "HA Typical", "HA Weighted", "HA Average", "HA Average Median Body", "HA Trend Biased", "HA Trend Biased (Extreme)",
+     "HAB Close", "HAB Open", "HAB High", "HAB Low", "HAB Median", "HAB Typical", "HAB Weighted", "HAB Average", "HAB Average Median Body", "HAB Trend Biased", "HAB Trend Biased (Extreme)"])
+
+per = input.int(14,"Period", group = "Basic Settings")
+nemadepth = input.int(3, "Depth", maxval = 35, minval = 1, group = "Basic Settings")
+type = input.string("EMA", "Variety Moving Average Type", options = ["EMA", "WMA", "SMA", "RMA", "T3"], group = "Basic Settings")
+
+t3hot = input.float(0.7, "T3 Hot", group= "T3 Settings")   
+t3swt = input.string("T3 New", "T3 Type", options = ["T3 New", "T3 Original"], group = "T3 Settings")
+
+colorbars = input.bool(true, "Color bars?", group = "UI Options")
+
+kfl=input.float(0.666, title="* Kaufman's Adaptive MA (KAMA) Only - Fast End", group = "Moving Average Inputs")
+ksl=input.float(0.0645, title="* Kaufman's Adaptive MA (KAMA) Only - Slow End", group = "Moving Average Inputs")
+amafl = input.int(2, title="* Adaptive Moving Average (AMA) Only - Fast", group = "Moving Average Inputs")
+amasl = input.int(30, title="* Adaptive Moving Average (AMA) Only - Slow", group = "Moving Average Inputs")
+
+haclose = request.security(ticker.heikinashi(syminfo.tickerid), timeframe.period, close)
+haopen = request.security(ticker.heikinashi(syminfo.tickerid), timeframe.period, open)
+hahigh = request.security(ticker.heikinashi(syminfo.tickerid), timeframe.period, high)
+halow = request.security(ticker.heikinashi(syminfo.tickerid), timeframe.period, low)
+hamedian = request.security(ticker.heikinashi(syminfo.tickerid), timeframe.period, hl2)
+hatypical = request.security(ticker.heikinashi(syminfo.tickerid), timeframe.period, hlc3)
+haweighted = request.security(ticker.heikinashi(syminfo.tickerid), timeframe.period, hlcc4)
+haaverage = request.security(ticker.heikinashi(syminfo.tickerid), timeframe.period, ohlc4)
+
+float src = switch srcoption
+	"Close" => loxxexpandedsourcetypes.rclose()
+	"Open" => loxxexpandedsourcetypes.ropen()
+	"High" => loxxexpandedsourcetypes.rhigh()
+	"Low" => loxxexpandedsourcetypes.rlow()
+	"Median" => loxxexpandedsourcetypes.rmedian()
+	"Typical" => loxxexpandedsourcetypes.rtypical()
+	"Weighted" => loxxexpandedsourcetypes.rweighted()
+	"Average" => loxxexpandedsourcetypes.raverage()
+    "Average Median Body" => loxxexpandedsourcetypes.ravemedbody()
+	"Trend Biased" => loxxexpandedsourcetypes.rtrendb()
+	"Trend Biased (Extreme)" => loxxexpandedsourcetypes.rtrendbext()
+	"HA Close" => loxxexpandedsourcetypes.haclose(haclose)
+	"HA Open" => loxxexpandedsourcetypes.haopen(haopen)
+	"HA High" => loxxexpandedsourcetypes.hahigh(hahigh)
+	"HA Low" => loxxexpandedsourcetypes.halow(halow)
+	"HA Median" => loxxexpandedsourcetypes.hamedian(hamedian)
+	"HA Typical" => loxxexpandedsourcetypes.hatypical(hatypical)
+	"HA Weighted" => loxxexpandedsourcetypes.haweighted(haweighted)
+	"HA Average" => loxxexpandedsourcetypes.haaverage(haaverage)
+    "HA Average Median Body" => loxxexpandedsourcetypes.haavemedbody(haclose, haopen)
+	"HA Trend Biased" => loxxexpandedsourcetypes.hatrendb(haclose, haopen, hahigh, halow)
+	"HA Trend Biased (Extreme)" => loxxexpandedsourcetypes.hatrendbext(haclose, haopen, hahigh, halow)
+	"HAB Close" => loxxexpandedsourcetypes.habclose(smthtype, amafl, amasl, kfl, ksl)
+	"HAB Open" => loxxexpandedsourcetypes.habopen(smthtype, amafl, amasl, kfl, ksl)
+	"HAB High" => loxxexpandedsourcetypes.habhigh(smthtype, amafl, amasl, kfl, ksl)
+	"HAB Low" => loxxexpandedsourcetypes.hablow(smthtype, amafl, amasl, kfl, ksl)
+	"HAB Median" => loxxexpandedsourcetypes.habmedian(smthtype, amafl, amasl, kfl, ksl)
+	"HAB Typical" => loxxexpandedsourcetypes.habtypical(smthtype, amafl, amasl, kfl, ksl)
+	"HAB Weighted" => loxxexpandedsourcetypes.habweighted(smthtype, amafl, amasl, kfl, ksl)
+	"HAB Average" => loxxexpandedsourcetypes.habaverage(smthtype, amafl, amasl, kfl, ksl)
+    "HAB Average Median Body" => loxxexpandedsourcetypes.habavemedbody(smthtype, amafl, amasl, kfl, ksl)
+	"HAB Trend Biased" => loxxexpandedsourcetypes.habtrendb(smthtype, amafl, amasl, kfl, ksl)
+	"HAB Trend Biased (Extreme)" => loxxexpandedsourcetypes.habtrendbext(smthtype, amafl, amasl, kfl, ksl)
+	=> haclose	
+
+variant(type, src, len)=>
+    out = 0.0
+    if type == "EMA"
+        out := ta.ema(src, len)
+    else if type == "WMA"
+        out := ta.wma(src, len)
+    else if type == "SMA"
+        out := ta.sma(src, len)
+    else if type == "RMA"
+        out := ta.rma(src, len)
+    else if type == "T3"
+        out := _iT3(src, len, t3hot, t3swt)
+    out
+    
+_gsmth(string type, float src, simple int per, simple int depth, float[] coeff)=>
+    float out = 0.
+    if depth == 1
+        ma1 = variant(type, src, per)
+        out := ma1
+        
+    if depth == 2
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        out := 
+             array.get(coeff, 1) * ma1 
+             - ma2
+        
+    if depth == 3
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + ma3
+             
+    if depth == 4
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - ma4
+             
+    if depth == 5
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + ma5
+             
+    if depth == 6
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - ma6
+             
+    if depth == 7
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + ma7
+
+    if depth == 8
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - ma8
+             
+    if depth == 9
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + ma9
+             
+    if depth == 10
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - ma10
+
+    if depth == 11
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + ma11
+    
+    if depth == 12
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - ma12
+
+    if depth == 13
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + ma13
+
+    if depth == 14
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - ma14
+             
+    if depth == 15
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + ma15
+    
+    if depth == 16
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - ma16
+             
+    if depth == 17
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + ma17
+             
+    if depth == 18
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        ma18 = variant(type, ma17, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + array.get(coeff, 17) * ma17
+             - ma18
+    
+    if depth == 19
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        ma18 = variant(type, ma17, per)
+        ma19 = variant(type, ma18, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + array.get(coeff, 17) * ma17
+             - array.get(coeff, 18) * ma18
+             + ma19
+             
+    if depth == 20
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        ma18 = variant(type, ma17, per)
+        ma19 = variant(type, ma18, per)
+        ma20 = variant(type, ma19, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + array.get(coeff, 17) * ma17
+             - array.get(coeff, 18) * ma18
+             + array.get(coeff, 19) * ma19
+             - ma20
+    
+    if depth == 21
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        ma18 = variant(type, ma17, per)
+        ma19 = variant(type, ma18, per)
+        ma20 = variant(type, ma19, per)
+        ma21 = variant(type, ma20, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + array.get(coeff, 17) * ma17
+             - array.get(coeff, 18) * ma18
+             + array.get(coeff, 19) * ma19
+             - array.get(coeff, 20) * ma20
+             + ma21
+
+    if depth == 22
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        ma18 = variant(type, ma17, per)
+        ma19 = variant(type, ma18, per)
+        ma20 = variant(type, ma19, per)
+        ma21 = variant(type, ma20, per)
+        ma22 = variant(type, ma21, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + array.get(coeff, 17) * ma17
+             - array.get(coeff, 18) * ma18
+             + array.get(coeff, 19) * ma19
+             - array.get(coeff, 20) * ma20
+             + array.get(coeff, 21) * ma21
+             - ma22
+
+    if depth == 23
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        ma18 = variant(type, ma17, per)
+        ma19 = variant(type, ma18, per)
+        ma20 = variant(type, ma19, per)
+        ma21 = variant(type, ma20, per)
+        ma22 = variant(type, ma21, per)
+        ma23 = variant(type, ma22, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + array.get(coeff, 17) * ma17
+             - array.get(coeff, 18) * ma18
+             + array.get(coeff, 19) * ma19
+             - array.get(coeff, 20) * ma20
+             + array.get(coeff, 21) * ma21
+             - array.get(coeff, 22) * ma22
+             + ma23
+    
+    if depth == 24
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        ma18 = variant(type, ma17, per)
+        ma19 = variant(type, ma18, per)
+        ma20 = variant(type, ma19, per)
+        ma21 = variant(type, ma20, per)
+        ma22 = variant(type, ma21, per)
+        ma23 = variant(type, ma22, per)
+        ma24 = variant(type, ma23, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + array.get(coeff, 17) * ma17
+             - array.get(coeff, 18) * ma18
+             + array.get(coeff, 19) * ma19
+             - array.get(coeff, 20) * ma20
+             + array.get(coeff, 21) * ma21
+             - array.get(coeff, 22) * ma22
+             + array.get(coeff, 23) * ma23
+             - ma24
+    
+    if depth == 25
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        ma18 = variant(type, ma17, per)
+        ma19 = variant(type, ma18, per)
+        ma20 = variant(type, ma19, per)
+        ma21 = variant(type, ma20, per)
+        ma22 = variant(type, ma21, per)
+        ma23 = variant(type, ma22, per)
+        ma24 = variant(type, ma23, per)
+        ma25 = variant(type, ma24, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + array.get(coeff, 17) * ma17
+             - array.get(coeff, 18) * ma18
+             + array.get(coeff, 19) * ma19
+             - array.get(coeff, 20) * ma20
+             + array.get(coeff, 21) * ma21
+             - array.get(coeff, 22) * ma22
+             + array.get(coeff, 23) * ma23
+             - array.get(coeff, 24) * ma24
+             + ma25
+
+    if depth == 26
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        ma18 = variant(type, ma17, per)
+        ma19 = variant(type, ma18, per)
+        ma20 = variant(type, ma19, per)
+        ma21 = variant(type, ma20, per)
+        ma22 = variant(type, ma21, per)
+        ma23 = variant(type, ma22, per)
+        ma24 = variant(type, ma23, per)
+        ma25 = variant(type, ma24, per)
+        ma26 = variant(type, ma25, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + array.get(coeff, 17) * ma17
+             - array.get(coeff, 18) * ma18
+             + array.get(coeff, 19) * ma19
+             - array.get(coeff, 20) * ma20
+             + array.get(coeff, 21) * ma21
+             - array.get(coeff, 22) * ma22
+             + array.get(coeff, 23) * ma23
+             - array.get(coeff, 24) * ma24
+             + array.get(coeff, 25) * ma25
+             - ma26
+
+    if depth == 27
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        ma18 = variant(type, ma17, per)
+        ma19 = variant(type, ma18, per)
+        ma20 = variant(type, ma19, per)
+        ma21 = variant(type, ma20, per)
+        ma22 = variant(type, ma21, per)
+        ma23 = variant(type, ma22, per)
+        ma24 = variant(type, ma23, per)
+        ma25 = variant(type, ma24, per)
+        ma26 = variant(type, ma25, per)
+        ma27 = variant(type, ma26, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + array.get(coeff, 17) * ma17
+             - array.get(coeff, 18) * ma18
+             + array.get(coeff, 19) * ma19
+             - array.get(coeff, 20) * ma20
+             + array.get(coeff, 21) * ma21
+             - array.get(coeff, 22) * ma22
+             + array.get(coeff, 23) * ma23
+             - array.get(coeff, 24) * ma24
+             + array.get(coeff, 25) * ma25
+             - array.get(coeff, 26) * ma26
+             + ma27
+
+    if depth == 28
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        ma18 = variant(type, ma17, per)
+        ma19 = variant(type, ma18, per)
+        ma20 = variant(type, ma19, per)
+        ma21 = variant(type, ma20, per)
+        ma22 = variant(type, ma21, per)
+        ma23 = variant(type, ma22, per)
+        ma24 = variant(type, ma23, per)
+        ma25 = variant(type, ma24, per)
+        ma26 = variant(type, ma25, per)
+        ma27 = variant(type, ma26, per)
+        ma28 = variant(type, ma27, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + array.get(coeff, 17) * ma17
+             - array.get(coeff, 18) * ma18
+             + array.get(coeff, 19) * ma19
+             - array.get(coeff, 20) * ma20
+             + array.get(coeff, 21) * ma21
+             - array.get(coeff, 22) * ma22
+             + array.get(coeff, 23) * ma23
+             - array.get(coeff, 24) * ma24
+             + array.get(coeff, 25) * ma25
+             - array.get(coeff, 26) * ma26
+             + array.get(coeff, 27) * ma27
+             - ma28
+             
+    if depth == 29
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        ma18 = variant(type, ma17, per)
+        ma19 = variant(type, ma18, per)
+        ma20 = variant(type, ma19, per)
+        ma21 = variant(type, ma20, per)
+        ma22 = variant(type, ma21, per)
+        ma23 = variant(type, ma22, per)
+        ma24 = variant(type, ma23, per)
+        ma25 = variant(type, ma24, per)
+        ma26 = variant(type, ma25, per)
+        ma27 = variant(type, ma26, per)
+        ma28 = variant(type, ma27, per)
+        ma29 = variant(type, ma28, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + array.get(coeff, 17) * ma17
+             - array.get(coeff, 18) * ma18
+             + array.get(coeff, 19) * ma19
+             - array.get(coeff, 20) * ma20
+             + array.get(coeff, 21) * ma21
+             - array.get(coeff, 22) * ma22
+             + array.get(coeff, 23) * ma23
+             - array.get(coeff, 24) * ma24
+             + array.get(coeff, 25) * ma25
+             - array.get(coeff, 26) * ma26
+             + array.get(coeff, 27) * ma27
+             - array.get(coeff, 28) * ma28
+             + ma29
+             
+    if depth == 30
+        ma1 = variant(type, src, per)
+        ma2 = variant(type, ma1, per)
+        ma3 = variant(type, ma2, per)
+        ma4 = variant(type, ma3, per)
+        ma5 = variant(type, ma4, per)
+        ma6 = variant(type, ma5, per)
+        ma7 = variant(type, ma6, per)
+        ma8 = variant(type, ma7, per)
+        ma9 = variant(type, ma8, per)
+        ma10 = variant(type, ma9, per)
+        ma11 = variant(type, ma10, per)
+        ma12 = variant(type, ma11, per)
+        ma13 = variant(type, ma12, per)
+        ma14 = variant(type, ma13, per)
+        ma15 = variant(type, ma14, per)
+        ma16 = variant(type, ma15, per)
+        ma17 = variant(type, ma16, per)
+        ma18 = variant(type, ma17, per)
+        ma19 = variant(type, ma18, per)
+        ma20 = variant(type, ma19, per)
+        ma21 = variant(type, ma20, per)
+        ma22 = variant(type, ma21, per)
+        ma23 = variant(type, ma22, per)
+        ma24 = variant(type, ma23, per)
+        ma25 = variant(type, ma24, per)
+        ma26 = variant(type, ma25, per)
+        ma27 = variant(type, ma26, per)
+        ma28 = variant(type, ma27, per)
+        ma29 = variant(type, ma28, per)
+        ma30 = variant(type, ma29, per)
+        out := 
+             array.get(coeff, 1)   * ma1 
+             - array.get(coeff, 2) * ma2 
+             + array.get(coeff, 3) * ma3
+             - array.get(coeff, 4) * ma4
+             + array.get(coeff, 5) * ma5
+             - array.get(coeff, 6) * ma6
+             + array.get(coeff, 7) * ma7
+             - array.get(coeff, 8) * ma8
+             + array.get(coeff, 9) * ma9
+             - array.get(coeff, 10) * ma10
+             + array.get(coeff, 11) * ma11
+             - array.get(coeff, 12) * ma12
+             + array.get(coeff, 13) * ma13
+             - array.get(coeff, 14) * ma14
+             + array.get(coeff, 15) * ma15
+             - array.get(coeff, 16) * ma16
+             + array.get(coeff, 17) * ma17
+             - array.get(coeff, 18) * ma18
+             + array.get(coeff, 19) * ma19
+             - array.get(coeff, 20) * ma20
+             + array.get(coeff, 21) * ma21
+             - array.get(coeff, 22) * ma22
+             + array.get(coeff, 23) * ma23
+             - array.get(coeff, 24) * ma24
+             + array.get(coeff, 25) * ma25
+             - array.get(coeff, 26) * ma26
+             + array.get(coeff, 27) * ma27
+             - array.get(coeff, 28) * ma28
+             + array.get(coeff, 29) * ma29
+             - ma30
+
+	out
+	
+nemadepth := math.max(math.min(nemadepth, 49), 1)
+coeff = array.new<float>(50, 0.)
+for k = 0 to nemadepth 
+    array.set(coeff, k, nz(fact(nemadepth) / (fact(nemadepth - k) * fact(k)), 1))
+
+depth = array.size(coeff) - 1
+out = _gsmth(type, src, per, nemadepth, coeff)
+sig = nz(out[1])
+
+colorout = out > sig ? greencolor : out < sig ? redcolor : color.gray
+
+plot(out, "Variety NEMA", color = colorout, linewidth = 3)
+barcolor(colorbars ? colorout : na)
+
+goLong = ta.crossover(out, sig)
+goShort = ta.crossunder(out, sig)
+
+alertcondition(goLong, title = "Long", message = "Variety N-Tuple Moving Averages [Loxx]: Long\nSymbol: {{ticker}}\nPrice: {{close}}")
+alertcondition(goShort, title = "Short", message = "Variety N-Tuple Moving Averages [Loxx]: Short\nSymbol: {{ticker}}\nPrice: {{close}}")
+
+
