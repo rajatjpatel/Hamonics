@@ -1,0 +1,2221 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+
+
+
+//@version=5
+indicator("MTF HP", 
+          shorttitle="MTF HP",
+          overlay=true, 
+          max_lines_count=500, 
+          max_labels_count=500,
+          max_boxes_count=500,
+          max_bars_back=2000)
+
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════ //
+// ZigZag Functions  -------------------------------------------------------------------------------- //
+
+//calculate zigzag
+calculate_zigzag(simple string resolution, simple int period, float hsrc, float lsrc, int max_pivots) =>
+    newbar = ta.change(time(resolution)) != 0
+    bi = ta.valuewhen(newbar, bar_index, period - 1)
+    len = bar_index - bi + 1
+    
+    float ph = na 
+    float pl = na
+    ph := ta.highestbars(hsrc, nz(len, 1)) == 0 ? hsrc : na
+    pl := ta.lowestbars(lsrc, nz(len, 1)) == 0 ? lsrc : na
+        
+    var dir = 0
+    dir := ph and na(pl) ? 1 : pl and na(ph) ? -1 : dir
+    var zigzag = array.new_float(0)
+    oldzigzag = array.copy(zigzag)
+    
+    bool dirchanged = (dir != dir[1])
+    if ph or pl
+        if dirchanged
+            bindex = bar_index
+            value = dir == 1 ? ph : pl
+            array.unshift(zigzag, bindex)
+            array.unshift(zigzag, value)
+            if array.size(zigzag) > max_pivots
+                array.pop(zigzag)
+                array.pop(zigzag)
+        else
+            bindex = bar_index
+            value = dir == 1 ? ph : pl
+            if array.size(zigzag) == 0
+                array.unshift(zigzag, bindex)
+                array.unshift(zigzag, value)
+                if array.size(zigzag) > max_pivots
+                    array.pop(zigzag)
+                    array.pop(zigzag)
+            else
+                if (dir == 1 and value > array.get(zigzag, 0)) or (dir == -1 and value < array.get(zigzag, 0))
+                    array.set(zigzag, 0, value)
+                    array.set(zigzag, 1, bindex)
+    
+    [zigzag, oldzigzag, dir]
+
+//is new zigzag
+is_newzigzag(float[] zigzag, float[] oldzigzag) =>
+    res = false
+    if array.size(zigzag) >= 4 and array.size(oldzigzag) >= 4
+        cond1 = array.get(zigzag, 0) != array.get(oldzigzag, 0) or array.get(zigzag, 1) != array.get(oldzigzag, 1)
+        cond2 = array.get(zigzag, 2) == array.get(oldzigzag, 2) and array.get(zigzag, 3) == math.round(array.get(oldzigzag, 3))
+        res := cond1 and cond2
+    res
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════ //
+// 5-point Harmonic Pattern Functions  ------------------------------------------------------------- //
+
+//draw trading lines
+draw_trading_lines(draw, start_barindex, entry_price, stop_loss, take_profit1, take_profit2, coluor, horizontal_length) => 
+    var line line_ep = na
+    var line line_sl = na
+    var line line_tp1 = na
+    var line line_tp2 = na
+    
+    var label label_ep = na
+    var label label_sl = na
+    var label label_tp1 = na
+    var label label_tp2 = na
+    
+    if draw
+        line.delete(line_ep)
+        line.delete(line_sl)
+        line.delete(line_tp1)
+        line.delete(line_tp2)
+        
+        label.delete(label_ep)
+        label.delete(label_sl)
+        label.delete(label_tp1)
+        label.delete(label_tp2)
+        
+        line_ep := line.new(x1=start_barindex, y1=entry_price, x2=start_barindex + horizontal_length, y2=entry_price, style=line.style_dashed, color=color.new(coluor, 30), width=2)
+        line_sl := line.new(x1=start_barindex, y1=stop_loss, x2=start_barindex + horizontal_length, y2=stop_loss, style=line.style_dashed, color=color.new(coluor, 30), width=2)
+        line_tp1 := line.new(x1=start_barindex, y1=take_profit1, x2=start_barindex + horizontal_length, y2=take_profit1, style=line.style_dashed, color=color.new(coluor, 30), width=2)
+        line_tp2 := line.new(x1=start_barindex, y1=take_profit2, x2=start_barindex + horizontal_length, y2=take_profit2, style=line.style_dashed, color=color.new(coluor, 30), width=2)
+        
+        label_ep := label.new(x=start_barindex + horizontal_length + 1, y=entry_price, style=label.style_label_left, text="ENT: " + str.tostring(entry_price), color=color.new(color.blue, 100), textcolor=color.new(coluor, 10))
+        label_sl := label.new(x=start_barindex + horizontal_length + 1, y=stop_loss, style=label.style_label_left, text="SL: " + str.tostring(stop_loss), color=color.new(color.blue, 100), textcolor=color.new(coluor, 10))
+        label_tp1 := label.new(x=start_barindex + horizontal_length + 1, y=take_profit1, style=label.style_label_left, text="TP1: " + str.tostring(take_profit1), color=color.new(color.blue, 100), textcolor=color.new(coluor, 10))
+        label_tp2 := label.new(x=start_barindex + horizontal_length + 1, y=take_profit2, style=label.style_label_left, text="TP2: " + str.tostring(take_profit2), color=color.new(color.blue, 100), textcolor=color.new(coluor, 10))
+        0
+    else 
+        if not na(label_ep) and (bar_index - label.get_x(label_ep)) * timeframe.multiplier > 30 * 24 * 60
+            line.delete(line_ep)
+            line.delete(line_sl)
+            line.delete(line_tp1)
+            line.delete(line_tp2)
+            
+            label.delete(label_ep)
+            label.delete(label_sl)
+            label.delete(label_tp1)
+            label.delete(label_tp2)
+        0
+        
+//draw harmonic pattern
+draw_harmonic_pattern(draw, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor) =>
+    var line line_XA = na
+    var line line_AB = na
+    var line line_XB = na
+    var line line_BC = na
+    var line line_CD = na
+    var line line_BD = na
+    var line line_XD = na
+    var line line_AC = na
+    
+    var label label_X = na
+    var label label_A = na
+    var label label_B = na
+    var label label_C = na
+    var label label_D = na
+    
+    var label label_XB = na
+    var label label_BD = na
+    var label label_AC = na
+    var label label_XD = na
+    
+    if draw
+        line.delete(line_XA)
+        line.delete(line_AB)
+        line.delete(line_XB)
+        line.delete(line_BC)
+        line.delete(line_CD)
+        line.delete(line_BD)
+        line.delete(line_XD)
+        line.delete(line_AC)
+        
+        label.delete(label_X)
+        label.delete(label_A)
+        label.delete(label_B)
+        label.delete(label_C)
+        label.delete(label_D)
+        
+        label.delete(label_XB)
+        label.delete(label_BD)
+        label.delete(label_AC)
+        label.delete(label_XD)
+    
+        line_XA := line.new(x1=Xx, y1=Xy, x2=Ax, y2=Ay, color=color.new(coluor, 30), width=2)
+        line_AB := line.new(x1=Ax, y1=Ay, x2=Bx, y2=By, color=color.new(coluor, 30), width=2)
+        line_XB := line.new(x1=Xx, y1=Xy, x2=Bx, y2=By, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        line_BC := line.new(x1=Bx, y1=By, x2=Cx, y2=Cy, color=color.new(coluor, 30), width=2)
+        line_CD := line.new(x1=Cx, y1=Cy, x2=Dx, y2=Dy, color=color.new(coluor, 30), width=2)
+        line_BD := line.new(x1=Bx, y1=By, x2=Dx, y2=Dy, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        line_XD := line.new(x1=Xx, y1=Xy, x2=Dx, y2=Dy, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        line_AC := line.new(x1=Ax, y1=Ay, x2=Cx, y2=Cy, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        linefill.new(line_XA, line_XB, color=color.new(coluor, 80))
+        linefill.new(line_BC, line_BD, color=color.new(coluor, 80))
+        
+        duration = ((Dx - Xx) * timeframe.multiplier) / (60.0 * 24.0)
+        tooltip = "timeframe: " + reso + "\n" + "pattern: " + name + "\n" + "duration: " + str.tostring(duration, "#.###") + " Day" + "\n"  + "trendy: " + (trendy ? "true" : "false") + "\n"
+        
+        label_X := label.new(x=Xx, y=Xy, text="X", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_A := label.new(x=Ax, y=Ay, text="A", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_B := label.new(x=Bx, y=By, text="B", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_C := label.new(x=Cx, y=Cy, text="C", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_D := label.new(x=Dx, y=Dy, text="D", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        
+        XA = math.abs(Xy - Ay)
+        AB = math.abs(Ay - By)
+        BC = math.abs(By - Cy)
+        CD = math.abs(Cy - Dy)
+        AD = math.abs(Ay - Dy)
+        label_XB := label.new(x=int((Xx + Bx) / 2), y=(Xy + By) / 2, text=str.tostring(AB / XA, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_BD := label.new(x=int((Bx + Dx) / 2), y=(By + Dy) / 2, text=str.tostring(CD / BC, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_AC := label.new(x=int((Ax + Cx) / 2), y=(Ay + Cy) / 2, text=str.tostring(BC / AB, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_XD := label.new(x=int((Xx + Dx) / 2), y=(Xy + Dy) / 2, text=str.tostring(AD / XA, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        0
+    else 
+        if not na(label_D) and (bar_index - label.get_x(label_D)) * timeframe.multiplier > 30 * 24 * 60
+            line.delete(line_XA)
+            line.delete(line_AB)
+            line.delete(line_XB)
+            line.delete(line_BC)
+            line.delete(line_CD)
+            line.delete(line_BD)
+            line.delete(line_XD)
+            line.delete(line_AC)
+            
+            label.delete(label_X)
+            label.delete(label_A)
+            label.delete(label_B)
+            label.delete(label_C)
+            label.delete(label_D)
+            
+            label.delete(label_XB)
+            label.delete(label_BD)
+            label.delete(label_AC)
+            label.delete(label_XD)
+        0
+        
+//get 5-points
+get_5_points(zigzag, oldzigzag, zigzagdir, confirm) =>
+    if array.size(zigzag) >= 10 and ta.barssince(is_newzigzag(zigzag, oldzigzag)) == confirm
+        Xx = math.round(array.get(zigzag, 9))
+        Xy = array.get(zigzag, 8)
+        Xd = zigzagdir[bar_index - Xx]
+        
+        Ax = math.round(array.get(zigzag, 7))
+        Ay = array.get(zigzag, 6)
+        Ad = zigzagdir[bar_index - Ax]
+        
+        Bx = math.round(array.get(zigzag, 5))
+        By = array.get(zigzag, 4)
+        Bd = zigzagdir[bar_index - Bx]
+        
+        Cx = math.round(array.get(zigzag, 3))
+        Cy = array.get(zigzag, 2)
+        Cd = zigzagdir[bar_index - Cx]
+        
+        Dx = math.round(array.get(zigzag, 1))
+        Dy = array.get(zigzag, 0)
+        Dd = zigzagdir[bar_index - Dx]
+        
+        [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd]
+    else
+        [na, na, na, na, na, na, na, na, na, na, na, na, na, na, na]
+
+//gartlay pattern
+gartlay_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = AB / XA >= 0.518 and AB / XA <= 0.718       //best 0.618 (±0.1)
+    cond2 = BC / AB >= 0.382 and BC / AB <= 0.886
+    cond3 = CD / BC >= 1.272 and CD / BC <= 1.618
+    cond4 = AD / XA >= 0.686 and AD / XA <= 0.886       //best 0.786 (±0.1)
+    cond5 = CD / AB >= 0.800 and CD / AB <= 1.200       //best 1 (±0.2)
+    cond6 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + AD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "Gartlay " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+
+//cypher pattern
+cypher_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = AB / XA >= 0.382 and AB / XA <= 0.618   
+    cond2 = XC / XA >= 1.272 and XC / XA <= 1.414
+    cond3 = CD / XC >= 0.686 and CD / XC <= 0.886       //best 0.786 (±0.1)
+    cond4 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond = cond1 and cond2 and cond3 and cond4
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + CD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "Cypher " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+
+//bat pattern
+bat_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = AB / XA >= 0.382 and AB / XA <= 0.500  
+    cond2 = BC / AB >= 0.382 and BC / AB <= 0.886
+    cond3 = CD / BC >= 1.618 and CD / BC <= 2.618
+    cond4 = AD / XA >= 0.786 and AD / XA <= 0.986       //best 0.886 (±0.1)
+    cond5 = CD / AB >= 1.072 and CD / AB <= 1.472       //best 1.272 (±0.2)
+    cond6 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + AD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "Bat " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+
+//deepcrab pattern
+deepcrab_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = AB / XA >= 0.786 and AB / XA <= 0.986       // best 0.886 (±0.1)
+    cond2 = BC / AB >= 0.382 and BC / AB <= 0.886
+    cond3 = CD / BC >= 2.242 and CD / BC <= 3.618
+    cond4 = AD / XA >= 1.518 and AD / XA <= 1.718       //best 1.618 (±0.1)
+    cond5 = CD / AB >= 1.072 and CD / AB <= 1.818       //best 1.272-1.618 (±0.2)
+    cond6 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + AD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "DeepCrab " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+
+//crab pattern
+crab_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = AB / XA >= 0.382 and AB / XA <= 0.618    
+    cond2 = BC / AB >= 0.382 and BC / AB <= 0.886
+    cond3 = CD / BC >= 2.242 and CD / BC <= 3.618
+    cond4 = AD / XA >= 1.518 and AD / XA <= 1.718       //best 1.618 (±0.1)
+    cond5 = CD / AB >= 1.072 and CD / AB <= 1.818       //best 1.272-1.618 (±0.2)
+    cond6 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000 
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + AD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "Crab " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+    
+//butterfly pattern
+butterfly_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = AB / XA >= 0.686 and AB / XA <= 0.886       //best 0.786 (±0.1)
+    cond2 = BC / AB >= 0.382 and BC / AB <= 0.886
+    cond3 = CD / BC >= 1.618 and CD / BC <= 2.618
+    cond4 = AD / XA >= 1.272 and AD / XA <= 1.618    
+    cond5 = CD / AB >= 0.800 and CD / AB <= 1.472       //best 1-1.272 (±0.2)
+    cond6 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + AD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "Butterfly " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+    
+//shark pattern
+shark_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = AB / XA >= 0.382 and AB / XA <= 0.618   
+    cond2 = BC / AB >= 1.130 and BC / AB <= 1.618
+    cond3 = CD / BC >= 1.618 and CD / BC <= 2.240
+    cond4 = CD / XC >= 0.886 and CD / XC <= 1.130    
+    cond5 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond = cond1 and cond2 and cond3 and cond4 and cond5
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + CD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "Shark " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+
+//anti-gartlay pattern
+anti_gartlay_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = BC / CD >= 0.518 and BC / CD <= 0.718       //best 0.618 (±0.1)
+    cond2 = AB / BC >= 0.382 and AB / BC <= 0.886
+    cond3 = XA / AB >= 1.272 and XA / AB <= 1.618
+    cond4 = XC / CD >= 0.686 and XC / CD <= 0.886       //best 0.786 (±0.1)
+    cond5 = XA / BC >= 0.800 and XA / BC <= 1.200       //best 1 (±0.2)
+    cond6 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + CD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "Anti-Gartlay " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+
+//anti cypher pattern
+anti_cypher_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = BC / CD >= 0.382 and BC / CD <= 0.618   
+    cond2 = AD / CD >= 1.272 and AD / CD <= 1.414
+    cond3 = XA / AD >= 0.686 and XA / AD <= 0.886       //best 0.786 (±0.1)
+    cond4 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond = cond1 and cond2 and cond3 and cond4
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + AD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "Anti-Cypher " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+
+//anti_bat pattern
+anti_bat_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = BC / CD >= 0.382 and BC / CD <= 0.500  
+    cond2 = AB / BC >= 0.382 and AB / BC <= 0.886
+    cond3 = XA / AB >= 1.618 and XA / AB <= 2.618
+    cond4 = XC / CD >= 0.786 and XC / CD <= 0.986       //best 0.886 (±0.1)
+    cond5 = XA / BC >= 1.072 and XA / BC <= 1.472       //best 1.272 (±0.2)
+    cond6 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + CD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "Anti-Bat " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+
+//anti crab pattern
+anti_crab_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = BC / CD >= 0.382 and BC / CD <= 0.618    
+    cond2 = AB / BC >= 0.382 and AB / BC <= 0.886
+    cond3 = XA / AB >= 2.242 and XA / AB <= 3.618
+    cond4 = XC / CD >= 1.518 and XC / CD <= 1.718       //best 1.618 (±0.1)
+    cond5 = XA / BC >= 1.072 and XA / BC <= 1.818       //best 1.272-1.618 (±0.2)
+    cond6 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000 
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + CD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "Anti-Crab " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+    
+//anti butterfly pattern
+anti_butterfly_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = BC / CD >= 0.686 and BC / CD <= 0.886       //best 0.786 (±0.1)
+    cond2 = AB / BC >= 0.382 and AB / BC <= 0.886
+    cond3 = XA / AB >= 1.618 and XA / AB <= 2.618
+    cond4 = XC / CD >= 1.272 and XC / CD <= 1.618    
+    cond5 = XA / BC >= 0.800 and XA / BC <= 1.472       //best 1-1.272 (±0.2)
+    cond6 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + CD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "Anti-Butterfly " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+    
+//anti shark pattern
+anti_shark_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = BC / CD >= 0.382 and BC / CD <= 0.618   
+    cond2 = AB / BC >= 1.130 and AB / BC <= 1.618
+    cond3 = XA / AB >= 1.618 and XA / AB <= 2.240
+    cond4 = XA / AD >= 0.886 and XA / AD <= 1.130    
+    cond5 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond = cond1 and cond2 and cond3 and cond4 and cond5
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + AD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + AD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "Anti-Shark " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+    
+//black swan pattern
+black_swan_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XB = math.abs(Xy - By)
+    XC = math.abs(Xy - Cy)
+    XD = math.abs(Xy - Dy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _XD = math.abs(Xx - Dx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = AB / XA >= 0.382 and AB / XA <= 0.724   
+    cond2 = BC / AB >= 2.000 and BC / AB <= 4.237
+    cond3 = CD / BC >= 0.500 and CD / BC <= 0.886
+    cond4 = CD / XC >= 0.382 and CD / XC <= 0.886
+    cond5 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond6 = XB / _XB >= XD / _XD
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + CD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "Black-Swan " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+
+//white swan pattern
+white_swan_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+
+    XA = math.abs(Xy - Ay)
+    XB = math.abs(Xy - By)
+    XC = math.abs(Xy - Cy)
+    XD = math.abs(Xy - Dy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _XD = math.abs(Xx - Dx)
+    _BD = math.abs(Bx - Dx)
+    
+    cond1 = AB / XA >= 1.382 and AB / XA <= 2.618   
+    cond2 = BC / AB >= 0.236 and BC / AB <= 0.500
+    cond3 = CD / BC >= 1.128 and CD / BC <= 2.000
+    cond4 = AD / XA >= 1.128 and AD / XA <= 2.618
+    cond5 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond6 = XB / _XB <= XD / _XD
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + CD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "White-Swan " + (Dd == 1 ? "▼" : "▲")
+    draw_harmonic_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+    
+    [cond, -Dd, trendy]
+
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════ //
+// 0-5 Harmonic Pattern Functions  ------------------------------------------------------------------ //
+
+//draw 0-5 pattern
+draw_05_pattern(draw, Zx, Zy, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor) =>
+    var line line_ZX = na
+    var line line_XA = na
+    var line line_AB = na
+    var line line_XB = na
+    var line line_BC = na
+    var line line_CD = na
+    var line line_BD = na
+    var line line_ZA = na
+    var line line_AC = na
+    
+    var label label_Z = na
+    var label label_X = na
+    var label label_A = na
+    var label label_B = na
+    var label label_C = na
+    var label label_D = na
+
+    var label label_ZA = na
+    var label label_XB = na
+    var label label_BD = na
+    var label label_AC = na
+    
+    if draw
+        line.delete(line_ZX)
+        line.delete(line_XA)
+        line.delete(line_AB)
+        line.delete(line_XB)
+        line.delete(line_BC)
+        line.delete(line_CD)
+        line.delete(line_BD)
+        line.delete(line_ZA)
+        line.delete(line_AC)
+        
+        label.delete(label_Z)
+        label.delete(label_X)
+        label.delete(label_A)
+        label.delete(label_B)
+        label.delete(label_C)
+        label.delete(label_D)
+        
+        label.delete(label_ZA)
+        label.delete(label_XB)
+        label.delete(label_BD)
+        label.delete(label_AC)
+    
+        duration = ((Dx - Zx) * timeframe.multiplier) / (60.0 * 24.0)
+        tooltip = "timeframe: " + reso + "\n" + "pattern: " + name + "\n" + "duration: " + str.tostring(duration, "#.###") + " Day" + "\n"  + "trendy: " + (trendy ? "true" : "false") + "\n"
+        
+        line_ZX := line.new(x1=Zx, y1=Zy, x2=Xx, y2=Xy, color=color.new(coluor, 30), width=2, style=line.style_dotted)
+        line_XA := line.new(x1=Xx, y1=Xy, x2=Ax, y2=Ay, color=color.new(coluor, 30), width=2)
+        line_AB := line.new(x1=Ax, y1=Ay, x2=Bx, y2=By, color=color.new(coluor, 30), width=2)
+        line_XB := line.new(x1=Xx, y1=Xy, x2=Bx, y2=By, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        line_BC := line.new(x1=Bx, y1=By, x2=Cx, y2=Cy, color=color.new(coluor, 30), width=2)
+        line_CD := line.new(x1=Cx, y1=Cy, x2=Dx, y2=Dy, color=color.new(coluor, 30), width=2)
+        line_BD := line.new(x1=Bx, y1=By, x2=Dx, y2=Dy, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        line_ZA := line.new(x1=Zx, y1=Zy, x2=Ax, y2=Ay, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        line_AC := line.new(x1=Ax, y1=Ay, x2=Cx, y2=Cy, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        linefill.new(line_XA, line_XB, color=color.new(coluor, 80))
+        linefill.new(line_BC, line_BD, color=color.new(coluor, 80))
+        
+        label_Z := label.new(x=Zx, y=Zy, text="0", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_X := label.new(x=Xx, y=Xy, text="X", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_A := label.new(x=Ax, y=Ay, text="A", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_B := label.new(x=Bx, y=By, text="B", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_C := label.new(x=Cx, y=Cy, text="C", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_D := label.new(x=Dx, y=Dy, text="D", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        
+        ZX = math.abs(Zy - Xy)
+        XA = math.abs(Xy - Ay)
+        AB = math.abs(Ay - By)
+        BC = math.abs(By - Cy)
+        CD = math.abs(Cy - Dy)
+        label_ZA := label.new(x=int((Zx + Ax) / 2), y=(Zy + Ay) / 2, text=str.tostring(XA / ZX, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_XB := label.new(x=int((Xx + Bx) / 2), y=(Xy + By) / 2, text=str.tostring(AB / XA, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_BD := label.new(x=int((Bx + Dx) / 2), y=(By + Dy) / 2, text=str.tostring(CD / BC, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_AC := label.new(x=int((Ax + Cx) / 2), y=(Ay + Cy) / 2, text=str.tostring(BC / AB, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        0
+    else 
+        if not na(label_D) and (bar_index - label.get_x(label_D)) * timeframe.multiplier > 30 * 24 * 60
+            line.delete(line_ZX)
+            line.delete(line_XA)
+            line.delete(line_AB)
+            line.delete(line_XB)
+            line.delete(line_BC)
+            line.delete(line_CD)
+            line.delete(line_BD)
+            line.delete(line_ZA)
+            line.delete(line_AC)
+            
+            label.delete(label_Z)
+            label.delete(label_X)
+            label.delete(label_A)
+            label.delete(label_B)
+            label.delete(label_C)
+            label.delete(label_D)
+            
+            label.delete(label_ZA)
+            label.delete(label_XB)
+            label.delete(label_BD)
+            label.delete(label_AC)
+        0
+        
+//get 6-points
+get_6_points(zigzag, oldzigzag, zigzagdir, confirm) =>
+    if array.size(zigzag) >= 12 and ta.barssince(is_newzigzag(zigzag, oldzigzag)) == confirm
+        Zx = math.round(array.get(zigzag, 11))
+        Zy = array.get(zigzag, 10)
+        Zd = zigzagdir[bar_index - Zx]
+        
+        Xx = math.round(array.get(zigzag, 9))
+        Xy = array.get(zigzag, 8)
+        Xd = zigzagdir[bar_index - Xx]
+        
+        Ax = math.round(array.get(zigzag, 7))
+        Ay = array.get(zigzag, 6)
+        Ad = zigzagdir[bar_index - Ax]
+        
+        Bx = math.round(array.get(zigzag, 5))
+        By = array.get(zigzag, 4)
+        Bd = zigzagdir[bar_index - Bx]
+        
+        Cx = math.round(array.get(zigzag, 3))
+        Cy = array.get(zigzag, 2)
+        Cd = zigzagdir[bar_index - Cx]
+        
+        Dx = math.round(array.get(zigzag, 1))
+        Dy = array.get(zigzag, 0)
+        Dd = zigzagdir[bar_index - Dx]
+        
+        [Zx, Zy, Zd, Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd]
+    else
+        [na, na, na, na, na, na, na, na, na, na, na, na, na, na, na, na, na, na]
+
+//0-5 Pattern
+zero5_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Zx, Zy, Zd, Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_6_points(zigzag, oldzigzag, zigzagdir, confirm)
+    
+    ZX = math.abs(Zy - Xy)
+    XA = math.abs(Xy - Ay)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    cond1 = XA / ZX >= 0.130 and XA / ZX <= 0.618  
+    cond2 = AB / XA >= 1.130 and AB / XA <= 1.618
+    cond3 = BC / AB >= 1.618 and BC / AB <= 2.24
+    cond4 = CD / BC >= 0.400 and CD / BC <= 0.600       // best 0.5(±0.1)
+    cond5 = CD / AB >= 0.800 and CD / AB <= 1.200       // best 1(±0.2)
+    cond = cond1 and cond2 and cond3 and cond4 and cond5
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(Cy + BC * 0.782 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + CD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = Dd == 1 ? Xy > Dy : Xy < Dy
+    name = "0-5 " + (Dd == 1 ? "▼" : "▲")
+    draw_05_pattern(cond and show_pattern, Zx, Zy, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+            
+    [cond, -Dd, trendy]
+    
+    
+// ══════════════════════════════════════════════════════════════════════════════════════════════════ //
+// AB=CD Pattern Functions  ---------------------------------------------------------------------- //
+
+//draw abcd pattern
+draw_abcd_pattern(draw, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor) =>
+    var line line_AB = na
+    var line line_BC = na
+    var line line_CD = na
+    var line line_BD = na
+    var line line_AC = na
+    
+    var label label_A = na
+    var label label_B = na
+    var label label_C = na
+    var label label_D = na
+
+    var label label_BD = na
+    var label label_AC = na
+    
+    if draw
+        line.delete(line_AB)
+        line.delete(line_BC)
+        line.delete(line_CD)
+        line.delete(line_BD)
+        line.delete(line_AC)
+        
+        label.delete(label_A)
+        label.delete(label_B)
+        label.delete(label_C)
+        label.delete(label_D)
+        
+        label.delete(label_BD)
+        label.delete(label_AC)
+            
+        duration = ((Dx - Ax) * timeframe.multiplier) / (60.0 * 24.0)
+        tooltip = "timeframe: " + reso + "\n" + "pattern: " + name + "\n" + "duration: " + str.tostring(duration, "#.###") + " Day" + "\n"  + "trendy: " + (trendy ? "true" : "false") + "\n"
+        
+        line_AB := line.new(x1=Ax, y1=Ay, x2=Bx, y2=By, color=color.new(coluor, 30), width=2)
+        line_BC := line.new(x1=Bx, y1=By, x2=Cx, y2=Cy, color=color.new(coluor, 30), width=2)
+        line_CD := line.new(x1=Cx, y1=Cy, x2=Dx, y2=Dy, color=color.new(coluor, 30), width=2)
+        line_BD := line.new(x1=Bx, y1=By, x2=Dx, y2=Dy, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        line_AC := line.new(x1=Ax, y1=Ay, x2=Cx, y2=Cy, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        
+        label_A := label.new(x=Ax, y=Ay, text="A", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10))
+        label_B := label.new(x=Bx, y=By, text="B", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10))
+        label_C := label.new(x=Cx, y=Cy, text="C", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10))
+        label_D := label.new(x=Dx, y=Dy, text="D", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10))
+        
+        AB = math.abs(Ay - By)
+        BC = math.abs(By - Cy)
+        CD = math.abs(Cy - Dy)
+        label_BD := label.new(x=int((Bx + Dx) / 2), y=(By + Dy) / 2, text=str.tostring(CD / BC, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_AC := label.new(x=int((Ax + Cx) / 2), y=(Ay + Cy) / 2, text=str.tostring(BC / AB, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        0
+    else 
+        if not na(label_D) and (bar_index - label.get_x(label_D)) * timeframe.multiplier > 30 * 24 * 60
+            line.delete(line_AB)
+            line.delete(line_BC)
+            line.delete(line_CD)
+            line.delete(line_BD)
+            line.delete(line_AC)
+            
+            label.delete(label_A)
+            label.delete(label_B)
+            label.delete(label_C)
+            label.delete(label_D)
+            
+            label.delete(label_BD)
+            label.delete(label_AC)
+        0   
+        
+//get 4-points
+get_4_points(zigzag, oldzigzag, zigzagdir, confirm) =>
+    if array.size(zigzag) >= 8 and ta.barssince(is_newzigzag(zigzag, oldzigzag)) == confirm
+        Ax = math.round(array.get(zigzag, 7))
+        Ay = array.get(zigzag, 6)
+        Ad = zigzagdir[bar_index - Ax]
+        
+        Bx = math.round(array.get(zigzag, 5))
+        By = array.get(zigzag, 4)
+        Bd = zigzagdir[bar_index - Bx]
+        
+        Cx = math.round(array.get(zigzag, 3))
+        Cy = array.get(zigzag, 2)
+        Cd = zigzagdir[bar_index - Cx]
+        
+        Dx = math.round(array.get(zigzag, 1))
+        Dy = array.get(zigzag, 0)
+        Dd = zigzagdir[bar_index - Dx]
+        
+        [Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd]
+    else
+        [na, na, na, na, na, na, na, na, na, na, na, na]
+
+//AB=CD Pattern
+abcd_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_4_points(zigzag, oldzigzag, zigzagdir, confirm)
+    
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    
+    _AB = math.abs(Ax - Bx)
+    _CD = math.abs(Cx - Dx)
+    
+    cond1 = BC / AB >= 0.518 and BC / AB <= 0.718       // best 0.618(±0.1)
+    cond2 = CD / BC >= 1.518 and CD / BC <= 1.718       // best 1.618(±0.1)
+    cond3 = CD / AB >= 0.800 and CD / AB <= 1.200       // best 1(±0.2)
+    cond4 = _CD / _AB >= 0.800 and _CD / _AB <= 1.200   // best 1(±0.2)
+    cond = cond1 and cond2 and cond3 and cond4
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(By + BC * 1.000 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + CD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = false
+    name = "AB=CD " + (Dd == 1 ? "▼" : "▲")
+    draw_abcd_pattern(cond and show_pattern, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd,  reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+            
+    [cond, -Dd, trendy]
+    
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════ //
+// 3-Drives Pattern Functions  ---------------------------------------------------------------------- //
+
+//draw 3-Drives pattern
+draw_threedrives_pattern(draw, Zx, Zy, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor) =>
+    var line line_ZX = na
+    var line line_XA = na
+    var line line_AB = na
+    var line line_XB = na
+    var line line_BC = na
+    var line line_CD = na
+    var line line_BD = na
+    var line line_ZA = na
+    var line line_AC = na
+    
+    var label label_Z = na
+    var label label_X = na
+    var label label_A = na
+    var label label_B = na
+    var label label_C = na
+    var label label_D = na
+
+    var label label_ZA = na
+    var label label_XB = na
+    var label label_BD = na
+    var label label_AC = na
+    
+    if draw
+        line.delete(line_ZX)
+        line.delete(line_XA)
+        line.delete(line_AB)
+        line.delete(line_XB)
+        line.delete(line_BC)
+        line.delete(line_CD)
+        line.delete(line_BD)
+        line.delete(line_ZA)
+        line.delete(line_AC)
+        
+        label.delete(label_Z)
+        label.delete(label_X)
+        label.delete(label_A)
+        label.delete(label_B)
+        label.delete(label_C)
+        label.delete(label_D)
+        
+        label.delete(label_ZA)
+        label.delete(label_XB)
+        label.delete(label_BD)
+        label.delete(label_AC)
+    
+        duration = ((Dx - Zx) * timeframe.multiplier) / (60.0 * 24.0)
+        tooltip = "timeframe: " + reso + "\n" + "pattern: " + name + "\n" + "duration: " + str.tostring(duration, "#.###") + " Day" + "\n"  + "trendy: " + (trendy ? "true" : "false") + "\n"
+        
+        line_ZX := line.new(x1=Zx, y1=Zy, x2=Xx, y2=Xy, color=color.new(coluor, 30), width=2, style=line.style_dotted)
+        line_XA := line.new(x1=Xx, y1=Xy, x2=Ax, y2=Ay, color=color.new(coluor, 30), width=2)
+        line_AB := line.new(x1=Ax, y1=Ay, x2=Bx, y2=By, color=color.new(coluor, 30), width=2)
+        line_XB := line.new(x1=Xx, y1=Xy, x2=Bx, y2=By, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        line_BC := line.new(x1=Bx, y1=By, x2=Cx, y2=Cy, color=color.new(coluor, 30), width=2)
+        line_CD := line.new(x1=Cx, y1=Cy, x2=Dx, y2=Dy, color=color.new(coluor, 30), width=2)
+        line_BD := line.new(x1=Bx, y1=By, x2=Dx, y2=Dy, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        line_ZA := line.new(x1=Zx, y1=Zy, x2=Ax, y2=Ay, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        line_AC := line.new(x1=Ax, y1=Ay, x2=Cx, y2=Cy, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        
+        label_Z := label.new(x=Zx, y=Zy, text="0", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_X := label.new(x=Xx, y=Xy, text="X", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_A := label.new(x=Ax, y=Ay, text="A", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_B := label.new(x=Bx, y=By, text="B", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_C := label.new(x=Cx, y=Cy, text="C", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_D := label.new(x=Dx, y=Dy, text="D", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        
+        ZX = math.abs(Zy - Xy)
+        XA = math.abs(Xy - Ay)
+        AB = math.abs(Ay - By)
+        BC = math.abs(By - Cy)
+        CD = math.abs(Cy - Dy)
+        label_ZA := label.new(x=int((Zx + Ax) / 2), y=(Zy + Ay) / 2, text=str.tostring(XA / ZX, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_XB := label.new(x=int((Xx + Bx) / 2), y=(Xy + By) / 2, text=str.tostring(AB / XA, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_BD := label.new(x=int((Bx + Dx) / 2), y=(By + Dy) / 2, text=str.tostring(CD / BC, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_AC := label.new(x=int((Ax + Cx) / 2), y=(Ay + Cy) / 2, text=str.tostring(BC / AB, "#.###"), style=label.style_label_center, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        0
+    else
+        if not na(label_D) and (bar_index - label.get_x(label_D)) * timeframe.multiplier > 30 * 24 * 60
+            line.delete(line_ZX)
+            line.delete(line_XA)
+            line.delete(line_AB)
+            line.delete(line_XB)
+            line.delete(line_BC)
+            line.delete(line_CD)
+            line.delete(line_BD)
+            line.delete(line_ZA)
+            line.delete(line_AC)
+            
+            label.delete(label_Z)
+            label.delete(label_X)
+            label.delete(label_A)
+            label.delete(label_B)
+            label.delete(label_C)
+            label.delete(label_D)
+            
+            label.delete(label_ZA)
+            label.delete(label_XB)
+            label.delete(label_BD)
+            label.delete(label_AC)
+        0
+        
+//3-Drive Pattern
+threedrives_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Zx, Zy, Zd, Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_6_points(zigzag, oldzigzag, zigzagdir, confirm)
+    
+    ZX = math.abs(Zy - Xy)
+    XA = math.abs(Xy - Ay)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    
+    _ZX = math.abs(Zx - Xx)
+    _AB = math.abs(Ax - Bx)
+    _CD = math.abs(Cx - Dx)
+    
+    cond1 = XA / ZX >= 0.518 and XA / ZX <= 0.718       // best 0.618(±0.1)
+    cond2 = BC / AB >= 0.518 and BC / AB <= 0.718       // best 0.618(±0.1)
+    cond3 = AB / XA >= 1.518 and AB / XA <= 1.718       // best 1.618(±0.1)
+    cond4 = CD / BC >= 1.518 and CD / BC <= 1.718       // best 1.618(±0.1)
+    cond5 = AB / ZX >= 0.800 and AB / ZX <= 1.200       // best 1(±0.2)
+    cond6 = CD / AB >= 0.800 and CD / AB <= 1.200       // best 1(±0.2)
+    cond7 = _AB / _ZX >= 0.800 and _AB / _ZX <= 1.200   // best 1(±0.2)
+    cond8 = _CD / _AB >= 0.800 and _CD / _AB <= 1.200   // best 1(±0.2)
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6 and cond7 and cond8
+    
+    entry_price = Dy
+    stop_loss = math.round_to_mintick(By + BC * 1.000 * (Dd == 1 ? 1 : -1))
+    take_profit1 = math.round_to_mintick(Dy + CD * 0.382 * (Dd == 1 ? -1 : 1))
+    take_profit2 = math.round_to_mintick(Dy + CD * 0.618 * (Dd == 1 ? -1 : 1))
+    
+    coluor = Dd == 1 ? bearcolor : bullcolor
+    trendy = false 
+    name = "Three-Drives " + (Dd == 1 ? "▼" : "▲")
+    draw_threedrives_pattern(cond and show_pattern, Zx, Zy, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+            
+    [cond, -Dd, trendy]
+
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════ //
+// Triangle Pattern Functions  ---------------------------------------------------------------------- //
+
+//draw triangle pattern
+draw_triangle_pattern(draw, Zx, Zy, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor) =>
+    var line line_ZX = na
+    var line line_XA = na
+    var line line_AB = na
+    var line line_BC = na
+    var line line_CD = na
+    
+    var label label_Z = na
+    var label label_X = na
+    var label label_A = na
+    var label label_B = na
+    var label label_C = na
+    var label label_D = na
+    
+    var line line_XN = na
+    var line line_MC = na
+    
+    if draw
+        line.delete(line_ZX)
+        line.delete(line_XA)
+        line.delete(line_AB)
+        line.delete(line_BC)
+        line.delete(line_CD)
+        
+        label.delete(label_Z)
+        label.delete(label_X)
+        label.delete(label_A)
+        label.delete(label_B)
+        label.delete(label_C)
+        label.delete(label_D)
+        
+        line.delete(line_XN)
+        line.delete(line_MC)
+    
+        duration = ((Dx - Zx) * timeframe.multiplier) / (60.0 * 24.0)
+        tooltip = "timeframe: " + reso + "\n" + "pattern: " + name + "\n" + "duration: " + str.tostring(duration, "#.###") + " Day" + "\n"  + "trendy: " + (trendy ? "true" : "false") + "\n"
+        
+        line_ZX := line.new(x1=Zx, y1=Zy, x2=Xx, y2=Xy, color=color.new(coluor, 30), width=2)
+        line_XA := line.new(x1=Xx, y1=Xy, x2=Ax, y2=Ay, color=color.new(coluor, 30), width=2)
+        line_AB := line.new(x1=Ax, y1=Ay, x2=Bx, y2=By, color=color.new(coluor, 30), width=2)
+        line_BC := line.new(x1=Bx, y1=By, x2=Cx, y2=Cy, color=color.new(coluor, 30), width=2)
+        line_CD := line.new(x1=Cx, y1=Cy, x2=Dx, y2=Dy, color=color.new(coluor, 30), width=2)
+        
+        label_Z := label.new(x=Zx, y=Zy, text="0", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_X := label.new(x=Xx, y=Xy, text="X", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_A := label.new(x=Ax, y=Ay, text="A", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_B := label.new(x=Bx, y=By, text="B", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_C := label.new(x=Cx, y=Cy, text="C", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_D := label.new(x=Dx, y=Dy, text="D", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+            
+        xb_a = (Xy - By) / (Xx - Bx)
+        xb_b = Xy - xb_a * Xx
+        
+        ac_a = (Ay - Cy) / (Ax - Cx)
+        ac_b = Ay - ac_a * Ax
+        
+        cd_a = (Cy - Dy) / (Cx - Dx)
+        cd_b = Cy - cd_a * Cx
+        
+        zx_a = (Zy - Xy) / (Zx - Xx)
+        zx_b = Zy - zx_a * Zx
+        
+        Mx = math.floor(-(zx_b - ac_b) / (zx_a - ac_a))
+        My = Mx * zx_a + zx_b
+        
+        Nx = math.ceil(-(cd_b - xb_b) / (cd_a - xb_a))
+        Ny = Nx * cd_a + cd_b
+        
+        line_XN := line.new(x1=Xx, y1=Xy, x2=Nx, y2=Ny, color=color.new(coluor, 30), width=2, style=line.style_dotted)
+        line_MC := line.new(x1=Mx, y1=My, x2=Cx, y2=Cy, color=color.new(coluor, 30), width=2, style=line.style_dotted)
+        linefill.new(line_XN, line_MC, color=color.new(coluor, 80))
+        0
+    else
+        if not na(label_D) and (bar_index - label.get_x(label_D)) * timeframe.multiplier > 30 * 24 * 60
+            line.delete(line_ZX)
+            line.delete(line_XA)
+            line.delete(line_AB)
+            line.delete(line_BC)
+            line.delete(line_CD)
+            
+            label.delete(label_Z)
+            label.delete(label_X)
+            label.delete(label_A)
+            label.delete(label_B)
+            label.delete(label_C)
+            label.delete(label_D)
+            
+            line.delete(line_XN)
+            line.delete(line_MC)
+        0
+      
+//descending triangle
+desc_triangle_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Zx, Zy, Zd, Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_6_points(zigzag, oldzigzag, zigzagdir, confirm)
+    
+    ZX = math.abs(Zy - Xy)
+    XA = math.abs(Xy - Ay)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    xb_a = (Xy - By) / (Xx - Bx)
+    xb_b = Xy - xb_a * Xx
+    
+    ac_a = (Ay - Cy) / (Ax - Cx)
+    ac_b = Ay - ac_a * Ax
+    
+    cd_a = (Cy - Dy) / (Cx - Dx)
+    cd_b = Cy - cd_a * Cx
+    
+    zx_a = (Zy - Xy) / (Zx - Xx)
+    zx_b = Zy - zx_a * Zx
+    
+    Mx = math.floor(-(zx_b - ac_b) / (zx_a - ac_a))
+    My = Mx * zx_a + zx_b
+    
+    Nx = math.ceil(-(cd_b - xb_b) / (cd_a - xb_a))
+    Ny = Nx * cd_a + cd_b
+    
+    cond = false
+    if Dd == 1
+        cond1 = XA / ZX >= 0.328 and XA / ZX <= 0.886
+        cond2 = AB / XA >= 0.618 and AB / XA <= 0.886
+        cond3 = BC / AB >= 1.130 and BC / AB <= 1.618
+        cond4 = CD / BC >= 1.242 and CD / BC <= 1.382
+        cond5 = Zy <= My and Dy >= Ny
+        cond6 = ac_a < 0 and xb_a < 0 and xb_a / ac_a > 1
+        cond := cond1 and cond2 and cond3 and cond4 and cond5 and cond6 
+    else
+        cond1 = XA / ZX >= 0.328 and XA / ZX <= 0.886
+        cond2 = AB / XA >= 1.130 and AB / XA <= 1.618
+        cond3 = BC / AB >= 0.618 and BC / AB <= 0.886
+        cond4 = CD / BC >= 1.242 and CD / BC <= 1.382
+        cond5 = Zy >= My and Dy <= Ny
+        cond6 = ac_a < 0 and xb_a < 0 and ac_a / xb_a > 1
+        cond := cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = math.round_to_mintick(Ny)
+    stop_loss = Cy
+    take_profit1 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.000 * (Dd == 1 ? 1 : -1))
+    take_profit2 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.500 * (Dd == 1 ? 1 : -1))
+    
+    coluor = Dd == 1 ? bullcolor : bearcolor
+    trendy = Dd == 1 ? Cy > Zy : Dd == -1 ? Cy < Zy : false
+    name = "Descending-Triangle " + (Dd == 1 ? "▲" : "▼")
+    draw_triangle_pattern(cond and show_pattern, Zx, Zy, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+            
+    [cond, Dd, trendy]
+
+//ascending triangle
+asc_triangle_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Zx, Zy, Zd, Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_6_points(zigzag, oldzigzag, zigzagdir, confirm)
+    
+    ZX = math.abs(Zy - Xy)
+    XA = math.abs(Xy - Ay)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    xb_a = (Xy - By) / (Xx - Bx)
+    xb_b = Xy - xb_a * Xx
+    
+    ac_a = (Ay - Cy) / (Ax - Cx)
+    ac_b = Ay - ac_a * Ax
+    
+    cd_a = (Cy - Dy) / (Cx - Dx)
+    cd_b = Cy - cd_a * Cx
+    
+    zx_a = (Zy - Xy) / (Zx - Xx)
+    zx_b = Zy - zx_a * Zx
+    
+    Mx = math.floor(-(zx_b - ac_b) / (zx_a - ac_a))
+    My = Mx * zx_a + zx_b
+    
+    Nx = math.ceil(-(cd_b - xb_b) / (cd_a - xb_a))
+    Ny = Nx * cd_a + cd_b
+    
+    cond = false
+    if Dd == 1
+        cond1 = XA / ZX >= 0.328 and XA / ZX <= 0.886
+        cond2 = AB / XA >= 1.130 and AB / XA <= 1.618
+        cond3 = BC / AB >= 0.618 and BC / AB <= 0.886
+        cond4 = CD / BC >= 1.242 and CD / BC <= 1.382
+        cond5 = Zy <= My and Dy >= Ny
+        cond6 = ac_a > 0 and xb_a > 0 and xb_a / ac_a < 1
+        cond := cond1 and cond2 and cond3 and cond4 and cond5 and cond6 
+    else
+        cond1 = XA / ZX >= 0.328 and XA / ZX <= 0.886
+        cond2 = AB / XA >= 0.618 and AB / XA <= 0.886
+        cond3 = BC / AB >= 1.130 and BC / AB <= 1.618
+        cond4 = CD / BC >= 1.242 and CD / BC <= 1.382
+        cond5 = Zy >= My and Dy <= Ny
+        cond6 = ac_a > 0 and xb_a > 0 and ac_a / xb_a < 1
+        cond := cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = math.round_to_mintick(Ny)
+    stop_loss = Cy
+    take_profit1 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.000 * (Dd == 1 ? 1 : -1))
+    take_profit2 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.500 * (Dd == 1 ? 1 : -1))
+
+    coluor = Dd == 1 ? bullcolor : bearcolor
+    trendy = Dd == 1 ? Cy > Zy : Dd == -1 ? Cy < Zy : false
+    name = "Ascending-Triangle " + (Dd == 1 ? "▲" : "▼")
+    draw_triangle_pattern(cond and show_pattern, Zx, Zy, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+            
+    [cond, Dd, trendy]
+
+//symmetrical triangle
+sym_triangle_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Zx, Zy, Zd, Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_6_points(zigzag, oldzigzag, zigzagdir, confirm)
+    
+    ZX = math.abs(Zy - Xy)
+    XA = math.abs(Xy - Ay)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    xb_a = (Xy - By) / (Xx - Bx)
+    xb_b = Xy - xb_a * Xx
+    
+    ac_a = (Ay - Cy) / (Ax - Cx)
+    ac_b = Ay - ac_a * Ax
+    
+    cd_a = (Cy - Dy) / (Cx - Dx)
+    cd_b = Cy - cd_a * Cx
+    
+    zx_a = (Zy - Xy) / (Zx - Xx)
+    zx_b = Zy - zx_a * Zx
+    
+    Mx = math.floor(-(zx_b - ac_b) / (zx_a - ac_a))
+    My = Mx * zx_a + zx_b
+    
+    Nx = math.ceil(-(cd_b - xb_b) / (cd_a - xb_a))
+    Ny = Nx * cd_a + cd_b
+    
+    cond1 = XA / ZX >= 0.328 and XA / ZX <= 0.886
+    cond2 = AB / XA >= 0.618 and AB / XA <= 0.886
+    cond3 = BC / AB >= 0.618 and BC / AB <= 0.886
+    cond4 = CD / BC >= 1.242 and CD / BC <= 1.382
+    cond5 = ac_a * xb_a < 0
+    cond6 = Dd == 1 ? Zy <= My : Zy >= My
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6
+    
+    entry_price = math.round_to_mintick(Ny)
+    stop_loss = Cy
+    take_profit1 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.000 * (Dd == 1 ? 1 : -1))
+    take_profit2 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.500 * (Dd == 1 ? 1 : -1))
+
+    coluor = Dd == 1 ? bullcolor : bearcolor
+    trendy = true
+    name = "Symmetrical-Triangle " + (Dd == 1 ? "▲" : "▼")
+    draw_triangle_pattern(cond and show_pattern, Zx, Zy, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+            
+    [cond, Dd, trendy]
+
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════ //
+// Header&Shoulders Functions  ---------------------------------------------------------------------- //
+
+//draw header&shoulder pattern
+draw_hs_pattern(draw, Sx, Sy, Zx, Zy, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor) =>
+    var line line_SZ = na
+    var line line_ZX = na
+    var line line_XA = na
+    var line line_AB = na
+    var line line_BC = na
+    var line line_CD = na
+    var line line_XB = na
+    var line line_MX = na
+    var line line_BN = na
+    
+    var label label_S = na
+    var label label_Z = na
+    var label label_X = na
+    var label label_A = na
+    var label label_B = na
+    var label label_C = na
+    var label label_D = na
+    
+    if draw
+        line.delete(line_SZ)
+        line.delete(line_ZX)
+        line.delete(line_XA)
+        line.delete(line_AB)
+        line.delete(line_BC)
+        line.delete(line_CD)
+        line.delete(line_XB)
+        line.delete(line_MX)
+        line.delete(line_BN)
+        
+        label.delete(label_S)
+        label.delete(label_Z)
+        label.delete(label_X)
+        label.delete(label_A)
+        label.delete(label_B)
+        label.delete(label_C)
+        label.delete(label_D)
+        
+        duration = ((Dx - Sx) * timeframe.multiplier) / (60.0 * 24.0)
+        tooltip = "timeframe: " + reso + "\n" + "pattern: " + name + "\n" + "duration: " + str.tostring(duration, "#.###") + " Day" + "\n"  + "trendy: " + (trendy ? "true" : "false") + "\n"
+        
+        line_SZ := line.new(x1=Sx, y1=Sy, x2=Zx, y2=Zy, color=color.new(coluor, 30), width=2)
+        line_ZX := line.new(x1=Zx, y1=Zy, x2=Xx, y2=Xy, color=color.new(coluor, 30), width=2)
+        line_XA := line.new(x1=Xx, y1=Xy, x2=Ax, y2=Ay, color=color.new(coluor, 30), width=2)
+        line_AB := line.new(x1=Ax, y1=Ay, x2=Bx, y2=By, color=color.new(coluor, 30), width=2)
+        line_BC := line.new(x1=Bx, y1=By, x2=Cx, y2=Cy, color=color.new(coluor, 30), width=2)
+        line_CD := line.new(x1=Cx, y1=Cy, x2=Dx, y2=Dy, color=color.new(coluor, 30), width=2)
+        
+        label_S := label.new(x=Sx, y=Sy, text="S", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_Z := label.new(x=Zx, y=Zy, text="0", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_X := label.new(x=Xx, y=Xy, text="X", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_A := label.new(x=Ax, y=Ay, text="A", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_B := label.new(x=Bx, y=By, text="B", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_C := label.new(x=Cx, y=Cy, text="C", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_D := label.new(x=Dx, y=Dy, text="D", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        
+        xb_a = (Xy - By) / (Xx - Bx)
+        xb_b = Xy - xb_a * Xx
+        
+        sz_a = (Sy - Zy) / (Sx - Zx)
+        sz_b = Sy - sz_a * Sx
+        
+        cd_a = (Cy - Dy) / (Cx - Dx)
+        cd_b = Cy - cd_a * Cx
+        
+        Mx = math.floor(-(xb_b - sz_b) / (xb_a - sz_a))
+        My = Mx * xb_a + xb_b
+        
+        Nx = math.ceil(-(xb_b - cd_b) / (xb_a - cd_a))
+        Ny = Nx * xb_a + xb_b
+        
+        line_XB := line.new(x1=Xx, y1=Xy, x2=Bx, y2=By, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        line_MX := line.new(x1=Mx, y1=My, x2=Xx, y2=Xy, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        line_BN := line.new(x1=Bx, y1=By, x2=Nx, y2=Ny, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        linefill.new(line_SZ, line_MX, color=color.new(coluor, 80))
+        linefill.new(line_XA, line_XB, color=color.new(coluor, 80))
+        linefill.new(line_BC, line_BN, color=color.new(coluor, 80))
+        0
+    else
+        if not na(label_D) and (bar_index - label.get_x(label_D)) * timeframe.multiplier > 30 * 24 * 60
+            line.delete(line_SZ)
+            line.delete(line_ZX)
+            line.delete(line_XA)
+            line.delete(line_AB)
+            line.delete(line_BC)
+            line.delete(line_CD)
+            line.delete(line_XB)
+            line.delete(line_MX)
+            line.delete(line_BN)
+            
+            label.delete(label_S)
+            label.delete(label_Z)
+            label.delete(label_X)
+            label.delete(label_A)
+            label.delete(label_B)
+            label.delete(label_C)
+            label.delete(label_D)
+        0
+  
+//get 7-points
+get_7_points(zigzag, oldzigzag, zigzagdir, confirm) =>
+    if array.size(zigzag) >= 14 and ta.barssince(is_newzigzag(zigzag, oldzigzag)) == confirm
+        Sx = math.round(array.get(zigzag, 13))
+        Sy = array.get(zigzag, 12)
+        Sd = zigzagdir[bar_index - Sx]
+        
+        Zx = math.round(array.get(zigzag, 11))
+        Zy = array.get(zigzag, 10)
+        Zd = zigzagdir[bar_index - Zx]
+        
+        Xx = math.round(array.get(zigzag, 9))
+        Xy = array.get(zigzag, 8)
+        Xd = zigzagdir[bar_index - Xx]
+        
+        Ax = math.round(array.get(zigzag, 7))
+        Ay = array.get(zigzag, 6)
+        Ad = zigzagdir[bar_index - Ax]
+        
+        Bx = math.round(array.get(zigzag, 5))
+        By = array.get(zigzag, 4)
+        Bd = zigzagdir[bar_index - Bx]
+        
+        Cx = math.round(array.get(zigzag, 3))
+        Cy = array.get(zigzag, 2)
+        Cd = zigzagdir[bar_index - Cx]
+        
+        Dx = math.round(array.get(zigzag, 1))
+        Dy = array.get(zigzag, 0)
+        Dd = zigzagdir[bar_index - Dx]
+        
+        [Sx, Sy, Sd, Zx, Zy, Zd, Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd]
+    else
+        [na, na, na, na, na, na, na, na, na, na, na, na, na, na, na, na, na, na, na, na, na]
+
+//header and shoulder pattern
+norm_hs_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Sx, Sy, Sd, Zx, Zy, Zd, Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_7_points(zigzag, oldzigzag, zigzagdir, confirm)
+    
+    ZX = math.abs(Zy - Xy)
+    XA = math.abs(Xy - Ay)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    ZB = math.abs(Zy - By)
+    XC = math.abs(Xy - Cy)
+    
+    xb_a = (Xy - By) / (Xx - Bx)
+    xb_b = Xy - xb_a * Xx
+    
+    sz_a = (Sy - Zy) / (Sx - Zx)
+    sz_b = Sy - sz_a * Sx
+    
+    cd_a = (Cy - Dy) / (Cx - Dx)
+    cd_b = Cy - cd_a * Cx
+    
+    Mx = math.floor(-(xb_b - sz_b) / (xb_a - sz_a))
+    My = Mx * xb_a + xb_b
+    
+    Nx = math.ceil(-(xb_b - cd_b) / (xb_a - cd_a))
+    Ny = Nx * xb_a + xb_b
+    
+    cond1 = XA / ZX >= 1.272 and XA / ZX <= 2.618
+    cond2 = ZB / ZX >= 0.786 and ZB / ZX <= 1.272
+    cond3 = AB / BC >= 1.272 and AB / BC <= 2.618
+    cond4 = XC / BC >= 0.786 and XC / BC <= 1.272
+    cond5 = CD / BC >= 1.242 and CD / BC <= 1.382
+    cond6 = Dd == -1
+    cond7 = Mx >= Sx and My >= Sy
+    cond8 = Nx <= Dx and Ny >= Dy
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6 and cond7 and cond8
+    
+    entry_price = math.round_to_mintick(Ny)
+    stop_loss = Cy
+    take_profit1 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.000 * (Dd == 1 ? 1 : -1))
+    take_profit2 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.500 * (Dd == 1 ? 1 : -1))
+    
+    coluor = bearcolor
+    trendy = true
+    name = "Header&Shoulder ▼"
+    draw_hs_pattern(cond and show_pattern, Sx, Sy, Zx, Zy, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+            
+    [cond, Dd, trendy]
+
+//header and shoulder pattern
+inve_hs_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Sx, Sy, Sd, Zx, Zy, Zd, Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_7_points(zigzag, oldzigzag, zigzagdir, confirm)
+    
+    ZX = math.abs(Zy - Xy)
+    XA = math.abs(Xy - Ay)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    ZB = math.abs(Zy - By)
+    XC = math.abs(Xy - Cy)
+    
+    xb_a = (Xy - By) / (Xx - Bx)
+    xb_b = Xy - xb_a * Xx
+    
+    sz_a = (Sy - Zy) / (Sx - Zx)
+    sz_b = Sy - sz_a * Sx
+    
+    cd_a = (Cy - Dy) / (Cx - Dx)
+    cd_b = Cy - cd_a * Cx
+    
+    Mx = math.floor(-(xb_b - sz_b) / (xb_a - sz_a))
+    My = Mx * xb_a + xb_b
+    
+    Nx = math.ceil(-(xb_b - cd_b) / (xb_a - cd_a))
+    Ny = Nx * xb_a + xb_b
+    
+    cond1 = XA / ZX >= 1.272 and XA / ZX <= 2.618
+    cond2 = ZB / ZX >= 0.786 and ZB / ZX <= 1.272
+    cond3 = AB / BC >= 1.272 and AB / BC <= 2.618
+    cond4 = XC / BC >= 0.786 and XC / BC <= 1.272
+    cond5 = CD / BC >= 1.242 and CD / BC <= 1.382
+    cond6 = Dd == 1
+    cond7 = Mx >= Sx and My <= Sy
+    cond8 = Nx <= Dx and Ny <= Dy
+    cond = cond1 and cond2 and cond3 and cond4 and cond5 and cond6 and cond7 and cond8
+    
+    entry_price = math.round_to_mintick(Ny)
+    stop_loss = Cy
+    take_profit1 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.000 * (Dd == 1 ? 1 : -1))
+    take_profit2 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.500 * (Dd == 1 ? 1 : -1))
+    
+    coluor = bullcolor
+    trendy = true
+    name = "Inverse-Header&Shoulder ▲"
+    draw_hs_pattern(cond and show_pattern, Sx, Sy, Zx, Zy, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+            
+    [cond, Dd, trendy]
+    
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════ //
+// Double-top/bottom Pattern Functions  ------------------------------------------------------------- //
+
+//draw double top/btm pattern
+draw_double_top_btm_pattern(draw, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor) =>
+    var line line_XA = na
+    var line line_AB = na
+    var line line_BC = na
+    var line line_CD = na
+    var line line_MB = na
+    var line line_BN = na
+    
+    var label label_X = na
+    var label label_A = na
+    var label label_B = na
+    var label label_C = na
+    var label label_D = na
+    
+    if draw
+        line.delete(line_XA)
+        line.delete(line_AB)
+        line.delete(line_BC)
+        line.delete(line_CD)
+        line.delete(line_MB)
+        line.delete(line_BN)
+        
+        label.delete(label_X)
+        label.delete(label_A)
+        label.delete(label_B)
+        label.delete(label_C)
+        label.delete(label_D)
+        
+        duration = ((Dx - Xx) * timeframe.multiplier) / (60.0 * 24.0)
+        tooltip = "timeframe: " + reso + "\n" + "pattern: " + name + "\n" + "duration: " + str.tostring(duration, "#.###") + " Day" + "\n"  + "trendy: " + (trendy ? "true" : "false") + "\n"
+        
+        line_XA := line.new(x1=Xx, y1=Xy, x2=Ax, y2=Ay, color=color.new(coluor, 30), width=2)
+        line_AB := line.new(x1=Ax, y1=Ay, x2=Bx, y2=By, color=color.new(coluor, 30), width=2)
+        line_BC := line.new(x1=Bx, y1=By, x2=Cx, y2=Cy, color=color.new(coluor, 30), width=2)
+        line_CD := line.new(x1=Cx, y1=Cy, x2=Dx, y2=Dy, color=color.new(coluor, 30), width=2)
+        
+        label_X := label.new(x=Xx, y=Xy, text="X", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_A := label.new(x=Ax, y=Ay, text="A", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_B := label.new(x=Bx, y=By, text="B", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_C := label.new(x=Cx, y=Cy, text="C", style=Dd == -1 ? label.style_label_down : label.style_label_up, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        label_D := label.new(x=Dx, y=Dy, text="D", style=Dd == -1 ? label.style_label_up : label.style_label_down, color=color.new(color.blue, 100), textcolor=color.new(coluor, 10), tooltip=tooltip)
+        
+        xa_a = (Xy - Ay) / (Xx - Ax)
+        xa_b = Xy - xa_a * Xx
+        cd_a = (Cy - Dy) / (Cx - Dx)
+        cd_b = Cy - cd_a * Cx
+        
+        Mx = math.floor((By - xa_b) / xa_a)
+        Nx = math.ceil((By - cd_b) / cd_a)
+        line_MB := line.new(x1=Mx, y1=By, x2=Bx, y2=By, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        line_BN := line.new(x1=Bx, y1=By, x2=Nx, y2=By, color=color.new(coluor, 30), width=1, style=line.style_dotted)
+        linefill.new(line_MB, line_XA, color=color.new(coluor, 80))
+        linefill.new(line_BN, line_BC, color=color.new(coluor, 80))
+        0
+    else
+        if not na(label_D) and (bar_index - label.get_x(label_D)) * timeframe.multiplier > 30 * 24 * 60
+            line.delete(line_XA)
+            line.delete(line_AB)
+            line.delete(line_BC)
+            line.delete(line_CD)
+            line.delete(line_MB)
+            line.delete(line_BN)
+            
+            label.delete(label_X)
+            label.delete(label_A)
+            label.delete(label_B)
+            label.delete(label_C)
+            label.delete(label_D)
+        0
+    
+//double top pattern
+double_top_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+    
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cd_a = (Cy - Dy) / (Cx - Dx)
+    cd_b = Cy - cd_a * Cx
+    
+    Nx = (By - cd_b) / cd_a
+    Ny = By
+    
+    cond1 = AB / XA >= 0.382 and AB / XA <= 0.886       
+    cond2 = BC / AB >= 0.786 and BC / AB <= 1.000
+    cond3 = CD / BC >= 1.242 and CD / BC <= 1.382
+    cond4 = Dd == -1
+    cond5 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond = cond1 and cond2 and cond3 and cond4 and cond5
+    
+    entry_price = math.round_to_mintick(Ny)
+    stop_loss = Cy
+    take_profit1 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.000 * (Dd == 1 ? 1 : -1))
+    take_profit2 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.500 * (Dd == 1 ? 1 : -1))
+    
+    coluor = bearcolor
+    trendy = true
+    name = "Double-Top ▼"
+    draw_double_top_btm_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+            
+    [cond, Dd, trendy]
+    
+//double bottom pattern
+double_btm_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcolor, bearcolor, show_pattern, show_price) =>
+    [Xx, Xy, Xd, Ax, Ay, Ad, Bx, By, Bd, Cx, Cy, Cd, Dx, Dy, Dd] = get_5_points(zigzag, oldzigzag, zigzagdir, confirm)
+    
+    XA = math.abs(Xy - Ay)
+    XC = math.abs(Xy - Cy)
+    AB = math.abs(Ay - By)
+    BC = math.abs(By - Cy)
+    CD = math.abs(Cy - Dy)
+    AD = math.abs(Ay - Dy)
+    
+    _XB = math.abs(Xx - Bx)
+    _BD = math.abs(Bx - Dx)
+    
+    cd_a = (Cy - Dy) / (Cx - Dx)
+    cd_b = Cy - cd_a * Cx
+    
+    Nx = (By - cd_b) / cd_a
+    Ny = By
+    
+    cond1 = AB / XA >= 0.382 and AB / XA <= 0.886       
+    cond2 = BC / AB >= 0.786 and BC / AB <= 1.000
+    cond3 = CD / BC >= 1.242 and CD / BC <= 1.382
+    cond4 = Dd == 1
+    cond5 = _XB / _BD >= 0.333 and _XB / _BD <= 3.000
+    cond = cond1 and cond2 and cond3 and cond4 and cond5
+    
+    entry_price = math.round_to_mintick(Ny)
+    stop_loss = Cy
+    take_profit1 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.000 * (Dd == 1 ? 1 : -1))
+    take_profit2 = math.round_to_mintick(Ny + math.abs(Ny - Cy) * 1.500 * (Dd == 1 ? 1 : -1))
+    
+    coluor = bullcolor 
+    trendy = true
+    name = "Double-Bottom ▲"
+    draw_double_top_btm_pattern(cond and show_pattern, Xx, Xy, Ax, Ay, Bx, By, Cx, Cy, Dx, Dy, Dd, reso, name, trendy, coluor)
+    draw_trading_lines(cond and show_price, Dx, entry_price, stop_loss, take_profit1, take_profit2, coluor, 20)
+            
+    [cond, Dd, trendy]
+   
+   
+// ══════════════════════════════════════════════════════════════════════════════════════════════════ //
+// Multi-Timeframe Zigzag  -------------------------------------------------------------------------- //
+
+zz_reso1 = input.timeframe(defval="30", title="timeframe resolution", group="Multi-Timeframe A")
+zz_src1 = input.string(defval="HM2/LM2", title="pivot high/low source", options=["HIGH/LOW", "CLOSE", "HM2/LM2"], tooltip="HM2 = (high + max(open, close)) / 2\nLM2 = (low + min(open, close)) / 2", group="Multi-Timeframe A")
+zz_perd1 = input.int(defval=5, title="timeframe pivot period", minval=0, group="Multi-Timeframe A")
+zz_confirm1 = input.int(defval=3, title="delay for confirmations", minval=0, group="Multi-Timeframe A")
+zz_bull_color1 = input.color(defval=color.new(#9FEE01, 30), title="bullish/bearish colors  ", inline="ZZAA", group="Multi-Timeframe A")
+zz_bear_color1 = input.color(defval=color.new(#CC0074, 30), title="", inline="ZZAA", group="Multi-Timeframe A")
+zz_enable_tf1 = input.bool(defval=true, title="enable harmonic patterns", group="Multi-Timeframe A")
+zz_show_ptrn1 = input.bool(defval=true, title="show harmonic patterns", tooltip="All drawings in each timeframe will be preserved for 30 days, and only the last pattern of each pattern will be shown", group="Multi-Timeframe A")
+zz_show_prce1 = input.bool(defval=false, title="show trading prices of patterns", tooltip="Including entry price, take profit 1, take profit 2, and stop loss price", group="Multi-Timeframe A")
+
+zz_reso2 = input.timeframe(defval="45", title="timeframe resolution", group="Multi-Timeframe B")
+zz_src2 = input.string(defval="HM2/LM2", title="pivot high/low source", options=["HIGH/LOW", "CLOSE", "HM2/LM2"], tooltip="HM2 = (high + max(open, close)) / 2\nLM2 = (low + min(open, close)) / 2", group="Multi-Timeframe B")
+zz_perd2 = input.int(defval=5, title="timeframe pivot period", minval=0, group="Multi-Timeframe B")
+zz_confirm2 = input.int(defval=3, title="delay for confirmations", minval=0, group="Multi-Timeframe B")
+zz_bull_color2 = input.color(defval=color.new(#00CC00, 30), title="bullish/bearish colors  ", inline="ZZBB", group="Multi-Timeframe B")
+zz_bear_color2 = input.color(defval=color.new(#FF0101, 30), title="", inline="ZZBB", group="Multi-Timeframe B")
+zz_enable_tf2 = input.bool(defval=true, title="enable harmonic patterns", group="Multi-Timeframe B")
+zz_show_ptrn2 = input.bool(defval=true, title="show harmonic patterns", tooltip="All drawings in each timeframe will be preserved for 30 days, and only the last pattern of each pattern will be shown", group="Multi-Timeframe B")
+zz_show_prce2 = input.bool(defval=false, title="show trading prices of patterns", tooltip="Including entry price, take profit 1, take profit 2, and stop loss price", group="Multi-Timeframe B")
+
+zz_reso3 = input.timeframe(defval="60", title="timeframe resolution", group="Multi-Timeframe C")
+zz_src3 = input.string(defval="HM2/LM2", title="pivot high/low source", options=["HIGH/LOW", "CLOSE", "HM2/LM2"], tooltip="HM2 = (high + max(open, close)) / 2\nLM2 = (low + min(open, close)) / 2", group="Multi-Timeframe C")
+zz_perd3 = input.int(defval=5, title="timeframe pivot period", minval=0, group="Multi-Timeframe C")
+zz_confirm3 = input.int(defval=3, title="delay for confirmations", minval=0, group="Multi-Timeframe C")
+zz_bull_color3 = input.color(defval=color.new(#009999, 30), title="bullish/bearish colors  ", inline="ZZAA", group="Multi-Timeframe C")
+zz_bear_color3 = input.color(defval=color.new(#FF7401, 30), title="", inline="ZZAA", group="Multi-Timeframe C")
+zz_enable_tf3 = input.bool(defval=true, title="enable harmonic patterns", group="Multi-Timeframe C")
+zz_show_ptrn3 = input.bool(defval=true, title="show harmonic patterns", tooltip="All drawings in each timeframe will be preserved for 30 days, and only the last pattern of each pattern will be shown", group="Multi-Timeframe C")
+zz_show_prce3 = input.bool(defval=false, title="show trading prices of patterns", tooltip="Including entry price, take profit 1, take profit 2, and stop loss price", group="Multi-Timeframe C")
+
+zz_reso4 = input.timeframe(defval="120", title="timeframe resolution", group="Multi-Timeframe D")
+zz_src4 = input.string(defval="HM2/LM2", title="pivot high/low source", options=["HIGH/LOW", "CLOSE", "HM2/LM2"], tooltip="HM2 = (high + max(open, close)) / 2\nLM2 = (low + min(open, close)) / 2", group="Multi-Timeframe D")
+zz_perd4 = input.int(defval=5, title="timeframe pivot period", minval=0, group="Multi-Timeframe D")
+zz_confirm4 = input.int(defval=3, title="delay for confirmations", minval=0, group="Multi-Timeframe D")
+zz_bull_color4 = input.color(defval=color.new(#1240AB, 30), title="bullish/bearish colors  ", inline="ZZBB", group="Multi-Timeframe D")
+zz_bear_color4 = input.color(defval=color.new(#FFAA01, 30), title="", inline="ZZBB", group="Multi-Timeframe D")
+zz_enable_tf4 = input.bool(defval=true, title="enable harmonic patterns", group="Multi-Timeframe D")
+zz_show_ptrn4 = input.bool(defval=true, title="show harmonic patterns", tooltip="All drawings in each timeframe will be preserved for 30 days, and only the last pattern of each pattern will be shown", group="Multi-Timeframe D")
+zz_show_prce4 = input.bool(defval=false, title="show trading prices of patterns", tooltip="Including entry price, take profit 1, take profit 2, and stop loss price", group="Multi-Timeframe D")
+
+zz_reso5 = input.timeframe(defval="180", title="timeframe resolution", group="Multi-Timeframe E")
+zz_src5 = input.string(defval="HM2/LM2", title="pivot high/low source", options=["HIGH/LOW", "CLOSE", "HM2/LM2"], tooltip="HM2 = (high + max(open, close)) / 2\nLM2 = (low + min(open, close)) / 2", group="Multi-Timeframe E")
+zz_perd5 = input.int(defval=5, title="timeframe pivot period", minval=0, group="Multi-Timeframe E")
+zz_confirm5 = input.int(defval=3, title="delay for confirmations", minval=0, group="Multi-Timeframe E")
+zz_bull_color5 = input.color(defval=color.new(#3715B0, 30), title="bullish/bearish colors  ", inline="ZZBB", group="Multi-Timeframe E")
+zz_bear_color5 = input.color(defval=color.new(#FFD201, 30), title="", inline="ZZBB", group="Multi-Timeframe E")
+zz_enable_tf5 = input.bool(defval=true, title="enable harmonic patterns", group="Multi-Timeframe E")
+zz_show_ptrn5 = input.bool(defval=true, title="show harmonic patterns", tooltip="All drawings in each timeframe will be preserved for 30 days, and only the last pattern of each pattern will be shown", group="Multi-Timeframe E")
+zz_show_prce5 = input.bool(defval=false, title="show trading prices of patterns", tooltip="Including entry price, take profit 1, take profit 2, and stop loss price", group="Multi-Timeframe E")
+
+zz_reso6 = input.timeframe(defval="240", title="timeframe resolution", group="Multi-Timeframe F")
+zz_src6 = input.string(defval="HM2/LM2", title="pivot high/low source", options=["HIGH/LOW", "CLOSE", "HM2/LM2"], tooltip="HM2 = (high + max(open, close)) / 2\nLM2 = (low + min(open, close)) / 2", group="Multi-Timeframe F")
+zz_perd6 = input.int(defval=5, title="timeframe pivot period", minval=0, group="Multi-Timeframe F")
+zz_confirm6 = input.int(defval=3, title="delay for confirmations", minval=0, group="Multi-Timeframe F")
+zz_bull_color6 = input.color(defval=color.new(#7109AA, 30), title="bullish/bearish colors  ", inline="ZZBB", group="Multi-Timeframe F")
+zz_bear_color6 = input.color(defval=color.new(#FFFF01, 30), title="", inline="ZZBB", group="Multi-Timeframe F")
+zz_enable_tf6 = input.bool(defval=true, title="enable harmonic patterns", group="Multi-Timeframe F")
+zz_show_ptrn6 = input.bool(defval=true, title="show harmonic patterns", tooltip="All drawings in each timeframe will be preserved for 30 days, and only the last pattern of each pattern will be shown", group="Multi-Timeframe F")
+zz_show_prce6 = input.bool(defval=false, title="show trading prices of patterns", tooltip="Including entry price, take profit 1, take profit 2, and stop loss price", group="Multi-Timeframe F")
+    
+hm = (math.max(open, close) + high) / 2
+lm = (math.min(open, close) + low) / 2
+
+zz_hsrc1 = zz_src1 == "CLOSE" ? close : zz_src1 == "HM2/LM2" ? hm : high
+zz_hsrc2 = zz_src2 == "CLOSE" ? close : zz_src2 == "HM2/LM2" ? hm : high
+zz_hsrc3 = zz_src3 == "CLOSE" ? close : zz_src3 == "HM2/LM2" ? hm : high
+zz_hsrc4 = zz_src4 == "CLOSE" ? close : zz_src4 == "HM2/LM2" ? hm : high
+zz_hsrc5 = zz_src5 == "CLOSE" ? close : zz_src5 == "HM2/LM2" ? hm : high
+zz_hsrc6 = zz_src6 == "CLOSE" ? close : zz_src6 == "HM2/LM2" ? hm : high
+
+zz_lsrc1 = zz_src1 == "CLOSE" ? close : zz_src1 == "HM2/LM2" ? lm : low
+zz_lsrc2 = zz_src2 == "CLOSE" ? close : zz_src2 == "HM2/LM2" ? lm : low
+zz_lsrc3 = zz_src3 == "CLOSE" ? close : zz_src3 == "HM2/LM2" ? lm : low
+zz_lsrc4 = zz_src4 == "CLOSE" ? close : zz_src4 == "HM2/LM2" ? lm : low
+zz_lsrc5 = zz_src5 == "CLOSE" ? close : zz_src5 == "HM2/LM2" ? lm : low
+zz_lsrc6 = zz_src6 == "CLOSE" ? close : zz_src6 == "HM2/LM2" ? lm : low
+    
+[zigzag1, oldzigzag1, zigzagdir1] = calculate_zigzag(zz_reso1, zz_perd1, zz_hsrc1, zz_lsrc1, 50)
+[zigzag2, oldzigzag2, zigzagdir2] = calculate_zigzag(zz_reso2, zz_perd2, zz_hsrc2, zz_lsrc2, 50)
+[zigzag3, oldzigzag3, zigzagdir3] = calculate_zigzag(zz_reso3, zz_perd3, zz_hsrc3, zz_lsrc3, 50)
+[zigzag4, oldzigzag4, zigzagdir4] = calculate_zigzag(zz_reso4, zz_perd4, zz_hsrc4, zz_lsrc4, 50)
+[zigzag5, oldzigzag5, zigzagdir5] = calculate_zigzag(zz_reso5, zz_perd5, zz_hsrc5, zz_lsrc5, 50)
+[zigzag6, oldzigzag6, zigzagdir6] = calculate_zigzag(zz_reso6, zz_perd6, zz_hsrc6, zz_lsrc6, 50)
+
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════ //
+// Harmonic Patterns  -------------------------------------------------------------------------- //
+
+hp_enable_gartlay = input.bool(defval=true, title="enable Gartlay pattern", group="Harmonic Patterns")
+hp_enable_cypher = input.bool(defval=true, title="enable Cypher pattern", group="Harmonic Patterns")
+hp_enable_bat = input.bool(defval=true, title="enable Bat pattern", group="Harmonic Patterns")
+hp_enable_deepcrab = input.bool(defval=true, title="enable Deepcrab pattern", group="Harmonic Patterns")
+hp_enable_crab = input.bool(defval=true, title="enable Crab pattern", group="Harmonic Patterns")
+hp_enable_butterfly = input.bool(defval=true, title="enable Butterfly pattern", group="Harmonic Patterns")
+hp_enable_shark = input.bool(defval=true, title="enable Shark pattern", group="Harmonic Patterns")
+hp_enable_zero5 = input.bool(defval=true, title="enable 0-5 pattern", group="Harmonic Patterns")
+hp_enable_abcd = input.bool(defval=true, title="enable AB=CD pattern", group="Harmonic Patterns")
+hp_enable_3drives = input.bool(defval=true, title="enable 3-Drives pattern", group="Harmonic Patterns")
+hp_enable_anti_gartlay = input.bool(defval=true, title="enable Anti-Gartlay pattern", group="Harmonic Patterns")
+hp_enable_anti_cypher = input.bool(defval=true, title="enable Anti-Cypher pattern", group="Harmonic Patterns")
+hp_enable_anti_bat = input.bool(defval=true, title="enable Anti-Bat pattern", group="Harmonic Patterns")
+hp_enable_anti_crab = input.bool(defval=true, title="enable Anti-Crab pattern", group="Harmonic Patterns")
+hp_enable_anti_butterfly = input.bool(defval=true, title="enable Anti-Butterfly pattern", group="Harmonic Patterns")
+hp_enable_anti_shark = input.bool(defval=true, title="enable Anti-Shark pattern", group="Harmonic Patterns")
+hp_enable_black_swan = input.bool(defval=true, title="enable Black-Swan pattern", group="Harmonic Patterns")
+hp_enable_white_swan = input.bool(defval=true, title="enable White-Swan pattern", group="Harmonic Patterns")
+hp_enable_desc_triangle = input.bool(defval=false, title="enable Descending-Triangle pattern", group="Harmonic Patterns")
+hp_enable_asc_triangle = input.bool(defval=false, title="enable Ascending-Triangle pattern", group="Harmonic Patterns")
+hp_enable_sym_triangle = input.bool(defval=false, title="enable Symmetrical-Triangle pattern", group="Harmonic Patterns")
+hp_enable_norm_hs = input.bool(defval=false, title="enable Headers&Shoulders pattern", group="Harmonic Patterns")
+hp_enable_inve_hs = input.bool(defval=false, title="enable Inverse-Headers&Shoulders pattern", group="Harmonic Patterns")
+hp_enable_double_top = input.bool(defval=false, title="enable Double-Top pattern", group="Harmonic Patterns")
+hp_enable_double_btm = input.bool(defval=false, title="enable Double-Bottom pattern", group="Harmonic Patterns")
+
+get_harmonic_patterns(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price) =>
+    patterns = matrix.new<int>(25, 3, na)
+
+    if hp_enable_gartlay
+        [cond, dir, trend] = gartlay_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 0, 0, cond ? 1 : 0)
+            matrix.set(patterns, 0, 1, dir)
+            matrix.set(patterns, 0, 2, trend ? 1 : 0)
+    
+    if hp_enable_bat
+        [cond, dir, trend] = bat_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 1, 0, cond ? 1 : 0)
+            matrix.set(patterns, 1, 1, dir)
+            matrix.set(patterns, 1, 2, trend ? 1 : 0)
+    
+    if hp_enable_cypher
+        [cond, dir, trend] = cypher_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 2, 0, cond ? 1 : 0)
+            matrix.set(patterns, 2, 1, dir)
+            matrix.set(patterns, 2, 2, trend ? 1 : 0)
+            
+    if hp_enable_deepcrab
+        [cond, dir, trend] = deepcrab_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 3, 0, cond ? 1 : 0)
+            matrix.set(patterns, 3, 1, dir)
+            matrix.set(patterns, 3, 2, trend ? 1 : 0)
+            
+    if hp_enable_crab
+        [cond, dir, trend] = crab_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 4, 0, cond ? 1 : 0)
+            matrix.set(patterns, 4, 1, dir)
+            matrix.set(patterns, 4, 2, trend ? 1 : 0)
+            
+    if hp_enable_butterfly
+        [cond, dir, trend] = butterfly_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 5, 0, cond ? 1 : 0)
+            matrix.set(patterns, 5, 1, dir)
+            matrix.set(patterns, 5, 2, trend ? 1 : 0)
+    
+    if hp_enable_shark
+        [cond, dir, trend] = shark_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 6, 0, cond ? 1 : 0)
+            matrix.set(patterns, 6, 1, dir)
+            matrix.set(patterns, 6, 2, trend ? 1 : 0)
+      
+    if hp_enable_zero5
+        [cond, dir, trend] = zero5_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 7, 0, cond ? 1 : 0)
+            matrix.set(patterns, 7, 1, dir)
+            matrix.set(patterns, 7, 2, trend ? 1 : 0)
+    
+    if hp_enable_abcd
+        [cond, dir, trend] = abcd_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 8, 0, cond ? 1 : 0)
+            matrix.set(patterns, 8, 1, dir)
+            matrix.set(patterns, 8, 2, trend ? 1 : 0)
+            
+    if hp_enable_3drives 
+        [cond, dir, trend] = threedrives_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 9, 0, cond ? 1 : 0)
+            matrix.set(patterns, 9, 1, dir)
+            matrix.set(patterns, 9, 2, trend ? 1 : 0)
+            
+    if hp_enable_anti_gartlay
+        [cond, dir, trend] = anti_gartlay_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 10, 0, cond ? 1 : 0)
+            matrix.set(patterns, 10, 1, dir)
+            matrix.set(patterns, 10, 2, trend ? 1 : 0)
+            
+    if hp_enable_anti_bat
+        [cond, dir, trend] = anti_bat_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 11, 0, cond ? 1 : 0)
+            matrix.set(patterns, 11, 1, dir)
+            matrix.set(patterns, 11, 2, trend ? 1 : 0)
+    
+    if hp_enable_anti_cypher
+        [cond, dir, trend] = anti_cypher_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 12, 0, cond ? 1 : 0)
+            matrix.set(patterns, 12, 1, dir)
+            matrix.set(patterns, 12, 2, trend ? 1 : 0)
+    
+    if hp_enable_anti_crab
+        [cond, dir, trend] = anti_crab_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 13, 0, cond ? 1 : 0)
+            matrix.set(patterns, 13, 1, dir)
+            matrix.set(patterns, 13, 2, trend ? 1 : 0)
+    
+    if hp_enable_anti_butterfly
+        [cond, dir, trend] = anti_butterfly_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 14, 0, cond ? 1 : 0)
+            matrix.set(patterns, 14, 1, dir)
+            matrix.set(patterns, 14, 2, trend ? 1 : 0)
+           
+    if hp_enable_anti_shark
+        [cond, dir, trend] = anti_shark_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 15, 0, cond ? 1 : 0)
+            matrix.set(patterns, 15, 1, dir)
+            matrix.set(patterns, 15, 2, trend ? 1 : 0)
+    
+    if hp_enable_black_swan
+        [cond, dir, trend] = black_swan_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 16, 0, cond ? 1 : 0)
+            matrix.set(patterns, 16, 1, dir)
+            matrix.set(patterns, 16, 2, trend ? 1 : 0)
+    
+    if hp_enable_white_swan
+        [cond, dir, trend] = white_swan_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 17, 0, cond ? 1 : 0)
+            matrix.set(patterns, 17, 1, dir)
+            matrix.set(patterns, 17, 2, trend ? 1 : 0)
+    
+    if hp_enable_desc_triangle
+        [cond, dir, trend] = desc_triangle_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 18, 0, cond ? 1 : 0)
+            matrix.set(patterns, 18, 1, dir)
+            matrix.set(patterns, 18, 2, trend ? 1 : 0)
+    
+    if hp_enable_asc_triangle
+        [cond, dir, trend] = asc_triangle_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 19, 0, cond ? 1 : 0)
+            matrix.set(patterns, 19, 1, dir)
+            matrix.set(patterns, 19, 2, trend ? 1 : 0)
+    
+    if hp_enable_sym_triangle
+        [cond, dir, trend] = sym_triangle_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 20, 0, cond ? 1 : 0)
+            matrix.set(patterns, 20, 1, dir)
+            matrix.set(patterns, 20, 2, trend ? 1 : 0)
+    
+    if hp_enable_norm_hs
+        [cond, dir, trend] = norm_hs_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 21, 0, cond ? 1 : 0)
+            matrix.set(patterns, 21, 1, dir)
+            matrix.set(patterns, 21, 2, trend ? 1 : 0)
+    
+    if hp_enable_inve_hs
+        [cond, dir, trend] = inve_hs_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 22, 0, cond ? 1 : 0)
+            matrix.set(patterns, 22, 1, dir)
+            matrix.set(patterns, 22, 2, trend ? 1 : 0)
+    
+    if hp_enable_double_top
+        [cond, dir, trend] = double_top_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 23, 0, cond ? 1 : 0)
+            matrix.set(patterns, 23, 1, dir)
+            matrix.set(patterns, 23, 2, trend ? 1 : 0)
+     
+    if hp_enable_double_btm
+        [cond, dir, trend] = double_btm_pattern(reso, zigzag, oldzigzag, zigzagdir, confirm, bullcol, bearcol, show_pattern, show_price)
+        if cond
+            matrix.set(patterns, 24, 0, cond ? 1 : 0)
+            matrix.set(patterns, 24, 1, dir)
+            matrix.set(patterns, 24, 2, trend ? 1 : 0)
+            
+    patterns
+
+
+patterns_reso1 = zz_enable_tf1 ? get_harmonic_patterns(zz_reso1, zigzag1, oldzigzag1, zigzagdir1, zz_confirm1, zz_bull_color1, zz_bear_color1, zz_show_ptrn1, zz_show_prce1) : matrix.new<int>(25, 3, na)
+patterns_reso2 = zz_enable_tf2 ? get_harmonic_patterns(zz_reso2, zigzag2, oldzigzag2, zigzagdir2, zz_confirm2, zz_bull_color2, zz_bear_color2, zz_show_ptrn2, zz_show_prce2) : matrix.new<int>(25, 3, na)
+patterns_reso3 = zz_enable_tf3 ? get_harmonic_patterns(zz_reso3, zigzag3, oldzigzag3, zigzagdir3, zz_confirm3, zz_bull_color3, zz_bear_color3, zz_show_ptrn3, zz_show_prce3) : matrix.new<int>(25, 3, na)
+patterns_reso4 = zz_enable_tf4 ? get_harmonic_patterns(zz_reso4, zigzag4, oldzigzag4, zigzagdir4, zz_confirm4, zz_bull_color4, zz_bear_color4, zz_show_ptrn4, zz_show_prce4) : matrix.new<int>(25, 3, na)
+patterns_reso5 = zz_enable_tf5 ? get_harmonic_patterns(zz_reso5, zigzag5, oldzigzag5, zigzagdir5, zz_confirm5, zz_bull_color5, zz_bear_color5, zz_show_ptrn5, zz_show_prce5) : matrix.new<int>(25, 3, na)
+patterns_reso6 = zz_enable_tf6 ? get_harmonic_patterns(zz_reso6, zigzag6, oldzigzag6, zigzagdir6, zz_confirm6, zz_bull_color6, zz_bear_color6, zz_show_ptrn6, zz_show_prce6) : matrix.new<int>(25, 3, na)
+
+get_events(patterns) =>
+    simple_bull = 0
+    simple_bear = 0
+    
+    trendy_bull = 0
+    trendy_bear = 0
+    
+    for i = 0 to matrix.rows(patterns) - 1
+        cond = matrix.get(patterns, i, 0)
+        dir = matrix.get(patterns, i, 1)
+        trend = matrix.get(patterns, i, 2)
+        if cond == 1
+            if dir == 1
+                simple_bull := simple_bull + 1
+            else if dir == -1
+                simple_bear := simple_bear + 1
+            
+            if dir == 1 and trend == 1
+                trendy_bull := trendy_bull + 1
+            else if dir == -1 and trend == 1
+                trendy_bear := trendy_bear + 1
+    
+    [simple_bull, simple_bear, trendy_bull, trendy_bear]
+
+[simple_bull_reso1, simple_bear_reso1, trendy_bull_reso1, trendy_bear_reso1] = get_events(patterns_reso1)
+[simple_bull_reso2, simple_bear_reso2, trendy_bull_reso2, trendy_bear_reso2] = get_events(patterns_reso2)
+[simple_bull_reso3, simple_bear_reso3, trendy_bull_reso3, trendy_bear_reso3] = get_events(patterns_reso3)
+[simple_bull_reso4, simple_bear_reso4, trendy_bull_reso4, trendy_bear_reso4] = get_events(patterns_reso4)
+[simple_bull_reso5, simple_bear_reso5, trendy_bull_reso5, trendy_bear_reso5] = get_events(patterns_reso5)
+[simple_bull_reso6, simple_bear_reso6, trendy_bull_reso6, trendy_bear_reso6] = get_events(patterns_reso6)
+
+simple_bull_case = (simple_bull_reso1 + simple_bull_reso2 + simple_bull_reso3 + simple_bull_reso4 + simple_bull_reso5 + simple_bull_reso6) > 0
+trendy_bull_case = (trendy_bull_reso1 + trendy_bull_reso2 + trendy_bull_reso3 + trendy_bull_reso4 + trendy_bull_reso5 + trendy_bull_reso6) > 0
+simple_bear_case = (simple_bear_reso1 + simple_bear_reso2 + simple_bear_reso3 + simple_bear_reso4 + simple_bear_reso5 + simple_bear_reso6) > 0
+trendy_bear_case = (trendy_bear_reso1 + trendy_bear_reso2 + trendy_bear_reso3 + trendy_bear_reso4 + trendy_bear_reso5 + trendy_bear_reso6) > 0
+
+simple_bull_bear_case_color = simple_bull_case and simple_bear_case ? color.purple : simple_bull_case ? color.green : simple_bear_case ? color.red : na
+plotshape(simple_bull_case and simple_bear_case, style=shape.circle, location=location.bottom, color=color.new(simple_bull_bear_case_color, 20), size=size.tiny)
+plotshape(simple_bull_case and not simple_bear_case, style=shape.circle, location=location.bottom, color=color.new(simple_bull_bear_case_color, 20), size=size.tiny)
+plotshape(not simple_bull_case and simple_bear_case, style=shape.circle, location=location.bottom, color=color.new(simple_bull_bear_case_color, 20), size=size.tiny)
+
+// trendy_bull_bear_case_color = trendy_bull_case and trendy_bear_case ? color.purple : trendy_bull_case ? color.green : trendy_bear_case ? color.red : na
+// plotshape(trendy_bull_case and trendy_bear_case, style=shape.circle, location=location.bottom, color=color.new(trendy_bull_bear_case_color, 20), size=size.tiny)
+// plotshape(trendy_bull_case and not trendy_bear_case, style=shape.circle, location=location.bottom, color=color.new(trendy_bull_bear_case_color, 20), size=size.tiny)
+// plotshape(not trendy_bull_case and trendy_bear_case, style=shape.circle, location=location.bottom, color=color.new(trendy_bull_bear_case_color, 20), size=size.tiny)
+
+int encode = (simple_bull_case ? 1 : 0) * 8 + (trendy_bull_case ? 1 : 0) * 4 + (simple_bear_case ? 1 : 0) * 2 + (trendy_bear_case ? 1 : 0) * 1
+plot(encode, title="bincode", display=display.none)
+
+
+//end of file
