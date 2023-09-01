@@ -1,0 +1,118 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © shoonya0000
+//
+//	* BUY & SELL VOLUME TO PRICE PRESSURE
+
+//		DISCLAIMER:
+//
+//      The Following indicator/code IS NOT intended to be
+//      a formal investment advice or recommendation by the
+//      author, nor should be construed as such. Users
+//      will be fully responsible by their use regarding 
+//      their own trading vehicles/assets.
+//
+//		
+//      WHAT IS THIS?
+//
+//           -- PRICE ACTION IN RELATION BY IT'S VOLUME --
+//
+//      A) Volume Pressure Histogram:
+//         Columns plotted in positive are considered the dominant
+//      Volume Force for the given period.  All "negative" columns
+//      represents the counterforce Vol.Press against the dominant.
+//
+//      B) Buy to Sell Convergence / Divergence:
+//         It's a simple adaptation of the popular "Price
+//      Percentage Oscillator" or MACD but taking Buying Pressure
+//      against Selling Pressure Averages, so given a Positive 
+//      oscillator reading (>0) represents Bullish dominant Trend
+//      and a Negative reading (<0) a Bearish dominant Trend.
+//      Histogram is the diff between RAW Volume Pressures
+//      Convergence/Divergence minus Normalised ones (Signal)
+//      which helps as a confirmation.
+//
+//      C) Volume bars are by default plotted from RAW Volume
+//      Pressure algorithms, but they can be as well filtered
+//      with Karthik Marar's approach against a "Total Volume
+//      Average" in favor to clean day to day noise like HFT.
+//
+//@version=1		
+//////////////////////////////////////////////////////////////////
+study("BSVP", shorttitle="BSVP", precision=0)
+signal = input(title="Base for FastMA Periods:", type=integer, defval=3)
+long = input(title="Buy to Sell Conv/Div Lookback:", type=integer, defval=27)
+vmacd = input(true, title="Buy to Sell Convergence/Div OSC:")
+vinv = input(false, title="Buy to Sell Conv/Div as cummulative:")
+norm = input(false, title="Normalised (Filtered) Version:")
+vapi = input(false, title="Display Acc/Dist % :")
+vol = iff(volume > 0, volume , 1)
+// PRESSURE ALGORITHMS AND VARIABLES
+TR = atr(1)
+// Bull And Bear "Power-Balance" by Vadim Gimelfarb Algorithm's
+BP =    iff(close<open,     iff(close[1]<open,  max(high-close[1], close-low), 
+                                                    max(high-open, close-low)),
+            iff(close>open,     iff(close[1]>open,  high-low, 
+                                                    max(open-close[1], high-low)),
+            iff(high-close>close-low, iff(close[1]<open,    max(high-close[1],close-low),
+                                                            high-open),
+            iff(high-close<close-low, iff(close[1]>open,    high-low,
+                                                            max(open-close[1], high-low)),
+            iff(close[1]>open,  max(high-open, close-low),
+            iff(close[1]<open,  max(open-close[1], high-low),
+        high-low))))))
+SP =    iff(close<open,     iff(close[1]>open,  max(close[1]-open, high-low),
+                                                    high-low),
+            iff(close>open,     iff(close[1]>open,  max(close[1]-low, high-close),
+                                                    max(open-low, high-close)),
+            iff(high-close>close-low,   iff(close[1]>open,  max(close[1]-open, high-low),
+                                                            high-low),
+            iff(high-close<close-low,   iff(close[1]>open,  max(close[1]-low, high-close),
+                                                            open-low),
+            iff(close[1]>open,  max(close[1]-open, high-low),
+            iff(close[1]<open,  max(open-low, high-close),
+        high-low))))))
+TP = BP+SP
+// RAW Pressure Volume Calculations
+BPV = (BP/TP)*vol
+SPV = (SP/TP)*vol
+TPV = BPV+SPV
+BPVavg = ema(ema(BPV,signal),signal)
+SPVavg = ema(ema(SPV,signal),signal)
+TPVavg = ema(wma(TPV,signal),signal)
+// Pressure Volume Normalized Version 
+VN = vol/ema(vol,long)
+BPN = ((BP/ema(BP,long))*VN)*100
+SPN = ((SP/ema(SP,long))*VN)*100
+TPN = BPN+SPN
+nbf = ema(wma(BPN,signal),signal)
+nsf = ema(wma(SPN,signal),signal)
+tpf = ema(wma(TPN,signal),signal)
+ndif = nbf-nsf
+// Conditional Selectors for RAW/Norm
+BPc1 = BPV>SPV ? BPV : -abs(BPV)
+BPc2 = BPN>SPN ? BPN : -abs(BPN)
+SPc1 = SPV>BPV ? SPV : -abs(SPV)
+SPc2 = SPN>BPN ? SPN : -abs(SPN)
+BPcon = norm ? BPc2 : BPc1
+SPcon = norm ? SPc2 : SPc1
+BPAcon = norm ? nbf : BPVavg
+SPAcon = norm ? nsf : SPVavg
+TPAcon = norm ? tpf : TPVavg
+// Volume Pressure Convergence Divergence 
+vpo1 = vinv ? (( sum(BPVavg,long)-sum(SPVavg,long))/sum(TPVavg,long))*100 : ((BPVavg-SPVavg)/TPVavg)*100
+vpo2 = vinv ? (( sum(nbf,long)-sum(nsf,long))/sum(tpf,long))*100 : ((nbf-nsf)/tpf)*100
+//vph = nz((vpo1 - vpo2),0)
+// Plot Indicator
+//histC = vph > vph[1] ? blue:#BA00AA
+Vpo1C = vpo1 > 0 ? green:red
+Vpo2C = vpo2 > 0 ? green:red
+plot(vmacd ? na:SPcon, color=red, title="SELLING", style=columns, linewidth=3, transp=80)
+plot(vmacd ? na:BPcon, color=green, title="BUYING", style=columns, linewidth=3, transp=80)
+plot(vmacd ? na:SPAcon, color=red, title="SPAvg", style=line, linewidth=2) //ema(BearPower*SPV,signal)
+plot(vmacd ? na:BPAcon, color=green, title="BPAvg", style=line, linewidth=2) //ema(BullPower*BPV,signal)
+plot(vmacd ? vpo1:na, color=Vpo1C,title="VPO1", style=line, linewidth=3)
+plot(vmacd ? vpo2:na, color=Vpo2C,title="VPO2", style=line, linewidth=1)
+//plot(vmacd ? vph:na, color=histC, title="VPH", style=columns, linewidth=3, transp=90)
+band1 = hline(40, title="Upper Line", linewidth=1, color=#eb0c0c)
+band0 = hline(0, title="Lower Line", linewidth=1, color=#eb0c0c)
+band2 = hline(-40, title="Lower Line", linewidth=1, color=#eb0c0c)
