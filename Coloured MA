@@ -1,0 +1,254 @@
+//@version=4
+//
+
+study("Coloured MA R4-1 by JustUncleL", shorttitle="CLRDMA", overlay=true)
+
+//
+// Author: JustUncleL
+// Date: 5-Jan-2017
+// Revision: R4.1
+//
+// Description: 
+// This project colours the MA plot relative it's direction and optionally
+// colour the candles with standard 2-tone colours, or Grab candle 4-tone
+// colours.
+// 
+// Options
+// 1) Anchor Time Frame to a Highter Time frame, eg. set anchor to 1440 and length set to 8,
+//    the script will re-size the MA length needed to display on the current TF, say 60.
+//
+// 2) You can select between 11 different types of moving averages, each MA line
+//    can be a different type:
+//    - SMA     = Simple Moving Average.
+//    - EMA     = Exponential Moving Average.
+//    - WMA     = Weighted Moving Average
+//    - VWMA    = Volume Weighted Moving Average
+//    - SMMA    = Smoothed Simple Moving Average.
+//    - DEMA    = Double Exponential Moving Average
+//    - TEMA    = Triple Exponential Moving Average.
+//    - LAGMA   = Laguerre Moving Average.
+//    - HullMA  = Hull Moving Average
+//    - SSMA    = Ehlers Super Smoother Moving average
+//    - ZEMA    = Near Zero Lag Exponential Moving Average.
+//    - TMA     = Triangular (smoothed) Simple Moving Average.
+//
+// 3) Option to display coloured Candles based on MA direction, the coulouring uses
+//    the Standard candle colours:
+//    - Lime    = MA trend direction up.
+//    - Red     = MA Trend Direction Down.
+//    the Grab candles scheme:
+//    - Lime    = Trend up, Bull candle.
+//    - Green   = Trend Up, Bear candle.
+//    - Red     = Trend Down, Bull candle.
+//    - DarkRed = Trend Up, Bear candle.
+//
+// Revisions:
+// 16-Dec-2019 R4-1
+//    - Upgraded to Version 4 Pinescript
+//    - Updated zerolag formula.
+//    - Added Alert for each change in direction of moving average (color change).
+//    - Added option to change the lookback length for Direction change 
+//      detection.
+//    - Added option to  color background with MA Direction.
+//
+// 06-Apr-2018
+//    - Change Anchor to be based purely on Minutes, so 1month=30240mins (21 trading days),
+//      1 week=7200mins (5 trading days), 1 Day=1440mins. This makes it more 
+//      consistant across intraday and extraday chart Timeframes.
+//
+// 13-Jan-2018
+//    - Corrected Anchor calculation for non-Intraday.
+//    - Added implied GPL Copyright notice.
+//    - Corrected some header notes.
+//
+// 22-Aug-2017
+//    - Added Laguerre to MA types.
+//    - Added Show Dots with MA Direction change.
+//
+// 11-Aug-2017 : Minor update.
+//    - Changed MA type input selection to an options list, new with V3 Pinescript.
+// 
+// R4 - 22-Jul-2017
+//    - Corrected Anchor calculation for weeks/months
+//    - fixed bar colouring in some displays.
+//
+// R3 - Work around for colouring candles transparency issue.
+// R2 - Added Grab Candles Bar colouring option.
+//    - Improved "variant" function efficiency.
+// R1 - Original.
+//
+//
+// -----------------------------------------------------------------------------
+// Copyright 2017,2018 JustUncleL
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+// 
+// The GNU General Public License can be found here
+// <http://www.gnu.org/licenses/>.
+//
+// -----------------------------------------------------------------------------
+//
+
+
+// - INPUTS
+
+// Use Alternate Anchor TF for MAs 
+anchor = input(0, minval=0, title="Set to an Anchor TimeFrame in mins (0=none, 1D=1440, 1W=7200)")
+// Medium Fast MA - type, source, length
+ma_type = input(defval="EMA", title="MA Type: ", options=["SMA", "EMA", "WMA", "VWMA", "SMMA", "DEMA", "TEMA", "LAGMA", "HullMA", "ZEMA", "TMA", "SSMA"])
+ma_len_ = input(defval=8, title="MA - Length", minval=1)
+Gamma = input(defval=0.77, title="MA - Gamma for LAGMA (Laguerre)")
+ma_src = input(close, title="MA - Source")
+show_ma = input(true, title="Show MA plot")
+col_bars = input(false, title="Colour Bars")
+useGrabClr = input(false, title="Use Grab Candle (4-tone) Colouring, instead of Standard (2-tone)")
+sdots = input(false, title="Show Direction Change Dots")
+lookbackDirection = input(defval=3,minval=1,title="Lookback Length for Direction Change (default=3)")
+col_bg = input(false,title="Color change Background with MA Direction")
+//
+// - /INPUTS
+
+// Constants colours that include fully non-transparent option.
+green100 = #008000FF
+lime100 = #00FF00FF
+red100 = #FF0000FF
+blue100 = #0000FFFF
+aqua100 = #00FFFFFF
+darkred100 = #8B0000FF
+gray100 = #808080FF
+
+// - FUNCTIONS
+
+// - variant(type, src, len)
+// Returns MA input selection variant, default to SMA if blank or typo.
+
+// SuperSmoother filter
+// © 2013  John F. Ehlers
+variant_supersmoother(src, len) =>
+    a1 = exp(-1.414 * 3.14159 / len)
+    b1 = 2 * a1 * cos(1.414 * 3.14159 / len)
+    c2 = b1
+    c3 = -a1 * a1
+    c1 = 1 - c2 - c3
+    v9 = 0.0
+    v9 := c1 * (src + nz(src[1])) / 2 + c2 * nz(v9[1]) + c3 * nz(v9[2])
+    v9
+
+variant_smoothed(src, len) =>
+    v5 = 0.0
+    sma_1 = sma(src, len)
+    v5 := na(v5[1]) ? sma_1 : (v5[1] * (len - 1) + src) / len
+    v5
+
+variant_zerolagema(src, len) =>
+    ema1 = ema(src, len)
+    ema2 = ema(ema1, len)
+    v10 = ema1 + ema1 - ema2
+    v10
+
+variant_doubleema(src, len) =>
+    v2 = ema(src, len)
+    v6 = 2 * v2 - ema(v2, len)
+    v6
+
+variant_tripleema(src, len) =>
+    v2 = ema(src, len)
+    v7 = 3 * (v2 - ema(v2, len)) + ema(ema(v2, len), len)  // Triple Exponential
+    v7
+
+//calc Laguerre
+variant_lag(p, g) =>
+    L0 = 0.0
+    L1 = 0.0
+    L2 = 0.0
+    L3 = 0.0
+    L0 := (1 - g) * p + g * nz(L0[1])
+    L1 := -g * L0 + nz(L0[1]) + g * nz(L1[1])
+    L2 := -g * L1 + nz(L1[1]) + g * nz(L2[1])
+    L3 := -g * L2 + nz(L2[1]) + g * nz(L3[1])
+    f = (L0 + 2 * L1 + 2 * L2 + L3) / 6
+    f
+
+// return variant, defaults to SMA 
+variant(type, src, len) =>
+    ema_1 = ema(src, len)
+    wma_1 = wma(src, len)
+    vwma_1 = vwma(src, len)
+    variant_smoothed__1 = variant_smoothed(src, len)
+    variant_doubleema__1 = variant_doubleema(src, len)
+    variant_tripleema__1 = variant_tripleema(src, len)
+    wma_2 = wma(src, len / 2)
+    wma_4 = wma(2 * wma_2 - wma_1, round(sqrt(len)))
+    variant_supersmoother__1 = variant_supersmoother(src, len)
+    variant_lag__1 = variant_lag(src, Gamma)
+    variant_zerolagema__1 = variant_zerolagema(src, len)
+    sma_1 = sma(src, len)
+    sma_2 = sma(sma_1, len)
+    type == "EMA" ? ema_1 : type == "WMA" ? wma_1 : type == "VWMA" ? vwma_1 : 
+       type == "SMMA" ? variant_smoothed__1 : type == "DEMA" ? variant_doubleema__1 : 
+       type == "TEMA" ? variant_tripleema__1 : type == "HullMA" ? wma_4 : 
+       type == "SSMA" ? variant_supersmoother__1 : type == "LAGMA" ? variant_lag__1 : 
+       type == "ZEMA" ? variant_zerolagema__1 : type == "TMA" ? sma_2 : sma_1
+
+// - /variant 
+
+// - /FUNCTIONS
+
+// - SERIES VARIABLES
+
+// If have anchor specified, calculate the base multiplier.
+mult = timeframe.isintraday ? 
+   anchor == 0 or timeframe.multiplier <= 0 or timeframe.multiplier >= anchor ? 1 : 
+   round(anchor / timeframe.multiplier) : 1
+mult := timeframe.isdwm ? timeframe.isdaily ? 
+   anchor == 0 or timeframe.multiplier <= 0 or timeframe.multiplier >= anchor or 
+   anchor <= 1440 ? 1 : round(anchor / 1440) : timeframe.isweekly ? 
+   anchor == 0 or timeframe.multiplier <= 0 or timeframe.multiplier >= anchor or 
+   anchor <= 7200 ? 1 : round(anchor / 7200) : timeframe.ismonthly ? 
+   anchor == 0 or timeframe.multiplier <= 0 or timeframe.multiplier >= anchor or 
+   anchor <= 30240 ? 1 : round(anchor / 30240) : 1 : mult
+
+//adjust length with Anchor Multiplier
+ma_len = mult == 1 ? ma_len_ : ma_len_ * mult
+//
+ma_series = variant(ma_type, ma_src, ma_len)
+
+// Get direction based on MA and lookbacklength
+direction = 0
+direction := rising(ma_series, lookbackDirection) ? 1 : falling(ma_series, lookbackDirection) ? -1 : nz(direction[1], 1)
+
+// - /SERIES VARIABLES
+
+// - PLOTTING
+
+// Plot MA series and color it according too direction
+pcol = direction > 0 ? color.lime : direction < 0 ? color.red : na
+plot(show_ma ? ma_series : na, title="MA Plot", color=pcol, linewidth=2, style=plot.style_line, join=true, transp=0)
+plot(sdots and change(direction) ? ma_series[1] : na, title="MA Dots Color", style=plot.style_circles, linewidth=6, color=pcol,transp=0, offset=-1)
+plot(sdots and change(direction) ? ma_series[1] : na, title="MA Dots Black", style=plot.style_circles, linewidth=4, color=color.white,transp=0, offset=-1)
+
+// Colour bars according to the close position relative to the MA selected
+// Or Grab candle colour code bars according to the close position relative to the MA selected
+// Colour bars according to the close position relative to the PAC selected.
+grabcol = useGrabClr ? open <= close ? direction > 0 ? lime100 : red100 : 
+   direction < 0 ? darkred100 : green100 : na
+stdcol = useGrabClr ? na : direction > 0 ? lime100 : direction < 0 ? red100 : na
+
+barcolor(col_bars ? useGrabClr ? grabcol : stdcol : na, title="Bar Colours")
+bgcolor(col_bg ? direction==-1 ? color.red : color.lime : na, title="BG Color", transp=90)
+
+// - /PLOTTING
+
+// - ALERTS
+
+alertcondition(change(direction) and direction==1, title="MA UP", message="MA UP")
+alertcondition(change(direction) and direction==-1, title="MA DOWN", message="MA DOWN")
+// /eof
