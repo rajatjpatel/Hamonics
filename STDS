@@ -1,0 +1,344 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Koalems
+
+// @version=5
+
+// ***************************************************************************************************
+//
+//
+// CREDITS
+//
+//
+// ***************************************************************************************************
+// Blended my own sessions indicator and "FX Market Sessions" by boidoki
+
+// ***************************************************************************************************
+//
+//
+// CONSTANTS
+//
+//
+// ***************************************************************************************************
+var colorTransparent = color.new(color.white, 100)
+var maxBoxes  = 500
+var maxLabels = 500
+
+// ***************************************************************************************************
+//
+//
+// TYPE
+//
+//
+// ***************************************************************************************************
+indicator(
+  title             = 'Fusion: Forex sessions with daylight savings',
+  shorttitle        = 'Fusion: Fx Sessions',
+  max_boxes_count   = maxBoxes,
+  max_labels_count  = maxLabels,
+  overlay           = true)
+
+// ***************************************************************************************************
+//
+//
+// INPUTS
+//
+//
+// ***************************************************************************************************
+TooltipTimezones = 'https://en.wikipedia.org/wiki/List_of_tz_database_time_zones'
+
+// ***************************************************************************************************
+// 7000 Inputs - Indicator: Session
+// ***************************************************************************************************
+
+Group7000 = '7000 Show'
+sessionsShow                          = input.bool(true,                            group=Group7000,                                                                  title='Sessions')
+sessionsShowOnMainChart               = input.bool(true,                            group=Group7000,                                                                  title='  On main chart', tooltip="If you are on the main chart then make sure this is checked.\n\nWhen you want to use this separate from your main chart ucheck it.\n\nOn the main chart we can show:\n* The legend\n* Boxes\n* Labels\n* Breakout check area\n* Start & end labels\n\nOn any other chart we can show:\n* The legend\n* Horizontal bars representing the sessions.\n\nAll objects are color coded and the legend shows the color codes.")
+
+sessShow = sessionsShow and timeframe.isintraday and timeframe.multiplier <= 60 and timeframe.multiplier >= 3
+
+sessShowBox                           = input.bool(true,                            group=Group7000,                                                                  title='  Boxes')               and sessShow and sessionsShowOnMainChart
+sessShowLabel                         = input.bool(true,                            group=Group7000,                                                                  title='  Labels')              and sessShow and sessionsShowOnMainChart
+sessShowOpeningRange                  = input.bool(false,                           group=Group7000,                                                                  title='  Breakout check area') and sessShow and sessionsShowOnMainChart
+sessShowSessionEnds                   = input.bool(false,                           group=Group7000,                                                                  title='  Start/end labels')    and sessShow and sessionsShowOnMainChart
+sessLedgendShow                       = input.bool(false,                           group=Group7000,                                                                  title="  Show legend")         and sessShow
+sessLedgendTransparency               = input.bool(true,                            group=Group7000,                                                                  title="    Legend match translucency")
+
+sessFrankfurtColor                    = input.color(#7e57c2,                        group=Group7000, inline="SRS1",                                                   title="Color")
+sessFrankfurtShow                     = input.bool(true,                            group=Group7000, inline="SRS1",                                                   title="Frankfurt")
+sessLondonColor                       = input.color(#4caf50,                        group=Group7000, inline="SRS2",                                                   title='Color')
+sessLondonShow                        = input.bool(true,                            group=Group7000, inline="SRS2",                                                   title="London")
+sessNewYorkColor                      = input.color(#f44336,                        group=Group7000, inline="SRS3",                                                   title="Color")
+sessNewYorkShow                       = input.bool(true,                            group=Group7000, inline="SRS3",                                                   title="New York")
+sessSydneyColor                       = input.color(#00bcd4,                        group=Group7000, inline="SRS4",                                                   title="Color")
+sessSydneyShow                        = input.bool(true,                            group=Group7000, inline="SRS4",                                                   title="Sydney")
+sessTokyoColor                        = input.color(#f57f17,                        group=Group7000, inline="SRS5",                                                   title="Color")
+sessTokyoShow                         = input.bool(true,                            group=Group7000, inline="SRS5",                                                   title="Tokyo")
+
+sessTransparency                      = input.int(45,                               group=Group7000,                                                                  title="Transparency")
+sessLineWidth                         = input.int(20,                               group=Group7000,                                                                  title="Line width")
+sessLedgendLocation                   = input.string("Bottom Left",                 group=Group7000,                                                                  title="Legend location", options=["Top Left", "Top Center", "Top Right", "Middle Left", "Middle Center", "Middle Right", "Bottom Left", "Bottom Center", "Bottom Right"])
+
+// ***************************************************************************************************
+// Inputs - Indicator: Session - DETAILS
+// ***************************************************************************************************
+
+// When using Timezones the form GMT+n does not take daylight savings into account however the form
+// "America/Phoenix" does. This is why our input for the timezone variables like "sessSydneyTz" are
+// strings like "Australia/Sydney", i.e., we don't have to worry about daylight savings ourselves.
+
+Group7020 = '7020 Session: Frankfurt'
+sessFrankfurtLabel                    = input.string('Frankfurt',                   group=Group7020,                                                                  title='Label')
+sessFrankfurtTz                       = input.string('Europe/Berlin',               group=Group7020,                                                                  title='Timezone', tooltip=TooltipTimezones)
+sessFrankfurtPeriod                   = input.session('0800-1601',                  group=Group7020,                                                                  title='Period')
+
+Group7030 = '7030 Session: London'
+sessLondonLabel                       = input.string('London',                      group=Group7030,                                                                  title='Label')
+sessLondonTz                          = input.string('Europe/London',               group=Group7030,                                                                  title='Timezone', tooltip=TooltipTimezones)
+sessLondonPeriod                      = input.session('0800-1601',                  group=Group7030,                                                                  title='Period')
+
+Group7040 = '7040 Session: New York'
+sessNewYorkLabel                      = input.string('New York',                    group=Group7040,                                                                  title='Label')
+sessNewYorkTz                         = input.string('America/New_York',            group=Group7040,                                                                  title='Timezone', tooltip=TooltipTimezones)
+sessNewYorkPeriod                     = input.session('0800-1601',                  group=Group7040,                                                                  title='Period')
+
+Group7050 = '7050 Session: Sydney'
+sessSydneyLabel                       = input.string('Sydney',                      group=Group7050,                                                                  title='Label')
+sessSydneyTz                          = input.string('Australia/Sydney',            group=Group7050,                                                                  title='Timezone', tooltip=TooltipTimezones)
+sessSydneyPeriod                      = input.session('0800-1601',                  group=Group7050,                                                                  title='Period')
+
+Group7060 = '7060 Session: Tokyo'
+sessTokyoLabel                        = input.string('Tokyo',                       group=Group7060,                                                                  title='Label')
+sessTokyoTz                           = input.string('Asia/Tokyo',                  group=Group7060,                                                                  title='Timezone', tooltip=TooltipTimezones)
+sessTokyoPeriod                       = input.session('0800-1601',                  group=Group7060,                                                                  title='Period')
+
+Group7070 = '7070 Session: Show & Styles'
+sessRectLineStyle                     = input.string(line.style_dashed,             group=Group7070,                                                                  title='Line style', options=[line.style_solid, line.style_dotted, line.style_dashed])
+sessRectLineWidth                     = input.int(1,                                group=Group7070, minval=1,                                                        title='Line width')
+sessLabelSize                         = input.string(size.normal,                   group=Group7070,                                                                  title='Label size', options=[size.auto, size.tiny, size.small, size.normal, size.large, size.huge])
+sessShowBgColor                       = input.bool(true,                            group=Group7070,                                                                  title='Background colors')
+sessRectBgOpacity                     = input.int(94,                               group=Group7070, minval=0, maxval=100, step=1,                                    title='Background opacity')
+
+Group7080 = '7080 Session: Opening Range'
+sessLookBackOrMins                    = input.int(30,                               group=Group7080, minval=1, step=1,                                                title='Breakout - start gap', tooltip='Minutes')
+
+// ***************************************************************************************************
+//
+//
+// INDICATOR
+//
+//
+// ***************************************************************************************************
+
+// Constants
+var sessLookbackMins = 12 * 60
+var sessLookbackOrBars = math.floor(sessLookBackOrMins / timeframe.multiplier)
+
+// Functions
+IsInSession(session) =>
+    IsInSession = not na(session)
+    IsInSession
+
+TableLocation(loc) =>
+  loc == 'Top Left'      ? position.top_left      :
+  loc == 'Top Center'    ? position.top_center    :
+  loc == 'Top Right'     ? position.top_right     :
+  loc == 'Middle Left'   ? position.middle_left   :
+  loc == 'Middle Center' ? position.middle_center :
+  loc == 'Middle Right'  ? position.middle_right  :
+  loc == 'Bottom Left'   ? position.bottom_left   :
+  loc == 'Bottom Center' ? position.bottom_center :
+  loc == 'Bottom Right'  ? position.bottom_right  : na
+
+CreateSessionRect(sessionTime, sessionDuration, labelText, col, sessShow) =>
+    bool result = false
+    bool shouldBeDelete = false
+    bool is_inSession = IsInSession(sessionTime)
+
+    if is_inSession
+        result := true
+        int minsLen = math.round(sessionDuration / timeframe.multiplier)
+        int begin_index = 0
+
+        for i = 1 to minsLen by 1
+            if not na(sessionTime[i])
+                begin_index += 1
+                begin_index
+
+        int pR = bar_index
+        int pL = bar_index - begin_index
+
+        float pT = 0
+        float pB = high
+        for i = 1 to begin_index by 1
+            pT := math.max(high[i], pT)
+            pB := math.min(low[i], pB)
+            pB
+
+        float range_1 = pT - pB
+
+        var label line_label = na
+        var box my_box = na
+
+        if sessShowBox
+            if not is_inSession[1]
+                my_box := switch col
+                    sessFrankfurtColor => box.new(pR, pT, pL, pB, border_color=col, border_width=sessRectLineWidth, border_style=sessRectLineStyle, bgcolor=color.new(sessFrankfurtColor, 99))
+                    sessLondonColor    => box.new(pR, pT, pL, pB, border_color=col, border_width=sessRectLineWidth, border_style=sessRectLineStyle, bgcolor=color.new(sessLondonColor, 99))
+                    sessNewYorkColor   => box.new(pR, pT, pL, pB, border_color=col, border_width=sessRectLineWidth, border_style=sessRectLineStyle, bgcolor=color.new(sessNewYorkColor, 99))
+                    sessSydneyColor    => box.new(pR, pT, pL, pB, border_color=col, border_width=sessRectLineWidth, border_style=sessRectLineStyle, bgcolor=color.new(sessSydneyColor, 99))
+                    sessTokyoColor     => box.new(pR, pT, pL, pB, border_color=col, border_width=sessRectLineWidth, border_style=sessRectLineStyle, bgcolor=color.new(sessTokyoColor, 99))
+                    => na
+
+            if sessShow and is_inSession
+                box.set_left(my_box, pL)
+                box.set_right(my_box, pR)
+                box.set_top(my_box, pT)
+                box.set_bottom(my_box, pB)
+
+            if shouldBeDelete
+                box.delete(my_box[1])
+
+        if sessShow and sessShowLabel
+            if not is_inSession[1]
+                line_label := label.new(pL, pT, labelText, textcolor=col, color=colorTransparent, style=label.style_none, size=sessLabelSize, textalign=text.align_left)
+                line_label
+
+            if is_inSession
+                label.set_xy(line_label, pL, pT)
+
+            if shouldBeDelete
+                label.delete(line_label[1])
+    result
+
+SetSessionHL(times, timesOrCalc) =>
+    float h = na
+    float l = na
+    h := times ? h[1] : na
+    l := times ? l[1] : na
+
+    if timesOrCalc
+        for i = 0 to sessLookbackOrBars by 1
+            h := i == 0 ? high : math.max(high[i], h)
+            l := i == 0 ? low  : math.min(low[i],  l)
+    [h, l]
+
+MakeBreakoutCheckAreaBox(h, l, condition) =>
+    box b = na
+    if condition
+        b := box.new(
+          bar_index, h, 
+          bar_index, l, 
+          border_color  = color.new(color.silver, 50),
+          border_width  = 1,
+          border_style  = line.style_solid,
+          bgcolor       = color.new(color.silver, 94))
+    b
+
+AdjustBreakoutCheckAreaBox(B, h) =>
+    if not na(h)
+        box.set_right(B, bar_index)
+
+// **********************************************************************
+// MAIN
+// **********************************************************************
+sessFrankfurtTimes  = time(timeframe.period, sessFrankfurtPeriod, sessFrankfurtTz)
+sessLondonTimes     = time(timeframe.period, sessLondonPeriod, sessLondonTz)
+sessNewYorkTimes    = time(timeframe.period, sessNewYorkPeriod, sessNewYorkTz)
+sessSydneyTimes     = time(timeframe.period, sessSydneyPeriod, sessSydneyTz)
+sessTokyoTimes      = time(timeframe.period, sessTokyoPeriod, sessTokyoTz)
+
+sessFrankfurtTimesOrCalc  = sessFrankfurtTimes[sessLookbackOrBars]  and na(sessFrankfurtTimes[sessLookbackOrBars + 1])
+sessLondonTimesOrCalc     = sessLondonTimes[sessLookbackOrBars]     and na(sessLondonTimes[sessLookbackOrBars + 1])
+sessNewYorkTimesOrCalc    = sessNewYorkTimes[sessLookbackOrBars]    and na(sessNewYorkTimes[sessLookbackOrBars + 1])
+sessSydneyTimesOrCalc     = sessSydneyTimes[sessLookbackOrBars]     and na(sessSydneyTimes[sessLookbackOrBars + 1])
+sessTokyoTimesOrCalc      = sessTokyoTimes[sessLookbackOrBars]      and na(sessTokyoTimes[sessLookbackOrBars + 1])
+
+[sessFrankfurt_h, sessFrankfurt_l]  = SetSessionHL(sessFrankfurtTimes,  sessFrankfurtTimesOrCalc)
+[sessLondon_h,    sessLondon_l]     = SetSessionHL(sessLondonTimes,     sessLondonTimesOrCalc)
+[sessNewYork_h,   sessNewYork_l]    = SetSessionHL(sessNewYorkTimes,    sessNewYorkTimesOrCalc)
+[sessSydney_h,    sessSydney_l]     = SetSessionHL(sessSydneyTimes,     sessSydneyTimesOrCalc)
+[sessTokyo_h,     sessTokyo_l]      = SetSessionHL(sessTokyoTimes,      sessTokyoTimesOrCalc)
+
+sessFrankfurtStarted  =    sessFrankfurtTimes  and na(sessFrankfurtTimes[1])
+sessLondonStarted     =    sessLondonTimes     and na(sessLondonTimes[1])
+sessNewYorkStarted    =    sessNewYorkTimes    and na(sessNewYorkTimes[1])
+sessSydneyStarted     =    sessSydneyTimes     and na(sessSydneyTimes[1])
+sessTokyoStarted      =    sessTokyoTimes      and na(sessTokyoTimes[1])
+sessFrankfurtEnded    = na(sessFrankfurtTimes) and    sessFrankfurtTimes[1]
+sessLondonEnded       = na(sessLondonTimes)    and    sessLondonTimes[1]
+sessNewYorkEnded      = na(sessNewYorkTimes)   and    sessNewYorkTimes[1]
+sessSydneyEnded       = na(sessSydneyTimes)    and    sessSydneyTimes[1]
+sessTokyoEnded        = na(sessTokyoTimes)     and    sessTokyoTimes[1]
+
+// Session end
+sessASessionEnded = sessFrankfurtEnded or sessLondonEnded or sessNewYorkEnded or sessSydneyEnded or sessTokyoEnded
+
+// We are in a session
+sessInSession = not na(sessFrankfurtTimes) or not na(sessLondonTimes) or not na(sessNewYorkTimes) or not na(sessSydneyTimes) or not na(sessTokyoTimes)
+
+// ***************************************************************************************************
+//
+//
+// SHOW
+//
+//
+// ***************************************************************************************************
+if sessLedgendShow
+    var infoPos = TableLocation(sessLedgendLocation)
+    var info = table.new(
+      infoPos, 
+      5, 1, 
+      frame_color   = color.gray,   frame_width   = 1, 
+      border_color  = color.black,  border_width  = 1)
+    var transl = sessLedgendTransparency ? sessTransparency : 0
+
+    table.cell(info, 0, 0, 'Frankfurt', text_color=color.white, text_size=size.small, text_halign=text.align_left, bgcolor=color.new(sessFrankfurtColor  , transl))
+    table.cell(info, 1, 0, 'London'   , text_color=color.white, text_size=size.small, text_halign=text.align_left, bgcolor=color.new(sessLondonColor     , transl))
+    table.cell(info, 2, 0, 'New York' , text_color=color.white, text_size=size.small, text_halign=text.align_left, bgcolor=color.new(sessNewYorkColor    , transl))
+    table.cell(info, 3, 0, 'Sydney'   , text_color=color.white, text_size=size.small, text_halign=text.align_left, bgcolor=color.new(sessSydneyColor     , transl))
+    table.cell(info, 4, 0, 'Tokyo'    , text_color=color.white, text_size=size.small, text_halign=text.align_left, bgcolor=color.new(sessTokyoColor      , transl))
+
+// ***************************************************************************************************
+// SHOW - On main chart
+// ***************************************************************************************************
+CreateSessionRect(sessFrankfurtTimes, sessLookbackMins, sessFrankfurtLabel, sessFrankfurtColor, sessShow and sessFrankfurtShow)
+CreateSessionRect(sessLondonTimes,    sessLookbackMins, sessLondonLabel,    sessLondonColor,    sessShow and sessLondonShow)
+CreateSessionRect(sessNewYorkTimes,   sessLookbackMins, sessNewYorkLabel,   sessNewYorkColor,   sessShow and sessNewYorkShow)
+CreateSessionRect(sessSydneyTimes,    sessLookbackMins, sessSydneyLabel,    sessSydneyColor,    sessShow and sessSydneyShow)
+CreateSessionRect(sessTokyoTimes,     sessLookbackMins, sessTokyoLabel,     sessTokyoColor,     sessShow and sessTokyoShow)
+
+if sessShowOpeningRange
+    sessFrankfurtBox  = MakeBreakoutCheckAreaBox(sessFrankfurt_h,  sessFrankfurt_l,  sessFrankfurtShow  and sessFrankfurtTimes  and sessFrankfurtTimesOrCalc)
+    sessLondonBox     = MakeBreakoutCheckAreaBox(sessLondon_h,     sessLondon_l,     sessLondonShow     and sessLondonTimes     and sessLondonTimesOrCalc)
+    sessNewYorkBox    = MakeBreakoutCheckAreaBox(sessNewYork_h,    sessNewYork_l,    sessNewYorkShow    and sessNewYorkTimes    and sessNewYorkTimesOrCalc)
+    sessSydneyBox     = MakeBreakoutCheckAreaBox(sessSydney_h,     sessSydney_l,     sessSydneyShow     and sessSydneyTimes     and sessSydneyTimesOrCalc)
+    sessTokyoBox      = MakeBreakoutCheckAreaBox(sessTokyo_h,      sessTokyo_l,      sessTokyoShow      and sessTokyoTimes      and sessTokyoTimesOrCalc)
+
+    AdjustBreakoutCheckAreaBox(sessFrankfurtBox,  sessFrankfurt_h)
+    AdjustBreakoutCheckAreaBox(sessLondonBox,     sessLondon_h)
+    AdjustBreakoutCheckAreaBox(sessNewYorkBox,    sessNewYork_h)
+    AdjustBreakoutCheckAreaBox(sessSydneyBox,     sessSydney_h)
+    AdjustBreakoutCheckAreaBox(sessTokyoBox,      sessTokyo_h)
+
+plotshape(sessShowSessionEnds and sessFrankfurtStarted  and sessFrankfurtShow,  color=color.new(sessFrankfurtColor, 45), text='Start', style=shape.labeldown, location=location.bottom, size=size.small, textcolor=color.white, title='Session start: Frankfurt')
+plotshape(sessShowSessionEnds and sessLondonStarted     and sessLondonShow,     color=color.new(sessLondonColor,    45), text='Start', style=shape.labeldown, location=location.bottom, size=size.small, textcolor=color.white, title='Session start: London')
+plotshape(sessShowSessionEnds and sessNewYorkStarted    and sessNewYorkShow,    color=color.new(sessNewYorkColor,   45), text='Start', style=shape.labeldown, location=location.bottom, size=size.small, textcolor=color.white, title='Session start: New York')
+plotshape(sessShowSessionEnds and sessSydneyStarted     and sessSydneyShow,     color=color.new(sessSydneyColor,    45), text='Start', style=shape.labeldown, location=location.bottom, size=size.small, textcolor=color.white, title='Session start: Sydney')
+plotshape(sessShowSessionEnds and sessTokyoStarted      and sessTokyoShow,      color=color.new(sessTokyoColor,     45), text='Start', style=shape.labeldown, location=location.bottom, size=size.small, textcolor=color.white, title='Session start: Tokyo')
+
+plotshape(sessShowSessionEnds and sessFrankfurtEnded    and sessFrankfurtShow,  color=color.new(sessFrankfurtColor, 45), text='End',   style=shape.labeldown, location=location.bottom, size=size.small, textcolor=color.white, title='Session end: Frankfurt')
+plotshape(sessShowSessionEnds and sessLondonEnded       and sessLondonShow,     color=color.new(sessLondonColor,    45), text='End',   style=shape.labeldown, location=location.bottom, size=size.small, textcolor=color.white, title='Session end: London')
+plotshape(sessShowSessionEnds and sessNewYorkEnded      and sessNewYorkShow,    color=color.new(sessNewYorkColor,   45), text='End',   style=shape.labeldown, location=location.bottom, size=size.small, textcolor=color.white, title='Session end: New York')
+plotshape(sessShowSessionEnds and sessSydneyEnded       and sessSydneyShow,     color=color.new(sessSydneyColor,    45), text='End',   style=shape.labeldown, location=location.bottom, size=size.small, textcolor=color.white, title='Session end: Sydney')
+plotshape(sessShowSessionEnds and sessTokyoEnded        and sessTokyoShow,      color=color.new(sessTokyoColor,     45), text='End',   style=shape.labeldown, location=location.bottom, size=size.small, textcolor=color.white, title='Session end: Tokyo')
+
+// ***************************************************************************************************
+// SHOW - Off main chart
+// ***************************************************************************************************
+offMainChart = not sessionsShowOnMainChart and sessShow
+
+plot(sessFrankfurtShow and offMainChart ? (sessFrankfurtTimes  ? 10 : na) : na, style=plot.style_linebr, linewidth=sessLineWidth, color=color.new(sessFrankfurtColor, sessTransparency), title="Frankfurt")
+plot(sessLondonShow    and offMainChart ? (sessLondonTimes     ?  8 : na) : na, style=plot.style_linebr, linewidth=sessLineWidth, color=color.new(sessLondonColor ,   sessTransparency), title="London")
+plot(sessNewYorkShow   and offMainChart ? (sessNewYorkTimes    ?  6 : na) : na, style=plot.style_linebr, linewidth=sessLineWidth, color=color.new(sessNewYorkColor,   sessTransparency), title="New York")
+plot(sessSydneyShow    and offMainChart ? (sessSydneyTimes     ?  4 : na) : na, style=plot.style_linebr, linewidth=sessLineWidth, color=color.new(sessSydneyColor ,   sessTransparency), title="Sydney")
+plot(sessTokyoShow     and offMainChart ? (sessTokyoTimes      ?  2 : na) : na, style=plot.style_linebr, linewidth=sessLineWidth, color=color.new(sessTokyoColor  ,   sessTransparency), title="Tokyo")
