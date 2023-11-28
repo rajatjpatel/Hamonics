@@ -1,0 +1,19 @@
+/@version=3
+study("Modified Gann HiLo Activator",overlay=true)
+length = input(50),mult = input(1,minval=0,maxval=1),Method = input("SMA",options=["SMA","Median"])
+//----
+Avg(x)=> Method == "SMA" ? sma(x,length) : percentile_linear_interpolation(x,length,50) 
+//----
+a = highest(length) - max(close,open)
+b = min(close,open) - lowest(length)
+c = max(close,open) + a*mult
+d = min(close,open) - b*mult
+//----
+e = Avg(c)
+f = Avg(d)
+g = 0
+g := cross(close,e) ? 1 : cross(close,f) ? 0 : nz(g[1])
+//---
+hilo = g*f+(1-g)*e
+css = g == 1 ? #0080FF : #FE2E64
+plot(hilo,color=css,linewidth=2,transp=0)
