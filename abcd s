@@ -1,0 +1,131 @@
+// @version=4
+// @author=Daveatt - BEST
+
+// ABCD Pattern Strat
+
+StrategyName        = "BEST ABCD Pattern Strategy"
+ShortStrategyName   = "BEST ABCD Pattern Strategy" 
+
+strategy(title=StrategyName, shorttitle=ShortStrategyName, overlay=true, 
+ pyramiding=2, default_qty_value=100, precision=7, currency=currency.USD,
+ commission_value=0.2,commission_type=strategy.commission.percent, initial_capital=1000000,
+ default_qty_type=strategy.fixed)
+
+filterBW = input(false, title="filter Bill Williams Fractals?")
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////// UTILITIES ///////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+//  ||-----------------------------------------------------------------------------------------------------||
+//  ||---   Fractal Recognition Functions:  ---------------------------------------------------------------||
+isRegularFractal(mode, _high, _low) =>
+    ret = mode == 1 ? _high[4] < _high[3] and _high[3] < _high[2] and _high[2] > _high[1] and _high[1] > _high[0] :
+     mode == -1 ? _low[4] > _low[3] and _low[3] > _low[2] and _low[2] < _low[1] and _low[1] < _low[0] : false
+
+isBWFractal(mode, _high, _low) =>
+    ret = mode == 1 ? _high[4] < _high[2] and _high[3] <= _high[2] and _high[2] >= _high[1] and _high[2] > _high[0] :
+     mode == -1 ? _low[4] > _low[2] and _low[3] >= _low[2] and _low[2] <= _low[1] and _low[2] < _low[0] : false
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+////////////////////////////// ABCD PATTERN ///////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+f_abcd()=>
+
+    _r = timeframe.period
+    _g = barmerge.gaps_off
+    _l = barmerge.lookahead_on
+
+    _high = high
+    _low = low
+
+    filteredtopf = filterBW ? isRegularFractal(1, _high, _low) : isBWFractal(1, _high, _low)
+    filteredbotf = filterBW ? isRegularFractal(-1, _high, _low) : isBWFractal(-1, _high, _low)
+
+    //  ||---   ZigZag:
+    istop = filteredtopf
+    isbot = filteredbotf
+    topcount = barssince(istop)
+    botcount = barssince(isbot)
+
+    zigzag = (istop and topcount[1] > botcount[1] ? _high[2] :
+     isbot and topcount[1] < botcount[1] ? _low[2] : na)
+
+    x = valuewhen(zigzag, zigzag, 4) 
+    a = valuewhen(zigzag, zigzag, 3) 
+    b = valuewhen(zigzag, zigzag, 2) 
+    c = valuewhen(zigzag, zigzag, 1) 
+    d = valuewhen(zigzag, zigzag, 0)
+
+    xab = (abs(b-a)/abs(x-a))
+    xad = (abs(a-d)/abs(x-a))
+    abc = (abs(b-c)/abs(a-b))
+    bcd = (abs(c-d)/abs(b-c))
+
+    // ABCD Part
+    _abc = abc >= 0.382 and abc <= 0.886
+    _bcd = bcd >= 1.13 and bcd <= 2.618
+    
+    _bull_abcd = _abc and _bcd and d < c 
+    _bear_abcd = _abc and _bcd and d > c
+
+    _bull   = _bull_abcd and not _bull_abcd[1]
+    _bear   = _bear_abcd and not _bear_abcd[1]
+
+    [_bull, _bear, zigzag]
+
+lapos_x = timenow + round(change(time)*12)
+
+[isLong, isShort, zigzag]  = f_abcd()
+
+plot(zigzag, title= 'ZigZag', color=color.black, offset=-2)
+plotshape(isLong, style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), size=size.normal, text="ABCD", textcolor=color.white)
+plotshape(isShort, style=shape.labeldown, location=location.abovebar, color=color.new(color.maroon, 0), size=size.normal, text="ABCD", textcolor=color.white)
+
+
+long_entry_price    = valuewhen(isLong, close, 0)
+short_entry_price   = valuewhen(isShort, close, 0)
+
+sinceNUP = barssince(isLong)
+sinceNDN = barssince(isShort)
+
+buy_trend   = sinceNDN > sinceNUP
+sell_trend  = sinceNDN < sinceNUP
+
+
+//////////////////////////
+//* Profit Component *//
+//////////////////////////
+
+//////////////////////////// MinTick ///////////////////////////
+fx_pips_value = syminfo.type == "forex" ? syminfo.mintick*10 : 1
+
+input_tp_pips = input(100, "Backtest Profit Goal (in USD)",minval=0)*fx_pips_value
+input_sl_pips = input(20, "Backtest STOP Goal (in USD)",minval=0)*fx_pips_value
+
+tp = buy_trend? long_entry_price + input_tp_pips : short_entry_price - input_tp_pips
+sl = buy_trend? long_entry_price - input_sl_pips : short_entry_price + input_sl_pips
+
+plot_tp = buy_trend and high[1] <= tp ? tp : sell_trend and low[1] <= tp ? tp : na
+plot_sl = buy_trend and low[1] >= sl ? sl : sell_trend and high[1] >= sl ? sl : na
+
+plot(plot_tp, title="TP", style=plot.style_circles, linewidth=3, color=color.blue)
+plot(plot_sl, title="SL", style=plot.style_circles, linewidth=3, color=color.red)
+
+longClose   = isShort
+shortClose  = isLong
+
+
+strategy.entry("Long", 1, when=isLong)
+// strategy.close("Long", when=longClose )
+strategy.exit("XL","Long", limit=tp,  when=buy_trend, stop=sl)
+
+
+strategy.entry("Short", 0,  when=isShort)
+// strategy.close("Short", when=shortClose )
+strategy.exit("XS","Short", when=sell_trend, limit=tp, stop=sl)
